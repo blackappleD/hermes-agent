@@ -20,8 +20,8 @@ def ensure_original_spirit_identity(
         return existing
 
     cfg = load_linz_world_config(config)
-    svc = service or default_service(config)
     try:
+        svc = service or default_service(config)
         result = svc.register_original_spirit(repo.profile_id, cfg.os_name)
     except LinzWorldServiceError as exc:
         return repo.save_failed_identity(

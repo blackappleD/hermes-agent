@@ -57,3 +57,20 @@ def test_run_agent_default_identity_gate_blocks_persona_load(monkeypatch):
 
     with pytest.raises(RuntimeError, match="linz identity blocked"):
         AIAgent(model="test", skip_context_files=True, skip_memory=True)
+
+
+def test_missing_service_url_saves_failed_identity_diagnostics(linz_home):
+    repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
+    identity = ensure_original_spirit_identity(
+        repo,
+        service=None,
+        config={"linz_world": {"service_url": ""}},
+    )
+
+    assert identity.registration_state.value == "failed"
+    assert "service_url" in identity.last_error
+    assert "Retry after Linz World identity registry is reachable." == identity.next_action
+
+    saved = repo.get_identity()
+    assert saved is not None
+    assert saved.registration_state.value == "failed"
