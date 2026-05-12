@@ -69,7 +69,7 @@ def linz_relationship(args=None, **kwargs) -> str:
     counterparty_id = str(args.get("counterparty_id") or "")
     summary = str(args.get("summary") or "")
     if action == "read":
-        return _result({"success": True, "relationships": read_relationships(counterparty_id, repository=LinzStateRepository())})
+        return _result(read_relationships(counterparty_id, repository=LinzStateRepository()))
     if action == "add_active":
         return _result(add_active_relationship(counterparty_id, summary, repository=LinzStateRepository()))
     return _result({"success": False, "error": {"code": "invalid_action", "message": "Use action=read or action=add_active."}})

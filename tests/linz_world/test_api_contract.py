@@ -218,3 +218,49 @@ def test_memory_events_request_includes_required_agent_id_and_fields(monkeypatch
         "operator_id",
     }
     assert calls[0][2]["agent_id"] == "agent-1"
+
+
+def test_relationship_projection_response_preserves_memory_projection(monkeypatch):
+    calls = []
+
+    def fake_request(method, url, json=None, headers=None, timeout=None):
+        calls.append((method, url, json, headers))
+        return _Response(
+            {
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "projection_id": "proj_1",
+                    "agent_id": "agent-1",
+                    "projection_type": "relationships",
+                    "source_version": 7,
+                    "content": {
+                        "summary": "trusted collaborators",
+                        "relationships": [
+                            {
+                                "relationship_id": "rel_1",
+                                "counterparty_id": "actor_1",
+                                "state": "ACTIVE",
+                                "summary": "trusted collaborator",
+                            }
+                        ],
+                    },
+                    "generated_at": "2026-05-12T00:00:00Z",
+                    "generated_by": "linz-world",
+                },
+            }
+        )
+
+    monkeypatch.setattr("httpx.request", fake_request)
+    token_ref = store_runtime_secret("event_token", "event-token")
+
+    result = HttpLinzWorldService("http://linz.test").read_relationships(
+        {"agent_id": "agent-1"},
+        token_ref,
+    )
+
+    assert calls[0][1] == "http://linz.test/api/v1/memory/projections/agent-1/relationships"
+    assert result["relationships"][0]["relationship_id"] == "rel_1"
+    assert result["projection"]["projection_id"] == "proj_1"
+    assert result["projection"]["projection_type"] == "relationships"
+    assert result["projection"]["content"]["summary"] == "trusted collaborators"

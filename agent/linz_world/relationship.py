@@ -8,15 +8,19 @@ from .governance import preflight_side_effect
 from .models import RelationshipRecord
 
 
-def read_relationships(counterparty_id: str = "", repository: LinzStateRepository | None = None, service=None) -> list[dict]:
+def read_relationships(counterparty_id: str = "", repository: LinzStateRepository | None = None, service=None) -> dict:
     repo = repository or LinzStateRepository()
     svc = service or default_service()
     try:
         identity = repo.get_identity()
         result = svc.read_relationships(identity.__dict__ if identity else {}, repo.get_login().token_ref, counterparty_id)
-        return list(result.get("relationships") or [])
+        return {
+            "success": True,
+            "relationships": list(result.get("relationships") or []),
+            "projection": dict(result.get("projection") or {}),
+        }
     except Exception:
-        return repo.relationships()
+        return {"success": True, "relationships": repo.relationships(), "projection": {}}
 
 
 def add_active_relationship(counterparty_id: str, summary: str = "", repository: LinzStateRepository | None = None, service=None) -> dict:

@@ -295,13 +295,7 @@ class HttpLinzWorldService(LocalLinzWorldService):
             f"/memory/projections/{agent_id}/relationships",
             headers={"Authorization": f"Bearer {token}"} if token else None,
         )
-        relationships = data.get("relationships") or []
-        if counterparty_id and isinstance(relationships, list):
-            relationships = [
-                item for item in relationships
-                if isinstance(item, dict) and str(item.get("counterparty_id") or "") == counterparty_id
-            ]
-        return {"relationships": relationships}
+        return _relationship_projection_summary(data, counterparty_id)
 
     def add_active_relationship(self, token_ref: str, counterparty_id: str, summary: str = "") -> dict[str, Any]:
         raise LinzWorldServiceError("unsupported_relationship_mutation", "No confirmed Linz World ACTIVE relationship mutation route exists.")
@@ -337,6 +331,38 @@ def derive_authorization_summary(
         "allowed_capabilities": ["publish", "compute", "memory_sink", "relationship"],
         "credential_id": str(credential.get("id") or refreshed.get("credentialId") or ""),
     }
+
+
+def _relationship_projection_summary(data: Any, counterparty_id: str = "") -> dict[str, Any]:
+    if not isinstance(data, dict):
+        raise LinzWorldServiceError("invalid_response", "Linz World relationship projection response missing object data.")
+    content = data.get("content") if isinstance(data.get("content"), (dict, list)) else {}
+    if isinstance(content, dict):
+        raw_relationships = content.get("relationships") or content.get("items") or data.get("relationships") or []
+    elif isinstance(content, list):
+        raw_relationships = content
+    else:
+        raw_relationships = data.get("relationships") or []
+    relationships = raw_relationships if isinstance(raw_relationships, list) else []
+    if counterparty_id:
+        relationships = [
+            item for item in relationships
+            if isinstance(item, dict) and str(item.get("counterparty_id") or "") == counterparty_id
+        ]
+    projection = {
+        key: data.get(key)
+        for key in (
+            "projection_id",
+            "agent_id",
+            "projection_type",
+            "source_version",
+            "content",
+            "generated_at",
+            "generated_by",
+        )
+        if key in data
+    }
+    return {"relationships": relationships, "projection": projection}
 
 
 def _string_list(value: Any) -> list[str]:
