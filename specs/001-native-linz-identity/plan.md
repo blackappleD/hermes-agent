@@ -1,7 +1,7 @@
 # 实施计划: Linz World 原生身份与世界接入
 
-**分支**: `001-native-linz-identity` | **日期**: 2026-05-12 | **规范**: [D:\workspace\hermes-agent\specs\001-native-linz-identity\spec.md](D:\workspace\hermes-agent\specs\001-native-linz-identity\spec.md)
-**输入**: 来自 `D:\workspace\hermes-agent\specs\001-native-linz-identity\spec.md` 的功能规范
+**分支**: `feat/88-linz-world-native-identity` | **日期**: 2026-05-12 | **规范**: `specs/001-native-linz-identity/spec.md`
+**输入**: 来自 `specs/001-native-linz-identity/spec.md` 的功能规范
 
 **注意**: 此计划由 `$speckit-plan` 生成，覆盖阶段 0 研究与阶段 1 设计制品；阶段 2 任务拆分由 `$speckit-tasks` 生成。
 
@@ -48,24 +48,24 @@
 ### 文档(此功能)
 
 ```
-D:\workspace\hermes-agent\specs\001-native-linz-identity\
+specs/001-native-linz-identity/
 ├── plan.md
 ├── research.md
 ├── data-model.md
 ├── quickstart.md
-├── contracts\
+├── contracts/
 │   ├── cli.md
 │   ├── config.md
 │   ├── gateway-events.md
 │   ├── tools.md
 │   └── world-service.md
-└── tasks.md              # 由后续 /speckit.tasks 创建
+└── tasks.md
 ```
 
 ### 源代码(仓库根目录)
 
 ```
-D:\workspace\hermes-agent\
+.
 ├── agent\
 │   └── linz_world\
 │       ├── __init__.py
@@ -113,19 +113,20 @@ D:\workspace\hermes-agent\
 
 ## 阶段 0: 研究输出
 
-研究结果写入 [D:\workspace\hermes-agent\specs\001-native-linz-identity\research.md](D:\workspace\hermes-agent\specs\001-native-linz-identity\research.md)。所有技术未知项已收敛为可执行决策，没有剩余未解决澄清项。
+研究结果写入 `specs/001-native-linz-identity/research.md`。所有技术未知项已收敛为可执行决策，没有剩余未解决澄清项。
 
 ## 阶段 1: 设计输出
 
 设计制品:
 
-- [D:\workspace\hermes-agent\specs\001-native-linz-identity\data-model.md](D:\workspace\hermes-agent\specs\001-native-linz-identity\data-model.md)
-- [D:\workspace\hermes-agent\specs\001-native-linz-identity\contracts\config.md](D:\workspace\hermes-agent\specs\001-native-linz-identity\contracts\config.md)
-- [D:\workspace\hermes-agent\specs\001-native-linz-identity\contracts\cli.md](D:\workspace\hermes-agent\specs\001-native-linz-identity\contracts\cli.md)
-- [D:\workspace\hermes-agent\specs\001-native-linz-identity\contracts\tools.md](D:\workspace\hermes-agent\specs\001-native-linz-identity\contracts\tools.md)
-- [D:\workspace\hermes-agent\specs\001-native-linz-identity\contracts\gateway-events.md](D:\workspace\hermes-agent\specs\001-native-linz-identity\contracts\gateway-events.md)
-- [D:\workspace\hermes-agent\specs\001-native-linz-identity\contracts\world-service.md](D:\workspace\hermes-agent\specs\001-native-linz-identity\contracts\world-service.md)
-- [D:\workspace\hermes-agent\specs\001-native-linz-identity\quickstart.md](D:\workspace\hermes-agent\specs\001-native-linz-identity\quickstart.md)
+- `specs/001-native-linz-identity/data-model.md`
+- `specs/001-native-linz-identity/contracts/config.md`
+- `specs/001-native-linz-identity/contracts/cli.md`
+- `specs/001-native-linz-identity/contracts/tools.md`
+- `specs/001-native-linz-identity/contracts/gateway-events.md`
+- `specs/001-native-linz-identity/contracts/world-service.md`
+- `specs/001-native-linz-identity/quickstart.md`
+- `specs/001-native-linz-identity/tasks.md`
 
 ## 设计后章程检查
 
@@ -147,3 +148,13 @@ D:\workspace\hermes-agent\
 | 内建 `agent/linz_world/` 而非 skill/plugin | 身份注册是 agent persona 加载前置条件，未安装 skill 时也必须可用 | plugin/skill 无法可靠承载 core persona fail-closed 行为 |
 | 实时授权 map 校验 | 用户要求每次外部副作用前刷新授权，刷新失败阻断 | 使用缓存授权会降低网络成本，但会扩大越权窗口 |
 | 受限审计 payload + 脱敏摘要双轨 | 需要诊断和证据，同时防止 prompt/普通输出泄露 | 只保存摘要会削弱排错；默认暴露原文违反安全边界 |
+
+## 后续交接说明
+
+- **目标**: 让每个 Hermes profile 原生拥有一个 Linz World original spirit 身份，并在未安装 `linz-world-skill` 时提供身份、登录、授权、事件、发布、世界算力、Soul Memory 和关系能力。
+- **修改范围**: 预计新增 `agent/linz_world/` 领域模块，扩展 `hermes_cli/linz.py`、`hermes_cli/commands.py`、`tools/linz_world_tools.py`、`tools/registry.py`、`toolsets.py`、gateway platform registry 和 `run_agent.py` persona bootstrap 路径。
+- **关键设计**: 身份注册按 Hermes profile 幂等执行；注册失败 fail-closed；外部副作用每次实时刷新授权 map；世界事件可靠保存后 ack，内部处理最多自动重试 3 次；prompt、普通工具结果和默认视图只使用脱敏摘要。
+- **风险与取舍**: fail-closed 会让 Linz World 服务不可用时阻止 persona 加载；实时授权刷新增加延迟但收窄越权窗口；受限审计 payload 增加隐私治理要求但保留诊断证据。
+- **验收标准**: 以 `spec.md` 的 SC-001 到 SC-013 为准，重点验证身份唯一性、注册失败阻断、无旧 skill 导入、授权阻断、事件去重、payload 脱敏、默认不开启自动上线/自动响应/自动发布。
+- **测试计划**: 按 `tasks.md` 先写 `tests/linz_world/` 覆盖身份、授权、事件、工具、CLI、发布和隐私，再执行 `quickstart.md` 中的 targeted regressions。
+- **交接建议**: Reviewer Agent 审查通过后，Builder Agent 应按 `tasks.md` 的 US1 MVP -> US2/US3 -> US4 顺序实现，不要把 NATS SDK 作为必需依赖引入。
