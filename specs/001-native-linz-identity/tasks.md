@@ -131,19 +131,20 @@
 
 - [ ] T043 [P] [US4] Add authorization and governance preflight tests in `tests/linz_world/test_auth_and_authorization.py`
 - [ ] T044 [P] [US4] Add publish success, reject, failure, and uncertain receipt tests in `tests/linz_world/test_publisher.py`
-- [ ] T045 [P] [US4] Add compute, memory, and relationship side-effect tests in `tests/linz_world/test_compute_memory_relationship.py`
+- [ ] T045 [P] [US4] Add compute, memory, and relationship side-effect tests in `tests/linz_world/test_compute_memory_relationship.py`, including missing compute API key reference fail-closed behavior
+- [ ] T045A [P] [US4] Add Linz World compute contract fixtures in `tests/linz_world/test_api_contract.py` covering `Authorization: Bearer <compute_api_key>`, missing/invalid/revoked key 401 envelopes, and successful `data.request_id/os_id/provider/model/choices/reservation/usage` parsing
 - [ ] T046 [P] [US4] Add no-credential-leak regression tests for tools and CLI in `tests/linz_world/test_tools.py`
 
 ### Implementation for US4
 
 - [ ] T047 [US4] Implement real-time authorization refresh for all side effects in `agent/linz_world/auth.py`
 - [ ] T048 [US4] Implement publish request validation, governance, remote call, and receipt persistence in `agent/linz_world/publisher.py`
-- [ ] T049 [US4] Implement world compute invocation with provider summary and receipt in `agent/linz_world/compute.py`
+- [ ] T049 [US4] Implement world compute invocation in `agent/linz_world/compute.py` using a profile-local compute API key secret reference, with request_id receipt, provider/model summary, usage/reservation diagnostics, and no raw key exposure
 - [ ] T050 [US4] Implement Soul Memory write validation with `artifact_ref` and `sink_reason` in `agent/linz_world/memory.py`
 - [ ] T051 [US4] Implement relationship read and ACTIVE mutation governance in `agent/linz_world/relationship.py`
 - [ ] T052 [US4] Update `tools/linz_world_tools.py` to route publish, compute, memory, and relationship calls through governance helpers
 - [ ] T053 [US4] Update `hermes_cli/linz.py` publish path to surface `published`, `rejected`, `failed`, and `uncertain` outcomes
-- [ ] T053A [US4] Align compute with `POST /api/v1/compute/chat` and memory with `/api/v1/memory/seeds`, `/api/v1/memory/soul`, `/api/v1/memory/events`, `/api/v1/memory/projections`, `/api/v1/memory/snapshots`, and `/api/v1/memory/lineage`; block or mark unsupported any publish path that only maps to the current Linz World placeholder `POST /api/v1/event/publish`
+- [ ] T053A [US4] Align compute with current Linz World `POST /api/v1/compute/chat` API-key contract and response fields, and memory with `/api/v1/memory/seeds`, `/api/v1/memory/soul`, `/api/v1/memory/events`, `/api/v1/memory/projections`, `/api/v1/memory/snapshots`, and `/api/v1/memory/lineage`; block or mark unsupported any publish path that only maps to the current Linz World placeholder `POST /api/v1/event/publish`
 
 **Checkpoint**: US4 external side effects are governed and auditable.
 

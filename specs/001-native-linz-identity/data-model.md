@@ -218,24 +218,33 @@ Auditable outcome of a publish request.
 
 ## Entity: World Compute Request
 
-World compute invocation through Linz World login session.
+World compute invocation through the Linz World Compute Gateway using a profile-local compute API key secret reference.
 
 **Fields**
 
 - `request_id`: local unique id.
 - `actor_agent_id`: canonical Linz World `agentId` invoking compute.
+- `compute_api_key_ref`: profile-local secret reference; raw key is never stored in prompt-visible config.
 - `input_summary`: redacted prompt/request summary.
 - `provider_summary`: provider/model or equivalent source summary.
+- `remote_request_id`: `data.request_id` returned by Linz World; primary remote receipt.
+- `remote_os_id`: `data.os_id` returned by Linz World for billing/governance correlation.
+- `reservation_summary`: redacted `data.reservation` summary.
+- `usage_summary`: redacted `data.usage` summary.
+- `choices_summary`: redacted assistant choices summary.
 - `authorization_map_version`: version used for decision.
 - `receipt`: remote or local diagnostic receipt.
-- `status`: `succeeded | rejected | failed`.
+- `status`: `succeeded | blocked | rejected | failed`.
 - `created_at`, `completed_at`: timestamps.
 
 **Validation Rules**
 
-- Must use current login session; raw API keys are invalid input.
+- Must use a configured compute API key secret reference for `Authorization: Bearer <compute_api_key>`; login tokens are not valid compute credentials unless Linz World later adds an explicit exchange/proxy contract.
+- Raw API keys in tool parameters, prompt-visible config, ordinary CLI output, or logs are invalid.
+- Missing compute API key reference blocks the external side effect with a diagnostic.
 - Real-time authorization refresh is required before invocation.
-- Result must not expose tokens or credentials.
+- Result must parse current Linz World response fields: `request_id`, `os_id`, `provider`, `model`, `choices`, `reservation`, and `usage`.
+- Result must not expose tokens, API keys, or credentials.
 
 ## Entity: Soul Memory Entry
 

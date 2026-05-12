@@ -133,7 +133,7 @@ All handlers return JSON strings, following Hermes tool conventions. Tool output
 
 ## Tool: `linz_compute`
 
-**Purpose**: Invoke Linz World compute through the current login session.
+**Purpose**: Invoke Linz World compute through the current profile's compute API key secret reference.
 
 **Parameters**
 
@@ -147,8 +147,10 @@ All handlers return JSON strings, following Hermes tool conventions. Tool output
 **Rules**
 
 - Must not accept explicit API keys or tokens.
+- Must fail closed if no compute API key secret reference is configured.
+- Must call `POST /api/v1/compute/chat` with `Authorization: Bearer <compute_api_key>` resolved from the secret reference.
 - Must refresh authorization map immediately before invocation.
-- Result includes provider/model/source summary, not credentials.
+- Result includes remote request_id receipt, provider/model/source summary, choices summary, usage, and reservation diagnostics, not credentials.
 
 ## Tool: `linz_memory_sink`
 

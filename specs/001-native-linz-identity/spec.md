@@ -126,7 +126,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **FR-017**: 系统必须把可处理的世界消息、需求、任务、订单、交付、结算和治理事件映射为 Hermes 内部事件类别，供后续张力场和用户界面消费。
 - **FR-018**: 系统必须在对话上下文、普通工具结果和用户默认视图中只暴露脱敏摘要和必要引用，不得暴露原始凭据、私密字段或完整未筛选 payload。
 - **FR-019**: 世界事件发布成功后，系统必须记录 publish receipt；发布失败时必须记录失败原因、被拒绝的 subject/event_type 摘要和治理结果。
-- **FR-020**: 世界算力调用必须使用当前 Linz World 登录会话，不得接受或回显裸凭据；结果必须保留 provider、model 或等价来源摘要及 receipt。
+- **FR-020**: 世界算力调用必须使用当前 Hermes profile 的 Linz World compute API key secret reference 调用当前后端，不得通过工具参数、prompt、普通 CLI 输出或日志接受/回显裸凭据；缺少 compute API key reference 时必须返回 blocked/unsupported 诊断，而不是尝试使用登录 token 代替。
 - **FR-021**: Soul Memory 写入必须包含 artifact_ref 或等价交付物引用、sink_reason 和证据摘要；系统不得只写入无来源的自由文本。
 - **FR-022**: 系统必须兼容旧 Soul Memory sink 命名输入并归一为新的记忆写入语义，确保旧命名调用不会因名称差异失败。
 - **FR-023**: 系统必须支持读取 Linz World 关系状态和添加 ACTIVE 关系，并把关系摘要作为后续自治层可消费的关系信号。
@@ -136,7 +136,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **FR-027**: 身份注册必须调用 Linz World 当前后端/skill 契约 `POST /api/v1/auth/register`，请求字段为 `publicKey`、`publicKeyType`、`fingerprint`、`metadata`；不得调用 Hermes 占位路径 `/identity/original-spirit`。成功后必须从 `data.agentId`、`data.soulId`、`data.soulHash`、`data.accessToken`、`data.expiresIn`、`data.registeredAt` 建立当前 profile 身份和登录状态；内部可保留 `os_id` 别名，但对外接口不得发送 `os_id` 替代 `agentId`。
 - **FR-028**: 登录与刷新必须匹配 Linz World 事件模块接口：登录调用 `POST /api/v1/event/agents/login`，请求字段为 `agentId`、`signedNonce`；刷新调用 `POST /api/v1/event/agents/refresh`，请求字段为 `token`；成功结果必须读取 `data.token`、`data.expiresAt`、`data.subjectClaims`、`data.credentialId`，并禁止在用户可见输出中泄露 token。
 - **FR-029**: 授权 map 不得调用未在 `linz-world` 后端或 skill 中存在的占位接口；当前版本必须从登录/凭证响应的 `subjectClaims`、`publishScopeSnapshot`、`subscribeScopeSnapshot` 以及 `GET /api/v1/event/subjects` 的主题定义组合授权摘要，若后端缺少必要数据则返回可诊断的 unsupported/unknown 状态并阻断外部副作用。
-- **FR-030**: 世界算力调用必须匹配 `POST /api/v1/compute/chat`，使用 `Authorization: Bearer <token>`，请求至少包含 `model`、`messages`、`stream`、`temperature`、`metadata`；系统不得要求用户手工输入裸 compute API key。
+- **FR-030**: 世界算力调用必须匹配当前 Linz World Compute Gateway 契约 `POST /api/v1/compute/chat`，使用 `Authorization: Bearer <compute_api_key>`，请求至少包含 `model`、`messages`、`stream`、`temperature`、`metadata`；成功响应必须从统一 envelope 的 `data.request_id`、`data.os_id`、`data.provider`、`data.model`、`data.choices`、`data.reservation`、`data.usage` 建模，并把 `request_id` 作为主要 receipt。缺失 Authorization、无效或吊销 compute key 的 401 响应必须保留为用户可诊断失败。
 - **FR-031**: Soul Memory 相关能力必须匹配 Linz World Memory 模块路由：人格种子使用 `/api/v1/memory/seeds`，Soul Memory 使用 `/api/v1/memory/soul`，记忆事件归档使用 `/api/v1/memory/events`，投影/快照/lineage 使用对应 `/api/v1/memory/...` 路由；不得调用未确认的 Hermes 占位 memory sink 路径。
 - **FR-032**: 发布与事件接收必须匹配 Linz World 事件系统实际契约：NATS subject 使用 `wsp.{agentId}.sys` 等正式主题；HTTP `POST /api/v1/event/publish` 当前在后端仅为占位返回，除非后端/skill 契约确认其真实 payload 和持久化语义，否则 Hermes 不得把它当作可靠发布成功依据。
 - **FR-033**: 配置必须使用 `linz_world.service_url` 作为用户可见服务地址键，并支持将 origin 根地址和 `/api/v1` 根地址归一化为同一 HTTP 调用行为；旧文档中的 `server_url` 只能作为兼容输入读取，不得作为新文档主键。
@@ -151,7 +151,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **Event Dispatch Record**: Hermes 对世界事件接收、去重、排队、处理、失败或跳过的可靠性状态，包含自动重试次数和是否需要人工处理。
 - **Publish Request**: 用户或 agent 试图发布到 Linz World 的结构化事件请求，必须通过身份、登录、授权、目录和治理检查。
 - **Publish Receipt**: 世界事件发布后的可追踪结果，记录成功的 world event id 或失败原因。
-- **World Compute Request**: 使用 Linz World 登录会话发起的世界算力调用，带有来源摘要、结果或诊断错误。
+- **World Compute Request**: 使用 profile secret store 中的 Linz World compute API key reference 发起的世界算力调用，带有 request_id、provider、model、usage、reservation、choices 摘要、结果或诊断错误。
 - **Soul Memory Entry**: 写入 Linz World 记忆侧的证据、交付物引用、规则或摘要，必须说明写入原因。
 - **Relationship Record**: Linz World 关系状态或 ACTIVE 关系变更，用于后续关系信号和治理判断。
 - **Governance Result**: 对发布、算力、记忆和关系动作的允许、拒绝、降级或需审批结论及其理由。
@@ -177,12 +177,14 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **SC-015**: 身份注册测试中 100% 的请求 payload 使用 `publicKey`、`publicKeyType`、`fingerprint`、`metadata`，并从响应 envelope 的 `data.agentId`、`data.soulId`、`data.soulHash`、`data.accessToken` 等字段建模；不得出现 `/identity/original-spirit`、`hermes_profile`、`os_name` 作为远端注册契约字段。
 - **SC-016**: 登录/授权测试中 100% 的登录请求使用 `POST /api/v1/event/agents/login` + `agentId`/`signedNonce`，并从 `subjectClaims` 或 credential scope snapshot 生成授权摘要；若授权数据缺失，发布、compute、memory、relationship 外部副作用全部阻断。
 - **SC-017**: Contract fixture 或 fake service 测试必须覆盖 Linz World 统一响应 envelope 成功、非 0 code、缺失 data、字段缺失和 HTTP 错误，且所有错误都会保存 failed/pending 状态和用户可诊断 next_action。
+- **SC-018**: `POST /api/v1/compute/chat` contract fixture 必须覆盖缺失 Authorization、无效或吊销 compute API key 的 401 envelope，以及成功 envelope 中 `request_id`、`os_id`、`provider`、`model`、`choices`、`reservation`、`usage` 字段解析；缺少 compute API key reference 时 Hermes compute 外部副作用必须 fail-closed。
 
 ## 假设
 
 - Hermes profile 是本功能的身份边界；同一 profile 共享一个 Linz World original spirit，不同 profile 允许拥有不同身份。
 - Linz World 注册、登录、授权 map、事件、发布、世界算力、Soul Memory 和关系服务由外部 Linz World 提供，本功能负责 Hermes 原生接入和治理边界。
 - Linz World 后端/skill 接口是跨仓库契约源；Hermes spec/实现必须定期对照 `OPEWorld-Tech/linz-world` 的 docs、specs 和 handler/service 测试，避免 Hermes 侧自造路径或字段名。
+- 当前 `linz-world` compute gateway 使用 compute API key 鉴权，而不是 event login token 鉴权；除非后端后续提供已确认的登录 token 换取/代理 compute 机制，Hermes 不得把登录 token 当作 compute Bearer 凭证。
 - Linz World original spirit 身份是 agent persona 加载的硬性前置条件；没有已注册身份时，该 persona 不进入普通对话运行状态。
 - 旧 linz-world-skill 身份导入和同步不属于当前版本范围；新运行期不依赖用户继续安装或调用该 skill，也不提供 legacy identity 迁移入口。
 - 默认交互模式是被动和用户可控的；自驱动、自动响应、上线监听和外部发布由后续模块或显式配置控制。

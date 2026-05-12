@@ -43,6 +43,16 @@
 - 让用户手工配置任意 endpoint mapping: 增加配置复杂度，也无法保证和 skill 一致。
 - 等 Linz World 后端补齐所有 publish/map/relationship 接口后再推进: 会阻塞已明确的注册、登录、compute、memory 一致性修复；缺失能力应 fail-closed 或标记 unsupported。
 
+## Decision: compute 按当前 Linz World API-key 契约接入，缺少 secret reference 时 fail-closed
+
+**Rationale**: `OPEWorld-Tech/linz-world` 当前 `docs/Linz-World-gateway-v0.1.md` 与 `backend/tests/contract/compute_chat_contract_test.go` 均要求 `POST /api/v1/compute/chat` 使用 `Authorization: Bearer <api_key>`，成功响应包含 `request_id`、`os_id`、`provider`、`model`、`choices`、`reservation`、`usage` 等字段。当前没有已确认的“event login token 可直接调用 compute”或“login token 换取 compute key”的后端契约。因此 Hermes compute 必须从 profile-local secret reference 解析 compute API key；若缺少该 reference，返回 blocked/unsupported，而不是用登录 token 伪装调用成功。
+
+**Alternatives considered**:
+
+- 使用 event login token 调用 compute: 与当前后端 contract test 不兼容，会导致 401 或错误归因。
+- 要求用户在工具参数中输入 compute API key: 会把裸凭据暴露给 prompt、工具调用记录或日志，不符合隐私边界。
+- 暂时完全移除 compute 能力: 过度收窄范围；当前后端已有可验证 compute 契约，可以在 secret reference 存在时安全接入。
+
 ## Decision: 授权 map 对所有外部副作用实时刷新
 
 **Rationale**: 用户选择每次外部副作用前实时刷新授权 map，刷新失败即阻断。该策略最保守，覆盖 publish、compute、Soul Memory 写入和 relationship 变更。

@@ -217,7 +217,9 @@ Confirmed event system transport for login/system events uses NATS subjects such
 
 **Headers**
 
-`Authorization: Bearer <token>`
+`Authorization: Bearer <compute_api_key>`
+
+Current Linz World compute gateway validates a compute API key. Hermes stores and passes this through a profile-local secret reference; tools, prompts, user-visible CLI output, and logs must never expose the raw key. If no compute API key reference exists, Hermes returns `unsupported` or `blocked` and does not call compute with the event login token.
 
 **Request**
 
@@ -240,13 +242,35 @@ Confirmed event system transport for login/system events uses NATS subjects such
 
 ```json
 {
-  "result": {},
-  "provider_summary": "provider/model/source summary",
-  "receipt": "opaque receipt"
+  "request_id": "req_...",
+  "os_id": "os-default",
+  "provider": "openai-main",
+  "model": "gpt-4o-mini",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "..."
+      }
+    }
+  ],
+  "reservation": {
+    "reservation_id": "res_...",
+    "reserved_amount": 1.0,
+    "status": "settled"
+  },
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 50,
+    "total_tokens": 150,
+    "ec_deducted": 0.15,
+    "settlement_status": "settled"
+  }
 }
 ```
 
-**Hermes rule**: invocation uses login session token reference only; explicit API key input is invalid.
+**Hermes rule**: `request_id` is the remote receipt. Provider/model summary comes from `data.provider` and `data.model`; cost/settlement diagnostics come from `data.usage` and `data.reservation`. Missing Authorization, invalid keys, revoked keys, non-zero envelope code, or missing required fields are failures. Explicit API keys in tool parameters or prompt-visible input are invalid.
 
 ## Soul Memory
 
