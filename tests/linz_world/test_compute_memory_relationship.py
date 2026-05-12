@@ -33,9 +33,9 @@ def test_memory_requires_artifact_ref_and_sink_reason(linz_home, FakeLinzService
     assert entry.status.value == "rejected"
 
 
-def test_relationship_mutation_uses_governance(linz_home, FakeLinzService):
+def test_relationship_mutation_without_confirmed_route_fails_closed(linz_home, FakeLinzService):
     svc = FakeLinzService()
     repo = _ready_repo(linz_home, svc)
     result = add_active_relationship("actor_2", "trusted collaborator", repo, svc)
-    assert result["success"] is True
-    assert result["relationship"]["state"] == "ACTIVE"
+    assert result["success"] is False
+    assert result["error"]["code"] == "unsupported_relationship_mutation"

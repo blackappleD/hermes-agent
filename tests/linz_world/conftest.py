@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+from agent.linz_world.api_client import LinzWorldServiceError
+
 
 @pytest.fixture
 def linz_home(tmp_path, monkeypatch):
@@ -68,14 +70,17 @@ class _FakeLinzService:
             "usage": {"total_tokens": 1},
         }
 
-    def write_memory(self, token_ref, artifact_ref, sink_reason, summary):
+    def write_memory(self, identity, token_ref, artifact_ref, sink_reason, summary):
         return {"receipt": "memory_1"}
 
     def read_relationships(self, identity, token_ref, counterparty_id=""):
         return {"relationships": []}
 
     def add_active_relationship(self, token_ref, counterparty_id, summary=""):
-        return {"relationship_id": "rel_1", "counterparty_id": counterparty_id, "state": "ACTIVE", "summary": summary}
+        raise LinzWorldServiceError(
+            "unsupported_relationship_mutation",
+            "No confirmed Linz World ACTIVE relationship mutation route exists.",
+        )
 
 
 @pytest.fixture

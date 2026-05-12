@@ -70,7 +70,7 @@ class LinzWorldService(Protocol):
     def refresh_authorization_map(self, identity: dict[str, Any], token_ref: str) -> dict[str, Any]: ...
     def publish_event(self, token_ref: str, subject: str, event_type: str, payload: dict[str, Any]) -> dict[str, Any]: ...
     def invoke_compute(self, token_ref: str, task: str, input_data: dict[str, Any]) -> dict[str, Any]: ...
-    def write_memory(self, token_ref: str, artifact_ref: str, sink_reason: str, summary: str) -> dict[str, Any]: ...
+    def write_memory(self, identity: dict[str, Any], token_ref: str, artifact_ref: str, sink_reason: str, summary: str) -> dict[str, Any]: ...
     def read_relationships(self, identity: dict[str, Any], token_ref: str, counterparty_id: str = "") -> dict[str, Any]: ...
     def add_active_relationship(self, token_ref: str, counterparty_id: str, summary: str = "") -> dict[str, Any]: ...
 
@@ -126,7 +126,7 @@ class LocalLinzWorldService:
             "usage": {},
         }
 
-    def write_memory(self, token_ref: str, artifact_ref: str, sink_reason: str, summary: str) -> dict[str, Any]:
+    def write_memory(self, identity: dict[str, Any], token_ref: str, artifact_ref: str, sink_reason: str, summary: str) -> dict[str, Any]:
         return {"receipt": f"memory_{hashlib.sha256(artifact_ref.encode('utf-8')).hexdigest()[:12]}"}
 
     def read_relationships(self, identity: dict[str, Any], token_ref: str, counterparty_id: str = "") -> dict[str, Any]:
@@ -152,7 +152,7 @@ class HttpLinzWorldService(LocalLinzWorldService):
         *,
         headers: dict[str, str] | None = None,
         require_object_data: bool = True,
-    ) -> dict[str, Any]:
+    ) -> Any:
         try:
             response = httpx.request(
                 method,
@@ -173,13 +173,19 @@ class HttpLinzWorldService(LocalLinzWorldService):
         data = envelope.get("data")
         if require_object_data and not isinstance(data, dict):
             raise LinzWorldServiceError("invalid_response", "Linz World service response missing object data.")
-        return data if isinstance(data, dict) else {"value": data}
+        return data
 
     def _post(self, path: str, payload: dict[str, Any], *, headers: dict[str, str] | None = None) -> dict[str, Any]:
         return self._request("POST", path, payload, headers=headers)
 
-    def _get(self, path: str, *, headers: dict[str, str] | None = None) -> dict[str, Any]:
-        return self._request("GET", path, headers=headers)
+    def _get(
+        self,
+        path: str,
+        *,
+        headers: dict[str, str] | None = None,
+        require_object_data: bool = True,
+    ) -> Any:
+        return self._request("GET", path, headers=headers, require_object_data=require_object_data)
 
     def register_original_spirit(self, hermes_profile: str, os_name: str) -> dict[str, Any]:
         fingerprint = hashlib.sha256(hermes_profile.encode("utf-8")).hexdigest()
@@ -220,7 +226,7 @@ class HttpLinzWorldService(LocalLinzWorldService):
             {"agentId": agent_id, "requestedPurpose": "hermes-runtime"},
             headers=headers,
         )
-        subjects = self._get("/event/subjects", headers=headers)
+        subjects = self._get("/event/subjects", headers=headers, require_object_data=False)
         return derive_authorization_summary(refreshed, credential, subjects)
 
     def publish_event(self, token_ref: str, subject: str, event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -251,7 +257,10 @@ class HttpLinzWorldService(LocalLinzWorldService):
             raise LinzWorldServiceError("invalid_response", f"Linz World compute response missing: {', '.join(missing)}")
         return data
 
-    def write_memory(self, token_ref: str, artifact_ref: str, sink_reason: str, summary: str) -> dict[str, Any]:
+    def write_memory(self, identity: dict[str, Any], token_ref: str, artifact_ref: str, sink_reason: str, summary: str) -> dict[str, Any]:
+        agent_id = identity.get("agent_id") or identity.get("agentId") or identity.get("os_id")
+        if not agent_id:
+            raise LinzWorldServiceError("identity_missing", "Linz World agentId is missing.")
         token = _resolve_bearer_value(
             token_ref,
             code="login_secret_missing",
@@ -260,6 +269,7 @@ class HttpLinzWorldService(LocalLinzWorldService):
         return self._post(
             "/memory/events",
             {
+                "agent_id": agent_id,
                 "external_event_id": artifact_ref,
                 "event_type": "hermes.memory.sink",
                 "event_time": utc_now_iso(),
@@ -300,12 +310,17 @@ class HttpLinzWorldService(LocalLinzWorldService):
 def derive_authorization_summary(
     refreshed: dict[str, Any],
     credential: dict[str, Any],
-    subjects: dict[str, Any],
+    subjects: Any,
 ) -> dict[str, Any]:
     publish_scope = _string_list(credential.get("publishScopeSnapshot"))
     subscribe_scope = _string_list(credential.get("subscribeScopeSnapshot"))
     subject_claims = _string_list(refreshed.get("subjectClaims"))
-    subject_defs = subjects.get("subjects") or subjects.get("items") or subjects.get("definitions") or []
+    if isinstance(subjects, list):
+        subject_defs = subjects
+    elif isinstance(subjects, dict):
+        subject_defs = subjects.get("subjects") or subjects.get("items") or subjects.get("definitions") or []
+    else:
+        subject_defs = []
     event_types = set()
     if isinstance(subject_defs, list):
         for item in subject_defs:

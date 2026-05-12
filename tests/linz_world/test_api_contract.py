@@ -5,6 +5,7 @@ import pytest
 from agent.linz_world.api_client import (
     HttpLinzWorldService,
     LinzWorldServiceError,
+    derive_authorization_summary,
     normalize_api_base_url,
     store_runtime_secret,
 )
@@ -117,3 +118,103 @@ def test_compute_401_envelope_is_diagnostic_failure(monkeypatch):
 
     with pytest.raises(LinzWorldServiceError, match="invalid compute key"):
         HttpLinzWorldService("http://linz.test").invoke_compute("revoked-key", "task", {})
+
+
+def test_subjects_array_envelope_derives_authorization_summary(monkeypatch):
+    calls = []
+
+    def fake_request(method, url, json=None, headers=None, timeout=None):
+        calls.append((method, url, json, headers))
+        if url.endswith("/event/agents/refresh"):
+            return _Response(
+                {
+                    "code": 0,
+                    "message": "success",
+                    "data": {
+                        "token": "event-token",
+                        "expiresAt": "2099-01-01T00:00:00Z",
+                        "subjectClaims": ["wsp.chat.message.sent"],
+                        "credentialId": "cred_1",
+                    },
+                }
+            )
+        if url.endswith("/event/agents/credentials"):
+            return _Response(
+                {
+                    "code": 0,
+                    "message": "success",
+                    "data": {
+                        "id": "cred_1",
+                        "agentId": "agent-1",
+                        "publishScopeSnapshot": ["wsp.chat.message.sent"],
+                        "subscribeScopeSnapshot": ["wsp.agent-1.sys"],
+                    },
+                }
+            )
+        return _Response(
+            {
+                "code": 0,
+                "message": "success",
+                "data": [
+                    {"subject": "wsp.chat.message.sent", "eventTypes": ["message.sent"]},
+                    {"subject": "wsp.agent-1.sys", "event_type": "subject_change"},
+                ],
+            }
+        )
+
+    monkeypatch.setattr("httpx.request", fake_request)
+    token_ref = store_runtime_secret("event_token", "event-token")
+
+    result = HttpLinzWorldService("http://linz.test").refresh_authorization_map({"agent_id": "agent-1"}, token_ref)
+
+    assert any(call[1] == "http://linz.test/api/v1/event/subjects" for call in calls)
+    assert result["allowed_subjects"] == ["wsp.agent-1.sys", "wsp.chat.message.sent"]
+    assert "message.sent" in result["allowed_event_types"]
+    assert "subject_change" in result["allowed_event_types"]
+
+
+def test_derive_authorization_summary_accepts_subjects_array():
+    result = derive_authorization_summary(
+        {"subjectClaims": ["wsp.chat.message.sent"], "credentialId": "cred_1"},
+        {"id": "cred_1", "publishScopeSnapshot": ["wsp.chat.message.sent"]},
+        [{"subject": "wsp.chat.message.sent", "eventTypes": ["message.sent"]}],
+    )
+
+    assert result["map_version"] == "cred_1"
+    assert result["allowed_subjects"] == ["wsp.chat.message.sent"]
+    assert result["allowed_event_types"] == ["message.sent"]
+
+
+def test_memory_events_request_includes_required_agent_id_and_fields(monkeypatch):
+    calls = []
+
+    def fake_request(method, url, json=None, headers=None, timeout=None):
+        calls.append((method, url, json, headers))
+        return _Response({"code": 0, "message": "success", "data": {"receipt": "memory_1"}})
+
+    monkeypatch.setattr("httpx.request", fake_request)
+    token_ref = store_runtime_secret("event_token", "event-token")
+
+    result = HttpLinzWorldService("http://linz.test").write_memory(
+        {"agent_id": "agent-1"},
+        token_ref,
+        "artifact-1",
+        "delivery evidence",
+        "summary",
+    )
+
+    assert result["receipt"] == "memory_1"
+    assert calls[0][1] == "http://linz.test/api/v1/memory/events"
+    assert calls[0][3]["Authorization"] == "Bearer event-token"
+    assert set(calls[0][2]) == {
+        "agent_id",
+        "external_event_id",
+        "event_type",
+        "event_time",
+        "payload",
+        "claim",
+        "evidence_refs",
+        "importance_score",
+        "operator_id",
+    }
+    assert calls[0][2]["agent_id"] == "agent-1"

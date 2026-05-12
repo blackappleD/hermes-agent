@@ -17,7 +17,8 @@ def write_memory(artifact_ref: str, sink_reason: str, summary: str, repository: 
     if not governance.allowed:
         return SoulMemoryEntry(artifact_ref, sink_reason, summary, ReceiptStatus.REJECTED, message=governance.message)
     try:
-        result = svc.write_memory(repo.get_login().token_ref, artifact_ref, sink_reason, summary)
+        identity = repo.get_identity()
+        result = svc.write_memory(identity.__dict__ if identity else {}, repo.get_login().token_ref, artifact_ref, sink_reason, summary)
         entry = SoulMemoryEntry(artifact_ref, sink_reason, summary, ReceiptStatus.PUBLISHED, receipt=str(result.get("receipt") or ""))
     except Exception as exc:
         entry = SoulMemoryEntry(artifact_ref, sink_reason, summary, ReceiptStatus.FAILED, message=f"Linz World memory write failed: {exc}")
