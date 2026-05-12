@@ -1,8 +1,8 @@
 # 实施计划: 模块 0：协议、配置与测试基座
 
-**分支**: `feat/89-module-0-protocol-config-test-base`  
-**日期**: 2026-05-12  
-**规范**: `specs/089-module-0-protocol-config-test-base/spec.md`  
+**分支**: `feat/89-module-0-protocol-config-test-base`
+**日期**: 2026-05-12
+**规范**: `specs/089-module-0-protocol-config-test-base/spec.md`
 **输入**: Issue OPE-89；`docs/基于张力场的Agent自驱动实现计划.md`
 
 ## 摘要
@@ -11,14 +11,14 @@
 
 ## 技术背景
 
-**语言/版本**: Python，沿用仓库当前支持范围；实现使用标准库。  
-**主要依赖**: `dataclasses`、`enum`、`typing`、标准库 JSON 友好结构；不新增依赖。  
-**存储**: N/A，本模块只定义协议对象和配置默认值。  
-**测试**: pytest。  
-**目标平台**: Hermes Agent 当前支持的 CLI/gateway/TUI 运行环境。  
-**项目类型**: Python CLI/agent runtime 仓库。  
-**性能目标**: 协议对象构造和序列化为轻量内存操作，不引入 I/O。  
-**约束条件**: 默认 `os_runtime.enabled=false`；不改变现有对话、工具、gateway、TUI、memory provider 或 `/goal` 行为。  
+**语言/版本**: Python，沿用仓库当前支持范围；实现使用标准库。
+**主要依赖**: `dataclasses`、`enum`、`typing`、标准库 JSON 友好结构；不新增依赖。
+**存储**: N/A，本模块只定义协议对象和配置默认值。
+**测试**: pytest。
+**目标平台**: Hermes Agent 当前支持的 CLI/gateway/TUI 运行环境。
+**项目类型**: Python CLI/agent runtime 仓库。
+**性能目标**: 协议对象构造和序列化为轻量内存操作，不引入 I/O。
+**约束条件**: 默认 `os_runtime.enabled=false`；不改变现有对话、工具、gateway、TUI、memory provider 或 `/goal` 行为。
 **规模/范围**: 模块 0，仅涉及 `agent/os_runtime` 协议、`hermes_cli/config.py` 默认配置和 `tests/os_runtime`。
 
 ## 章程检查

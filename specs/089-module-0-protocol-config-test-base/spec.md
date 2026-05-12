@@ -1,9 +1,9 @@
 # 功能规范: 模块 0：协议、配置与测试基座
 
-**功能分支**: `feat/89-module-0-protocol-config-test-base`  
-**Spec-Kit 特性目录**: `specs/089-module-0-protocol-config-test-base`  
-**创建时间**: 2026-05-12  
-**状态**: 草稿，待 Reviewer Agent 审查  
+**功能分支**: `feat/89-module-0-protocol-config-test-base`
+**Spec-Kit 特性目录**: `specs/089-module-0-protocol-config-test-base`
+**创建时间**: 2026-05-12
+**状态**: 草稿，待 Reviewer Agent 审查
 **输入**: Issue OPE-89；`docs/基于张力场的Agent自驱动实现计划.md` 中“模块 0：协议、配置与测试基座”
 
 ## 背景
