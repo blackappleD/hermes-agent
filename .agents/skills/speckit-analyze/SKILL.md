@@ -30,14 +30,14 @@ $ARGUMENTS
 
 ### 1. 初始化分析上下文
 
-从仓库根目录运行一次 `.specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks` 并解析 JSON 以获取 FEATURE_DIR 和 AVAILABLE_DOCS. 推导绝对路径:
+从仓库根目录根据当前系统运行一次先决条件脚本并解析 JSON 以获取 FEATURE_DIR 和 AVAILABLE_DOCS: Windows 使用 `.specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks`; macOS/Linux 使用 `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks`. 推导绝对路径:
 
 - SPEC = FEATURE_DIR/spec.md
 - PLAN = FEATURE_DIR/plan.md
 - TASKS = FEATURE_DIR/tasks.md
 
 如果任何必需文件缺失, 则以错误消息中止(指示用户运行缺失的先决条件命令).
-对于参数中的单引号, 如 "I'm Groot", 使用转义语法: 例如 'I'\''m Groot'(或尽可能使用双引号: "I'm Groot").
+对于参数中的单引号, 如 "I'm Groot", 使用当前 shell 的转义语法(或尽可能使用双引号: "I'm Groot").
 
 ### 2. 加载制品(渐进式展示)
 

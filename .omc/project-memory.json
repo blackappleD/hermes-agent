@@ -1,0 +1,467 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1778555164382,
+  "projectRoot": "D:\\workspace\\hermes-agent",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": ">=20.0.0",
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "pyproject.toml"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "fastapi",
+        "version": null,
+        "category": "backend"
+      },
+      {
+        "name": "pytest",
+        "version": null,
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": "Node.js 20.0.0"
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "pytest",
+    "lintCommand": "ruff check",
+    "devCommand": null,
+    "scripts": {
+      "postinstall": "echo '✅ Browser tools ready. Run: python run_agent.py --help'"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "assets",
+      "docs",
+      "scripts",
+      "tests"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "acp_adapter": {
+      "path": "acp_adapter",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1778555164325,
+      "keyFiles": [
+        "auth.py",
+        "entry.py",
+        "events.py",
+        "permissions.py",
+        "server.py"
+      ]
+    },
+    "acp_registry": {
+      "path": "acp_registry",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1778555164326,
+      "keyFiles": [
+        "agent.json",
+        "icon.svg"
+      ]
+    },
+    "agent": {
+      "path": "agent",
+      "purpose": null,
+      "fileCount": 53,
+      "lastAccessed": 1778555164335,
+      "keyFiles": [
+        "account_usage.py",
+        "anthropic_adapter.py",
+        "auxiliary_client.py",
+        "bedrock_adapter.py",
+        "codex_responses_adapter.py"
+      ]
+    },
+    "assets": {
+      "path": "assets",
+      "purpose": "Static assets",
+      "fileCount": 1,
+      "lastAccessed": 1778555164335,
+      "keyFiles": [
+        "banner.png"
+      ]
+    },
+    "cron": {
+      "path": "cron",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1778555164335,
+      "keyFiles": [
+        "jobs.py",
+        "scheduler.py",
+        "__init__.py"
+      ]
+    },
+    "datagen-config-examples": {
+      "path": "datagen-config-examples",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1778555164336,
+      "keyFiles": [
+        "example_browser_tasks.jsonl",
+        "run_browser_tasks.sh",
+        "trajectory_compression.yaml",
+        "web_research.yaml"
+      ]
+    },
+    "docker": {
+      "path": "docker",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1778555164336,
+      "keyFiles": [
+        "entrypoint.sh",
+        "SOUL.md"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 2,
+      "lastAccessed": 1778555164337,
+      "keyFiles": [
+        "hermes-kanban-v1-spec.pdf",
+        "基于张力场的Agent自驱动实现计划.md"
+      ]
+    },
+    "environments": {
+      "path": "environments",
+      "purpose": null,
+      "fileCount": 8,
+      "lastAccessed": 1778555164337,
+      "keyFiles": [
+        "agentic_opd_env.py",
+        "agent_loop.py",
+        "hermes_base_env.py",
+        "patches.py",
+        "README.md"
+      ]
+    },
+    "gateway": {
+      "path": "gateway",
+      "purpose": null,
+      "fileCount": 20,
+      "lastAccessed": 1778555164338,
+      "keyFiles": [
+        "channel_directory.py",
+        "config.py",
+        "delivery.py",
+        "display_config.py",
+        "hooks.py"
+      ]
+    },
+    "hermes_cli": {
+      "path": "hermes_cli",
+      "purpose": null,
+      "fileCount": 74,
+      "lastAccessed": 1778555164338,
+      "keyFiles": [
+        "auth.py",
+        "auth_commands.py",
+        "azure_detect.py",
+        "backup.py",
+        "banner.py"
+      ]
+    },
+    "locales": {
+      "path": "locales",
+      "purpose": null,
+      "fileCount": 16,
+      "lastAccessed": 1778555164339,
+      "keyFiles": [
+        "af.yaml",
+        "de.yaml",
+        "en.yaml",
+        "es.yaml",
+        "fr.yaml"
+      ]
+    },
+    "nix": {
+      "path": "nix",
+      "purpose": null,
+      "fileCount": 11,
+      "lastAccessed": 1778555164339,
+      "keyFiles": [
+        "checks.nix",
+        "configMergeScript.nix",
+        "devShell.nix",
+        "hermes-agent.nix",
+        "lib.nix"
+      ]
+    },
+    "optional-skills": {
+      "path": "optional-skills",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778555164340,
+      "keyFiles": [
+        "DESCRIPTION.md"
+      ]
+    },
+    "packaging": {
+      "path": "packaging",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778555164340,
+      "keyFiles": []
+    },
+    "plans": {
+      "path": "plans",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778555164341,
+      "keyFiles": [
+        "gemini-oauth-provider.md"
+      ]
+    },
+    "plugins": {
+      "path": "plugins",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778555164341,
+      "keyFiles": [
+        "__init__.py"
+      ]
+    },
+    "providers": {
+      "path": "providers",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1778555164341,
+      "keyFiles": [
+        "base.py",
+        "README.md",
+        "__init__.py"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 19,
+      "lastAccessed": 1778555164342,
+      "keyFiles": [
+        "benchmark_browser_eval.py",
+        "build_model_catalog.py",
+        "build_skills_index.py",
+        "check-windows-footguns.py",
+        "contributor_audit.py"
+      ]
+    },
+    "skills": {
+      "path": "skills",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778555164342,
+      "keyFiles": []
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 58,
+      "lastAccessed": 1778555164342,
+      "keyFiles": [
+        "conftest.py",
+        "run_interrupt_test.py",
+        "test_account_usage.py",
+        "test_atomic_replace_symlinks.py",
+        "test_base_url_hostname.py"
+      ]
+    },
+    "tinker-atropos": {
+      "path": "tinker-atropos",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778555164343,
+      "keyFiles": []
+    },
+    "tools": {
+      "path": "tools",
+      "purpose": null,
+      "fileCount": 73,
+      "lastAccessed": 1778555164343,
+      "keyFiles": [
+        "ansi_strip.py",
+        "approval.py",
+        "binary_extensions.py",
+        "browser_camofox.py",
+        "browser_camofox_state.py"
+      ]
+    },
+    "tui_gateway": {
+      "path": "tui_gateway",
+      "purpose": null,
+      "fileCount": 8,
+      "lastAccessed": 1778555164343,
+      "keyFiles": [
+        "entry.py",
+        "event_publisher.py",
+        "render.py",
+        "server.py",
+        "slash_worker.py"
+      ]
+    },
+    "ui-tui": {
+      "path": "ui-tui",
+      "purpose": null,
+      "fileCount": 10,
+      "lastAccessed": 1778555164344,
+      "keyFiles": [
+        "babel.compiler.config.cjs",
+        "eslint.config.mjs",
+        "package-lock.json",
+        "package.json",
+        "README.md"
+      ]
+    },
+    "web": {
+      "path": "web",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1778555164344,
+      "keyFiles": [
+        "eslint.config.js",
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "README.md"
+      ]
+    },
+    "website": {
+      "path": "website",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1778555164345,
+      "keyFiles": [
+        "docusaurus.config.ts",
+        "package-lock.json",
+        "package.json",
+        "README.md",
+        "sidebars.ts"
+      ]
+    },
+    "gateway\\assets": {
+      "path": "gateway\\assets",
+      "purpose": "Static assets",
+      "fileCount": 1,
+      "lastAccessed": 1778555164348,
+      "keyFiles": [
+        "telegram-botfather-threads-settings.jpg"
+      ]
+    },
+    "ui-tui\\scripts": {
+      "path": "ui-tui\\scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 2,
+      "lastAccessed": 1778555164352,
+      "keyFiles": [
+        "build.mjs",
+        "profile-tui.mjs"
+      ]
+    },
+    "ui-tui\\src": {
+      "path": "ui-tui\\src",
+      "purpose": "Source code",
+      "fileCount": 7,
+      "lastAccessed": 1778555164352,
+      "keyFiles": [
+        "app.tsx",
+        "banner.ts",
+        "entry.tsx"
+      ]
+    },
+    "web\\public": {
+      "path": "web\\public",
+      "purpose": "Public files",
+      "fileCount": 1,
+      "lastAccessed": 1778555164352,
+      "keyFiles": [
+        "favicon.ico"
+      ]
+    },
+    "web\\src": {
+      "path": "web\\src",
+      "purpose": "Source code",
+      "fileCount": 3,
+      "lastAccessed": 1778555164353,
+      "keyFiles": [
+        "App.tsx",
+        "index.css",
+        "main.tsx"
+      ]
+    },
+    "website\\docs": {
+      "path": "website\\docs",
+      "purpose": "Documentation",
+      "fileCount": 2,
+      "lastAccessed": 1778555164353,
+      "keyFiles": [
+        "index.md",
+        "user-stories.mdx"
+      ]
+    },
+    "website\\scripts": {
+      "path": "website\\scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 4,
+      "lastAccessed": 1778555164353,
+      "keyFiles": [
+        "extract-skills.py",
+        "generate-llms-txt.py",
+        "generate-skill-docs.py"
+      ]
+    },
+    "website\\src": {
+      "path": "website\\src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1778555164354,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "CONTRIBUTING.md",
+      "accessCount": 1,
+      "lastAccessed": 1778558151894,
+      "type": "file"
+    },
+    {
+      "path": "skills\\github\\github-pr-workflow\\references\\conventional-commits.md",
+      "accessCount": 1,
+      "lastAccessed": 1778558157534,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

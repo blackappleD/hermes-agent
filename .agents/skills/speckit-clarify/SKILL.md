@@ -24,12 +24,12 @@ $ARGUMENTS
 
 执行步骤:
 
-1. 从仓库根目录运行 `.specify/scripts/powershell/check-prerequisites.ps1 -Json -PathsOnly` **一次**(组合 `--json --paths-only` 模式 / `-Json -PathsOnly`). 解析最小 JSON 负载字段:
+1. 从仓库根目录根据当前系统运行先决条件脚本 **一次** 并解析最小 JSON 负载字段: Windows 使用 `.specify/scripts/powershell/check-prerequisites.ps1 -Json -PathsOnly`; macOS/Linux 使用 `.specify/scripts/bash/check-prerequisites.sh --json --paths-only`.
    - `FEATURE_DIR`
    - `FEATURE_SPEC`
    - (可选捕获 `IMPL_PLAN`, `TASKS` 用于未来的链式流程.)
    - 如果 JSON 解析失败, 中止并指示用户重新运行 `/speckit.specify` 或验证功能分支环境.
-   - 对于参数中包含单引号的情况(如 "I'm Groot"), 使用转义语法: 例如 'I'\''m Groot'(或优先使用双引号: "I'm Groot").
+   - 对于参数中包含单引号的情况(如 "I'm Groot"), 使用当前 shell 的转义语法(或优先使用双引号: "I'm Groot").
 
 2. 加载当前规范文件. 使用此分类法执行结构化模糊性和覆盖范围扫描. 对于每个类别, 标记状态: 清晰 / 部分 / 缺失. 生成用于优先级排序的内部覆盖范围图(除非不会提问, 否则不输出原始图).
 

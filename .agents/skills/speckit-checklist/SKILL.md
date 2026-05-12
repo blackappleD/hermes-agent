@@ -37,9 +37,9 @@ $ARGUMENTS
 
 ## 执行步骤
 
-1. **设置**: 从仓库根目录运行 `.specify/scripts/powershell/check-prerequisites.ps1 -Json` 并解析JSON以获取FEATURE_DIR和AVAILABLE_DOCS列表.
+1. **设置**: 从仓库根目录根据当前系统运行先决条件脚本并解析 JSON 以获取 FEATURE_DIR 和 AVAILABLE_DOCS 列表: Windows 使用 `.specify/scripts/powershell/check-prerequisites.ps1 -Json`; macOS/Linux 使用 `.specify/scripts/bash/check-prerequisites.sh --json`.
    - 所有文件路径必须是绝对路径.
-   - 对于参数中的单引号如"I'm Groot", 使用转义语法: 例如 'I'\''m Groot'(或者尽可能使用双引号: "I'm Groot").
+   - 对于参数中的单引号如"I'm Groot", 使用当前 shell 的转义语法(或者尽可能使用双引号: "I'm Groot").
 
 2. **澄清意图(动态)**: 推导最多三个初始上下文澄清问题(无预编目录). 它们必须:
    - 从用户的表述 + 从规范/计划/任务中提取的信号生成

@@ -52,7 +52,7 @@ $ARGUMENTS
 
 ## 大纲
 
-1. **设置**: 从仓库根目录运行 `.specify/scripts/powershell/setup-plan.ps1 -Json` 并解析 JSON 获取 FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, BRANCH。对于参数中的单引号如 "I'm Groot", 使用转义语法: 例如 'I'\''m Groot' (或尽可能使用双引号: "I'm Groot")。
+1. **设置**: 从仓库根目录根据当前系统运行计划脚本并解析 JSON 获取 FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, BRANCH。Windows 使用 `.specify/scripts/powershell/setup-plan.ps1 -Json`; macOS/Linux 使用 `.specify/scripts/bash/setup-plan.sh --json`。对于参数中的单引号如 "I'm Groot", 使用当前 shell 的转义语法(或尽可能使用双引号: "I'm Groot")。
 
 2. **加载上下文**: 读取 FEATURE_SPEC 和 `.specify/memory/constitution.md`。加载 IMPL_PLAN 模板(已复制)。
 
@@ -137,7 +137,7 @@ $ARGUMENTS
    - 如果项目纯内部使用(构建脚本, 一次性工具等), 则跳过
 
 3. **代理上下文更新**:
-   - 运行 `.specify/scripts/powershell/update-agent-context.ps1 -AgentType codex`
+   - 根据当前系统运行代理上下文脚本: Windows 使用 `.specify/scripts/powershell/update-agent-context.ps1 -AgentType codex`; macOS/Linux 使用 `.specify/scripts/bash/update-agent-context.sh codex`
    - 这些脚本检测当前使用的是哪个 AI 代理
    - 更新相应的代理专用上下文文件
    - 仅从当前计划中添加新技术

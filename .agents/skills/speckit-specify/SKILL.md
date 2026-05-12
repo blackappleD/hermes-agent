@@ -68,20 +68,21 @@ $ARGUMENTS
      - "Create a dashboard for analytics" → "analytics-dashboard"
      - "Fix payment processing timeout bug" → "fix-payment-timeout"
 
-2. **创建功能分支**, 通过运行带有 `--short-name`(和 `--json`)的脚本来创建。在顺序模式下, **不要**传递 `--number` — 脚本会自动检测下一个可用编号。在时间戳模式下, 脚本会自动生成 `YYYYMMDD-HHMMSS` 前缀:
+2. **创建功能分支**, 通过运行带有短名称和 JSON 输出标志的脚本来创建。先根据当前系统选择脚本: Windows 使用 `.specify/scripts/powershell/create-new-feature.ps1` 和 PowerShell 参数; macOS/Linux 使用 `.specify/scripts/bash/create-new-feature.sh` 和 Bash 参数。在顺序模式下, **不要**传递编号参数 — 脚本会自动检测下一个可用编号。在时间戳模式下, 脚本会自动生成 `YYYYMMDD-HHMMSS` 前缀:
 
    **分支编号模式**: 在运行脚本之前, 检查 `.specify/init-options.json` 是否存在并读取 `branch_numbering` 值。
    - 如果是 `"timestamp"`, 在脚本调用中添加 `--timestamp`(Bash)或 `-Timestamp`(PowerShell)
    - 如果是 `"sequential"` 或不存在, 不添加任何额外标志(默认行为)
 
-   - Bash 示例: `.specify/scripts/powershell/create-new-feature.ps1 "$ARGUMENTS" --json --short-name "user-auth" "Add user authentication"`
-   - Bash(时间戳): `.specify/scripts/powershell/create-new-feature.ps1 "$ARGUMENTS" --json --timestamp --short-name "user-auth" "Add user authentication"`
+   - Bash 示例: `.specify/scripts/bash/create-new-feature.sh "$ARGUMENTS" --json --short-name "user-auth" "Add user authentication"`
+   - Bash(时间戳): `.specify/scripts/bash/create-new-feature.sh "$ARGUMENTS" --json --timestamp --short-name "user-auth" "Add user authentication"`
    - PowerShell 示例: `.specify/scripts/powershell/create-new-feature.ps1 "$ARGUMENTS" -Json -ShortName "user-auth" "Add user authentication"`
    - PowerShell(时间戳): `.specify/scripts/powershell/create-new-feature.ps1 "$ARGUMENTS" -Json -Timestamp -ShortName "user-auth" "Add user authentication"`
 
    **重要**:
-   - **不要**传递 `--number` — 脚本会自动确定正确的下一个编号
+   - **不要**传递 `--number` 或 `-Number` — 脚本会自动确定正确的下一个编号
    - 始终包含 JSON 标志(Bash 用 `--json`, PowerShell 用 `-Json`), 以便输出可以被可靠地解析
+   - 不要在 Windows 上使用 Bash 脚本路径, 不要在 macOS/Linux 上使用 PowerShell 脚本路径
    - 每个功能只能运行此脚本一次
    - JSON 会在终端中作为输出提供 — 始终参考它来获取你需要的实际内容
    - JSON 输出将包含 BRANCH_NAME 和 SPEC_FILE 路径
