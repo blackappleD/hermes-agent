@@ -39,11 +39,13 @@ Place tokens or credentials only in the profile's secret/runtime store. Do not p
 4. If registration succeeds, `hermes linz status` shows `registered` with `os_id` and `soul_id`.
 5. If registration fails, the persona load is blocked and status shows `pending` or `failed` with a diagnostic.
 
-## 4. No Legacy Import Scenario
+## 4. Scope Exclusion Scenario
 
-1. Call the old identity import command if implemented as a stub.
-2. Expected: command reports old linz-world-skill identity import is out of scope.
-3. Expected: no old `~/.linz-world` identity file is read, written, or migrated.
+1. List `hermes linz` native commands.
+2. Expected: no legacy identity import, sync, or migration command is present.
+3. Inspect implementation paths touched by this feature.
+4. Expected: no `agent/linz_world/migration.py` or equivalent legacy identity sync path is implemented.
+5. Expected: no old `~/.linz-world` identity file is read, written, migrated, or synchronized.
 
 ## 5. Authorization and Publish Scenario
 

@@ -1,6 +1,6 @@
 # 功能规范: Linz World 原生身份与世界接入
 
-**功能分支**: `001-native-linz-identity`
+**功能分支**: `feat/88-linz-world-native-identity`
 **创建时间**: 2026-05-12
 **状态**: 草稿
 **输入**: 用户描述: "根据 docs/基于张力场的Agent自驱动实现计划.md 中的模块 -1：Linz World 原生身份与世界接入，开发 spec。将 linz-world-skill 暴露的能力迁移为 Hermes Agent 原生能力；Hermes Agent 创建或加载时基于当前 Hermes profile 幂等注册为 Linz World original spirit；登录、上线监听、自动响应和事件发布继续受配置与治理约束。"
@@ -11,9 +11,17 @@
 
 - Q: Linz World 注册失败时，agent persona 加载应如何处理？ → A: 注册失败时阻止 agent persona 加载，直到注册成功。
 - Q: 旧 linz-world-skill 身份导入遇到当前 Hermes profile 已有 Linz World 身份时，应该怎么处理？ → A: 不考虑旧身份导入，按全新原生开发处理。
+- Q: 旧身份导入或同步是否属于本 issue 范围？ → A: 不属于，不需要考虑旧身份导入和同步的问题。依据: issue 评论 `e7605d41-d0ee-42d8-9a5c-3c46a2ececbb`。
 - Q: 世界事件已经可靠保存，但 Hermes 内部处理持续失败时，最多应该重试几次后停止自动重试？ → A: 最多 3 次，仍失败则标记为 failed 并等待人工处理。
 - Q: 授权 map 已存在但刷新失败或过期时，外部副作用应该怎么处理？ → A: 每次外部副作用都必须实时刷新授权 map，刷新失败则阻断。
 - Q: Linz World 原始事件 payload 应该如何保留？ → A: 保存受限审计用原始 payload；prompt 和普通输出只使用脱敏摘要。
+
+## 非目标
+
+- 不实现旧 `linz-world-skill` 身份导入、同步或迁移。
+- 不新增 `hermes linz import-skill-profile`、`agent/linz_world/migration.py` 或等价的 legacy identity 入口。
+- 不读取、写入、覆盖或同步旧 `~/.linz-world` 身份目录或旧 skill profile。
+- 不在本模块实现张力场自驱动算法、泡泡协议协作运行时或完整经济结算能力。
 
 ## 用户场景与测试 *(必填)*
 
@@ -45,8 +53,6 @@ Hermes 用户可以在不安装 linz-world-skill 的情况下，通过 Hermes �
 
 1. **给定** 当前 profile 已有 Linz World 身份，**当** 用户查看状态、登录、退出、刷新授权 map 或查看未读世界事件，**那么** Hermes 提供原生结果和可诊断错误。
 2. **给定** 用户未安装 linz-world-skill，**当** 用户列出 Hermes 的 Linz World 命令或 agent 工具，**那么** 身份、状态、授权、事件、发布、世界算力、Soul Memory 和关系能力仍然可见。
-3. **给定** 用户请求导入旧 linz-world-skill 身份，**当** 该请求发生在本功能范围内，**那么** 系统明确告知旧身份导入不属于当前版本范围。
-
 ---
 
 ### 用户故事 3 - 世界事件可靠进入 Hermes 事件流 (优先级: P2)
@@ -84,7 +90,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 
 - 当前 Hermes profile 已有部分 Linz World 字段但缺少关键身份时，系统必须进入可诊断的 pending 或 failed 状态，并阻止 agent persona 加载，不能假定注册成功。
 - 同一个 Hermes profile 被多个入口同时加载时，系统必须避免重复注册。
-- 旧 linz-world-skill 本地身份导入不属于当前版本范围；系统不得尝试读取、覆盖或迁移旧身份。
+- 旧 linz-world-skill 本地身份导入、同步和迁移不属于当前版本范围；系统不得提供 legacy identity 入口，也不得尝试读取、覆盖、迁移或同步旧身份。
 - 未安装 linz-world-skill 时，所有原生命令和工具仍必须可发现；缺少 Linz World 服务配置时返回可操作的配置错误。
 - 世界事件 payload 不是对象、subject/event_type 不在正式目录或使用旧协议名称时，系统必须拒绝处理或降级为不可执行记录。
 - 重复世界事件、乱序事件或处理失败事件必须保留可追踪状态；处理失败事件最多自动重试 3 次，仍失败后标记为 failed 并等待人工处理。
@@ -103,7 +109,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **FR-004**: 系统必须保证身份注册按 Hermes profile 幂等执行，重复加载同一 profile 不得产生多个 Linz World 身份。
 - **FR-005**: 注册成功后，系统必须把 os_id、soul_id、os_name、account_id 和注册状态保存到当前 Hermes profile 的 Linz World 身份记录中。
 - **FR-006**: 注册失败或服务不可用时，系统必须保存 pending 或 failed 状态、最后错误和下一步诊断，并阻止该 agent persona 加载，直到注册成功。
-- **FR-007**: 系统不得在当前版本中读取、导入、覆盖或迁移旧 linz-world-skill 本地身份；旧身份导入请求必须返回明确的范围外说明。
+- **FR-007**: 系统不得在当前版本中实现旧 linz-world-skill 本地身份导入、同步或迁移入口，也不得读取、导入、覆盖、迁移或同步旧身份来源。
 - **FR-008**: 用户必须能够通过 Hermes 原生命令查看 Linz World 状态、登录、退出、授权 map、近期事件和发布入口。
 - **FR-009**: Agent 可用工具必须包含 Linz World 状态、授权 map、近期事件、发布、关系、Soul Memory 和世界算力能力，并且这些工具必须受到相同治理规则约束。
 - **FR-010**: 系统必须把授权 map 作为只读治理输入；每次外部副作用执行前都必须实时刷新授权 map，刷新失败或授权未知时必须阻断该副作用。
@@ -145,7 +151,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **SC-001**: 在未安装 linz-world-skill 的全新环境中，用户可以在 2 分钟内查看 Hermes 原生 Linz World 状态；如果注册失败，100% 的 agent persona 加载尝试会被阻止并显示 pending 或 failed 诊断。
 - **SC-002**: 同一 Hermes profile 连续加载 10 次后，只保留一个 Linz World original spirit 身份，且用户可见审计记录中没有重复注册成功事件。
 - **SC-003**: 100% 的注册失败、登录失败和授权 map 刷新失败都会向用户显示可操作诊断，而不是静默跳过。
-- **SC-004**: 100% 的旧 linz-world-skill 身份导入请求会被明确标记为当前版本范围外，且不会读取或修改旧身份来源。
+- **SC-004**: 100% 的实现和任务中不包含旧 linz-world-skill 身份导入、同步或迁移入口，且不会读取、写入或修改旧身份来源。
 - **SC-005**: 100% 的未登录、未授权、未知 subject/event_type 或禁止结算转账发布请求会在外部投递前被阻断，并返回用户可理解原因。
 - **SC-006**: 同一个世界事件重复投递 5 次时，Hermes 只生成 1 条用户可见事件记录和最多 1 次 agent turn 触发。
 - **SC-007**: 在 Linz World 服务可达时，95% 的状态、授权 map 和近期事件查询会在 5 秒内向用户返回结果或明确错误。
@@ -161,7 +167,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - Hermes profile 是本功能的身份边界；同一 profile 共享一个 Linz World original spirit，不同 profile 允许拥有不同身份。
 - Linz World 注册、登录、授权 map、事件、发布、世界算力、Soul Memory 和关系服务由外部 Linz World 提供，本功能负责 Hermes 原生接入和治理边界。
 - Linz World original spirit 身份是 agent persona 加载的硬性前置条件；没有已注册身份时，该 persona 不进入普通对话运行状态。
-- 旧 linz-world-skill 身份导入不属于当前版本范围；新运行期不依赖用户继续安装或调用该 skill。
+- 旧 linz-world-skill 身份导入和同步不属于当前版本范围；新运行期不依赖用户继续安装或调用该 skill，也不提供 legacy identity 迁移入口。
 - 默认交互模式是被动和用户可控的；自驱动、自动响应、上线监听和外部发布由后续模块或显式配置控制。
 - 世界事件 payload 可能包含敏感信息，因此默认只向 agent 上下文、普通工具结果和用户默认视图暴露脱敏摘要和引用；原始 payload 仅用于受限审计。
 - 授权 map 是发布和世界能力调用的主要治理输入；每次外部副作用都要求实时授权 map 校验，如果授权状态未知或刷新失败，系统默认拒绝外部副作用。

@@ -14,13 +14,13 @@
 - 使用 user plugin: plugin 加载顺序和启用状态不适合作为 core persona 身份前置条件。
 - 直接把逻辑分散到 `run_agent.py`、`cli.py`、`gateway/run.py`: 会扩大核心文件改动面，违背复用和小 diff 原则。
 
-## Decision: Hermes profile 是唯一身份边界，旧 linz-world-skill 身份导入范围外
+## Decision: Hermes profile 是唯一身份边界，旧 linz-world-skill 身份导入和同步范围外
 
-**Rationale**: 澄清结果要求按全新原生开发处理，不考虑旧身份导入。每个当前 Hermes profile 拥有一个 Linz World original spirit，身份摘要保存在 profile-aware 配置/状态中。
+**Rationale**: 澄清结果要求按全新原生开发处理，不考虑旧身份导入。2026-05-12 的 issue 人类评论 `e7605d41-d0ee-42d8-9a5c-3c46a2ececbb` 进一步确认旧身份导入和同步不属于本 issue 范围。每个当前 Hermes profile 拥有一个 Linz World original spirit，身份摘要保存在 profile-aware 配置/状态中。
 
 **Alternatives considered**:
 
-- 一次性导入旧身份: 用户明确排除。
+- 一次性导入或同步旧身份: 用户明确排除。
 - 自动读取旧 `~/.linz-world` 身份: 会产生隐式迁移和覆盖风险。
 - 多身份绑定同一 profile: 增加授权、事件归属和审计复杂度，不属于 MVP。
 

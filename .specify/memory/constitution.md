@@ -1,50 +1,43 @@
-# [PROJECT_NAME] 项目章程
-<!-- 示例: Spec 章程, TaskFlow 章程等 -->
+# Hermes Agent Spec Constitution
 
-## 核心原则
+## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- 示例: I. 库优先 -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- 示例: 每个功能都作为独立的库开始; 库必须是自包含的, 可独立测试的, 有文档的; 需要明确的目的 - 不允许仅用于组织的库 -->
+### I. Profile-Scoped State
 
-### [PRINCIPLE_2_NAME]
-<!-- 示例: II. CLI 接口 -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- 示例: 每个库通过 CLI 暴露功能; 文本输入/输出协议: stdin/args → stdout, 错误 → stderr; 支持 JSON + 人类可读格式 -->
+Every feature that stores runtime or identity state must scope that state to the active Hermes profile. New features must use the repository's profile-aware configuration and runtime-state helpers instead of writing implicit global state. Migration from legacy external tools is out of scope unless a spec explicitly includes it.
 
-### [PRINCIPLE_3_NAME]
-<!-- 示例: III. 测试优先(不可协商) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- 示例: TDD 强制执行: 编写测试 → 用户批准 → 测试失败 → 然后实施; 严格执行红-绿-重构循环 -->
+### II. Native Surfaces Before Optional Skills
 
-### [PRINCIPLE_4_NAME]
-<!-- 示例: IV. 集成测试 -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- 示例: 需要集成测试的重点领域: 新库合约测试, 合约变更, 服务间通信, 共享模式 -->
+Capabilities described as native Hermes behavior must be available through core CLI, runtime, gateway, or tool surfaces without requiring an optional skill or plugin. Optional adapters may extend behavior, but core identity, safety, and user-visible diagnostics must not depend on opt-in packages.
 
-### [PRINCIPLE_5_NAME]
-<!-- 示例: V. 可观测性, VI. 版本控制与破坏性变更, VII. 简洁性 -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- 示例: 文本 I/O 确保可调试性; 需要结构化日志; 或: MAJOR.MINOR.BUILD 格式; 或: 从简单开始, YAGNI 原则 -->
+### III. Fail-Closed External Side Effects
 
-## [SECTION_2_NAME]
-<!-- 示例: 附加约束, 安全要求, 性能标准等 -->
+Operations that affect external systems must validate identity, login/session state, authorization, catalog membership, payload shape, and governance policy before making the external call. Unknown authorization, failed refresh, missing identity, or invalid payload must block the side effect and return actionable diagnostics.
 
-[SECTION_2_CONTENT]
-<!-- 示例: 技术栈要求, 合规标准, 部署策略等 -->
+### IV. Privacy and Audit Separation
 
-## [SECTION_3_NAME]
-<!-- 示例: 开发工作流, 审查流程, 质量门控等 -->
+Sensitive payloads, raw tokens, private keys, and unrestricted event bodies must not appear in prompts, normal tool results, default CLI/UI output, or user-facing logs. Features may retain restricted audit references only when the spec defines the retention purpose, access boundary, and redacted summary used for ordinary views.
 
-[SECTION_3_CONTENT]
-<!-- 示例: 代码审查要求, 测试门控, 部署审批流程等 -->
+### V. Testable Incremental Delivery
 
-## 治理
-<!-- 示例: 章程优先于所有其他实践; 修订需要文档, 批准, 迁移计划 -->
+Specifications must break work into independently testable increments. High-risk behavior such as identity idempotency, fail-closed registration, authorization blocking, event deduplication, retry limits, receipt recording, and redaction must have explicit tests before implementation is considered complete.
 
-[GOVERNANCE_RULES]
-<!-- 示例: 所有 PR/审查必须验证合规性; 复杂性必须证明合理; 使用 [GUIDANCE_FILE] 获取运行时开发指导 -->
+## Technical Constraints
 
-**版本**: [CONSTITUTION_VERSION] | **批准日期**: [RATIFICATION_DATE] | **最后修订**: [LAST_AMENDED_DATE]
-<!-- 示例: 版本: 2.1.1 | 批准日期: 2025-06-13 | 最后修订: 2025-07-16 -->
+- Prefer existing Hermes infrastructure before introducing new frameworks: config loaders, profile-aware paths, gateway platform registry, tool registry, SessionDB or existing runtime state facilities.
+- New required dependencies must be justified in the spec and reviewed before Builder implementation. Optional transports must degrade with clear diagnostics when unavailable.
+- Default behavior must preserve user control. Automatic online listening, automatic responses, self-driven continuation, and automatic external publishing require explicit configuration or a separate approved feature.
+- Specs must document non-goals and excluded migrations when source plans include broader work than the current issue.
+
+## Workflow Gates
+
+- Planner updates must modify spec-kit artifacts only unless the issue explicitly requests implementation.
+- Reviewer checks must verify consistency among `spec.md`, `plan.md`, `tasks.md`, contracts, data model, quickstart, and this constitution.
+- Builder may start only after spec review approval, and should implement in the story order defined by `tasks.md`.
+- Each spec update that changes requirements, scope, acceptance criteria, or task breakdown must be committed and pushed on the issue branch.
+
+## Governance
+
+This constitution governs spec-kit work for this repository. Changes require a spec commit that explains the reason and updates any affected plan gate checks. When this constitution conflicts with issue-specific human clarification, Planner must update the spec to record the clarification and keep implementation tasks consistent with it.
+
+**Version**: 1.0.0 | **Approved**: 2026-05-12 | **Last Amended**: 2026-05-12

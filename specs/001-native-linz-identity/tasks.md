@@ -52,7 +52,7 @@
 
 - [ ] T015 [P] [US1] Add identity registration idempotency tests in `tests/linz_world/test_identity_bootstrap.py`
 - [ ] T016 [P] [US1] Add fail-closed persona bootstrap tests in `tests/linz_world/test_identity_bootstrap.py`
-- [ ] T017 [P] [US1] Add no legacy skill import tests in `tests/linz_world/test_identity_bootstrap.py`
+- [ ] T017 [P] [US1] Add partial identity field fail-closed tests in `tests/linz_world/test_identity_bootstrap.py`
 
 ### Implementation for US1
 
@@ -72,17 +72,17 @@
 
 **Goal**: Users and agents can inspect and operate Linz World status, login, auth map, events, publish entrypoint, compute, Soul Memory, and relationship capabilities without installing `linz-world-skill`.
 
-**Independent Test**: In an environment without `linz-world-skill`, execute native CLI commands and agent tools for status, login, map, recent events, and unsupported legacy import.
+**Independent Test**: In an environment without `linz-world-skill`, execute native CLI commands and agent tools for status, login, map, recent events, publish entrypoint, compute, Soul Memory, and relationship discovery.
 
 ### Tests for US2
 
 - [ ] T025 [P] [US2] Add native CLI command tests in `tests/linz_world/test_cli.py`
 - [ ] T026 [P] [US2] Add native agent tool schema and redaction tests in `tests/linz_world/test_tools.py`
-- [ ] T027 [P] [US2] Add unsupported legacy import command test in `tests/linz_world/test_cli.py`
+- [ ] T027 [P] [US2] Add native CLI discoverability tests in `tests/linz_world/test_cli.py`
 
 ### Implementation for US2
 
-- [ ] T028 [US2] Implement login, logout, map, events, publish, and import-skill-profile CLI handlers in `hermes_cli/linz.py`
+- [ ] T028 [US2] Implement login, logout, map, events, and publish CLI handlers in `hermes_cli/linz.py`
 - [ ] T029 [US2] Implement Linz login/session operations in `agent/linz_world/auth.py`
 - [ ] T030 [US2] Implement native Linz agent tools in `tools/linz_world_tools.py`
 - [ ] T031 [US2] Register Linz tools with the existing tool registry in `tools/registry.py`
@@ -182,7 +182,7 @@
 
 1. Complete Phase 1 and Phase 2.
 2. Complete US1 only.
-3. Verify identity bootstrap, idempotency, fail-closed registration, and no legacy import.
+3. Verify identity bootstrap, idempotency, and fail-closed registration.
 4. Hand back for review before enabling external side effects.
 
 ### Incremental Delivery
@@ -197,4 +197,4 @@
 - Keep implementation commits on the same branch after Reviewer approval.
 - Do not add a hard NATS dependency unless the task is explicitly revised and approved.
 - Treat authorization refresh failure as a blocker for every external side effect.
-- Never read, import, or migrate old `linz-world-skill` identity state in this feature.
+- Do not implement legacy identity import, sync, or migration paths, and never read, import, sync, or migrate old `linz-world-skill` identity state in this feature.

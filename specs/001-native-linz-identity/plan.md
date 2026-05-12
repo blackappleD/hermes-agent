@@ -7,7 +7,7 @@
 
 ## 摘要
 
-将 Linz World 从可选 skill 能力提升为 Hermes 原生世界身份层：每个 Hermes profile 拥有一个 original spirit 身份，agent persona 创建/加载时必须成功注册或复用身份，注册失败时 fail-closed 并阻止 persona 进入普通对话状态。本功能提供原生命令、agent 工具、事件接入、授权治理、发布 receipt、世界算力、Soul Memory 和关系能力；不做旧 linz-world-skill 身份导入。外部副作用每次执行前实时刷新授权 map，刷新失败即阻断。世界事件可靠保存后确认接收，Hermes 内部处理最多自动重试 3 次；原始 payload 仅限受限审计路径，prompt 和普通输出只使用脱敏摘要。
+将 Linz World 从可选 skill 能力提升为 Hermes 原生世界身份层：每个 Hermes profile 拥有一个 original spirit 身份，agent persona 创建/加载时必须成功注册或复用身份，注册失败时 fail-closed 并阻止 persona 进入普通对话状态。本功能提供原生命令、agent 工具、事件接入、授权治理、发布 receipt、世界算力、Soul Memory 和关系能力；不做旧 linz-world-skill 身份导入、同步或迁移入口。外部副作用每次执行前实时刷新授权 map，刷新失败即阻断。世界事件可靠保存后确认接收，Hermes 内部处理最多自动重试 3 次；原始 payload 仅限受限审计路径，prompt 和普通输出只使用脱敏摘要。
 
 技术方法采用 `agent/linz_world/` 作为内建领域模块，复用现有 `get_hermes_home()` profile-aware 路径、`hermes_cli/config.py` 配置体系、`gateway.platform_registry` 动态平台、`gateway.platforms.base.MessageEvent`、`tools.registry` 自注册工具、`toolsets.py` 工具暴露和 `hermes_state.SessionDB` 持久化能力。NATS 监听作为可选传输适配，不在本计划中引入新的必需依赖。
 
@@ -20,7 +20,7 @@
 **目标平台**: Hermes CLI、TUI、gateway、agent runtime；Windows/Linux/macOS Python 环境
 **项目类型**: Python CLI + agent runtime + messaging gateway
 **性能目标**: 服务可达时 95% 的 status/map/events 查询在 5 秒内返回；重复 5 次同一世界事件只产生 1 条用户可见事件和最多 1 次 agent turn；处理失败第 3 次重试后停止自动重试
-**约束条件**: 注册失败 fail-closed；不读取/导入/迁移旧 linz-world-skill 身份；外部副作用必须实时授权 map 校验；默认不启用自驱动、自动监听、自动响应、自动外部发布；原始 payload 仅限受限审计；无新必需依赖
+**约束条件**: 注册失败 fail-closed；不读取/导入/同步/迁移旧 linz-world-skill 身份；外部副作用必须实时授权 map 校验；默认不启用自驱动、自动监听、自动响应、自动外部发布；原始 payload 仅限受限审计；无新必需依赖
 **规模/范围**: 每个 Hermes profile 一个 original spirit；MVP 覆盖身份、授权、事件、发布、compute、Soul Memory、relationship，不覆盖张力场自驱动、泡泡协议或经济结算
 
 **Language/Version**: Python >=3.11
@@ -32,11 +32,11 @@
 
 *门控: 必须在阶段 0 研究前通过. 阶段 1 设计后重新检查.*
 
-`.specify/memory/constitution.md` 仍是未填充模板，没有可执行的项目章程条款。实际门控采用仓库 AGENTS.md 工作协议：
+`.specify/memory/constitution.md` 已补齐为 Hermes Agent Spec Constitution；本计划按该章程和仓库 AGENTS.md 工作协议执行门控：
 
 - **行为保护**: 默认不启用自驱动、自动监听、自动响应、自动外部发布；外部副作用 fail-closed。通过。
 - **依赖控制**: 不新增必需依赖；NATS 监听设计为可选适配，若后续实现需要新增包，必须在任务阶段显式记录并获得用户授权。通过。
-- **Profile-aware 路径**: 所有运行期状态使用当前 Hermes profile 和 `get_hermes_home()`，不得写入旧 `~/.linz-world` 身份。通过。
+- **Profile-aware 路径**: 所有运行期状态使用当前 Hermes profile 和 `get_hermes_home()`，不得读取、写入、导入、同步或迁移旧 `~/.linz-world` 身份。通过。
 - **测试先行**: 后续任务必须先覆盖身份幂等、注册失败阻断、授权阻断、事件去重/重试、payload 脱敏等高风险行为。通过。
 - **复用现有基础设施**: 复用 config、gateway、tool registry、SessionDB、memory/tool hooks，不复制 agent runtime 主循环。通过。
 - **可观测性**: 注册、登录、事件、发布、compute、memory、relationship 均需要状态或审计结果。通过。
@@ -155,6 +155,6 @@ specs/001-native-linz-identity/
 - **修改范围**: 预计新增 `agent/linz_world/` 领域模块，扩展 `hermes_cli/linz.py`、`hermes_cli/commands.py`、`tools/linz_world_tools.py`、`tools/registry.py`、`toolsets.py`、gateway platform registry 和 `run_agent.py` persona bootstrap 路径。
 - **关键设计**: 身份注册按 Hermes profile 幂等执行；注册失败 fail-closed；外部副作用每次实时刷新授权 map；世界事件可靠保存后 ack，内部处理最多自动重试 3 次；prompt、普通工具结果和默认视图只使用脱敏摘要。
 - **风险与取舍**: fail-closed 会让 Linz World 服务不可用时阻止 persona 加载；实时授权刷新增加延迟但收窄越权窗口；受限审计 payload 增加隐私治理要求但保留诊断证据。
-- **验收标准**: 以 `spec.md` 的 SC-001 到 SC-013 为准，重点验证身份唯一性、注册失败阻断、无旧 skill 导入、授权阻断、事件去重、payload 脱敏、默认不开启自动上线/自动响应/自动发布。
+- **验收标准**: 以 `spec.md` 的 SC-001 到 SC-013 为准，重点验证身份唯一性、注册失败阻断、无旧身份导入/同步/迁移入口、授权阻断、事件去重、payload 脱敏、默认不开启自动上线/自动响应/自动发布。
 - **测试计划**: 按 `tasks.md` 先写 `tests/linz_world/` 覆盖身份、授权、事件、工具、CLI、发布和隐私，再执行 `quickstart.md` 中的 targeted regressions。
 - **交接建议**: Reviewer Agent 审查通过后，Builder Agent 应按 `tasks.md` 的 US1 MVP -> US2/US3 -> US4 顺序实现，不要把 NATS SDK 作为必需依赖引入。

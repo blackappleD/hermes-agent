@@ -22,7 +22,7 @@ Represents the current Hermes profile and its profile-aware runtime boundary.
 **Validation Rules**
 
 - All Linz World state must be scoped to the active profile.
-- Runtime must not read, import, overwrite, or migrate old linz-world-skill identity state.
+- Runtime must not read, import, sync, overwrite, or migrate old linz-world-skill identity state.
 
 ## Entity: World Identity
 
