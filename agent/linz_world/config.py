@@ -10,6 +10,8 @@ DEFAULT_LINZ_WORLD_CONFIG: dict[str, Any] = {
     "enabled": True,
     "identity_required_on_agent_load": True,
     "service_url": "",
+    "server_url": "",
+    "compute_api_key_ref": "",
     "os_name": "Hermes",
     "auto_listen": False,
     "auto_respond": False,
@@ -25,6 +27,7 @@ class LinzWorldConfig:
     enabled: bool = True
     identity_required_on_agent_load: bool = True
     service_url: str = ""
+    compute_api_key_ref: str = ""
     os_name: str = "Hermes"
     auto_listen: bool = False
     auto_respond: bool = False
@@ -60,6 +63,7 @@ def load_linz_world_config(config: dict[str, Any] | None = None) -> LinzWorldCon
     if not isinstance(raw, dict):
         raw = {}
     merged = {**DEFAULT_LINZ_WORLD_CONFIG, **raw}
+    service_url = str(merged.get("service_url") or merged.get("server_url") or "").strip()
     retry_limit = int(merged.get("event_retry_limit") or 3)
     query_limit = int(merged.get("event_query_limit") or 20)
     return LinzWorldConfig(
@@ -67,7 +71,8 @@ def load_linz_world_config(config: dict[str, Any] | None = None) -> LinzWorldCon
         identity_required_on_agent_load=_bool_value(
             merged.get("identity_required_on_agent_load"), True
         ),
-        service_url=str(merged.get("service_url") or "").strip(),
+        service_url=service_url,
+        compute_api_key_ref=str(merged.get("compute_api_key_ref") or "").strip(),
         os_name=str(merged.get("os_name") or "Hermes").strip() or "Hermes",
         auto_listen=_bool_value(merged.get("auto_listen")),
         auto_respond=_bool_value(merged.get("auto_respond")),

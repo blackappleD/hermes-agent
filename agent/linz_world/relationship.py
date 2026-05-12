@@ -12,7 +12,8 @@ def read_relationships(counterparty_id: str = "", repository: LinzStateRepositor
     repo = repository or LinzStateRepository()
     svc = service or default_service()
     try:
-        result = svc.read_relationships(repo.get_login().token_ref, counterparty_id)
+        identity = repo.get_identity()
+        result = svc.read_relationships(identity.__dict__ if identity else {}, repo.get_login().token_ref, counterparty_id)
         return list(result.get("relationships") or [])
     except Exception:
         return repo.relationships()

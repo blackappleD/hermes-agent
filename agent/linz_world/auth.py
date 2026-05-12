@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .api_client import LinzWorldService, LinzWorldServiceError, default_service
+from .api_client import LinzWorldService, LinzWorldServiceError, default_service, store_runtime_secret
 from .event_state import LinzStateRepository
 from .models import AuthState, AuthorizationMap, LoginSession, LoginState, utc_now_iso
 
@@ -15,10 +15,15 @@ def login(repository: LinzStateRepository | None = None, service: LinzWorldServi
         return repo.save_login(session)
     try:
         result = (service or default_service()).login(identity.__dict__)
+        token_ref = str(result.get("token_ref") or "")
+        if result.get("token"):
+            token_ref = store_runtime_secret("event_token", str(result["token"]))
         session = LoginSession(
             state=LoginState.LOGGED_IN,
-            token_ref=str(result.get("token_ref") or ""),
-            expires_at=str(result.get("expires_at") or ""),
+            token_ref=token_ref,
+            expires_at=str(result.get("expiresAt") or result.get("expires_at") or ""),
+            credential_id=str(result.get("credentialId") or result.get("credential_id") or ""),
+            subject_claims=list(result.get("subjectClaims") or result.get("subject_claims") or []),
         )
     except Exception as exc:
         session = LoginSession(state=LoginState.LOGGED_OUT, last_error=f"Linz World login failed: {exc}")

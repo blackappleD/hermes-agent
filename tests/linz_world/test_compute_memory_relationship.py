@@ -20,6 +20,13 @@ def test_compute_rejects_explicit_credentials(linz_home, FakeLinzService):
     assert "secret" not in receipt.message
 
 
+def test_compute_missing_api_key_ref_fails_closed(linz_home, FakeLinzService):
+    repo = _ready_repo(linz_home, FakeLinzService())
+    receipt = invoke_compute("do work", {}, repo, FakeLinzService())
+    assert receipt.status.value == "rejected"
+    assert "API key reference is missing" in receipt.message
+
+
 def test_memory_requires_artifact_ref_and_sink_reason(linz_home, FakeLinzService):
     repo = _ready_repo(linz_home, FakeLinzService())
     entry = write_memory("", "reason", "summary", repo)

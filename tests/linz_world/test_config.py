@@ -19,3 +19,8 @@ def test_retry_limit_is_capped_at_three():
 def test_missing_service_url_is_actionable_configuration_error():
     with pytest.raises(LinzWorldServiceError, match="service_url"):
         default_service({"linz_world": {"service_url": ""}})
+
+
+def test_server_url_is_only_compatibility_input():
+    cfg = load_linz_world_config({"linz_world": {"server_url": "http://linz.test"}})
+    assert cfg.service_url == "http://linz.test"

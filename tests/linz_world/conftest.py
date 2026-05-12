@@ -23,14 +23,22 @@ class _FakeLinzService:
         if self.fail_register:
             raise RuntimeError("registry down")
         return {
-            "os_id": f"os_{hermes_profile}",
-            "soul_id": f"soul_{hermes_profile}",
+            "agentId": f"agent_{hermes_profile}",
+            "soulId": f"soul_{hermes_profile}",
+            "soulHash": f"hash_{hermes_profile}",
+            "accessToken": "access-token-secret",
+            "expiresIn": 86400,
+            "registeredAt": "2026-05-12T00:00:00Z",
             "os_name": os_name,
-            "account_id": f"acct_{hermes_profile}",
         }
 
     def login(self, identity):
-        return {"token_ref": "linz_session:test", "expires_at": "2099-01-01T00:00:00Z"}
+        return {
+            "token": "event-token-secret",
+            "expiresAt": "2099-01-01T00:00:00Z",
+            "subjectClaims": ["wsp.chat.message.sent"],
+            "credentialId": "cred_1",
+        }
 
     def logout(self, token_ref):
         return {"ok": True}
@@ -50,12 +58,20 @@ class _FakeLinzService:
         return {"world_event_id": "evt_published", "published_at": "2026-05-12T00:00:00Z"}
 
     def invoke_compute(self, token_ref, task, input_data):
-        return {"result": {"ok": True}, "provider_summary": "fake/model", "receipt": "compute_1"}
+        return {
+            "request_id": "req_1",
+            "os_id": "agent_test",
+            "provider": "fake",
+            "model": "model",
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": "ok"}}],
+            "reservation": {"status": "settled"},
+            "usage": {"total_tokens": 1},
+        }
 
     def write_memory(self, token_ref, artifact_ref, sink_reason, summary):
         return {"receipt": "memory_1"}
 
-    def read_relationships(self, token_ref, counterparty_id=""):
+    def read_relationships(self, identity, token_ref, counterparty_id=""):
         return {"relationships": []}
 
     def add_active_relationship(self, token_ref, counterparty_id, summary=""):

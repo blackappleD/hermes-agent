@@ -56,10 +56,17 @@ class ReceiptStatus(str, Enum):
 @dataclass
 class WorldIdentity:
     profile_id: str
+    agent_id: str = ""
     os_id: str = ""
     os_name: str = ""
     soul_id: str = ""
+    soul_hash: str = ""
     account_id: str = ""
+    access_token_ref: str = ""
+    access_token_expires_at: str = ""
+    registered_at: str = ""
+    credential_id: str = ""
+    compute_api_key_ref: str = ""
     registration_state: RegistrationStatus = RegistrationStatus.PENDING
     authorization_state: AuthState = AuthState.UNKNOWN
     memory_summary_available: bool = False
@@ -70,9 +77,11 @@ class WorldIdentity:
     def is_complete(self) -> bool:
         return (
             self.registration_state == RegistrationStatus.REGISTERED
+            and bool(self.agent_id)
             and bool(self.os_id)
             and bool(self.os_name)
             and bool(self.soul_id)
+            and bool(self.soul_hash)
             and bool(self.account_id)
         )
 
@@ -82,6 +91,8 @@ class LoginSession:
     state: LoginState = LoginState.LOGGED_OUT
     token_ref: str = ""
     expires_at: str = ""
+    credential_id: str = ""
+    subject_claims: list[str] = field(default_factory=list)
     last_error: str = ""
     updated_at: str = field(default_factory=utc_now_iso)
 
@@ -162,9 +173,13 @@ class PublishReceipt:
 class ComputeReceipt:
     request_id: str
     status: ReceiptStatus
+    provider: str = ""
+    model: str = ""
     provider_summary: str = ""
     result_summary: str = ""
     receipt: str = ""
+    usage: dict[str, Any] = field(default_factory=dict)
+    reservation: dict[str, Any] = field(default_factory=dict)
     message: str = ""
     recorded_at: str = field(default_factory=utc_now_iso)
 

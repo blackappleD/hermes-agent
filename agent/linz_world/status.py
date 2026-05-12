@@ -15,10 +15,13 @@ def status_summary(repository: LinzStateRepository | None = None) -> dict:
         "success": True,
         "registration_state": identity.registration_state.value if identity else "pending",
         "identity": {
+            "agent_id": identity.agent_id if identity else "",
             "os_id": identity.os_id if identity else "",
             "soul_id": identity.soul_id if identity else "",
+            "soul_hash": identity.soul_hash if identity else "",
             "os_name": identity.os_name if identity else "",
             "account_id": identity.account_id if identity else "",
+            "compute_api_key_configured": bool(identity.compute_api_key_ref) if identity else False,
         },
         "login_state": login.state.value,
         "authorization_state": auth_map.state.value,
