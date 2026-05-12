@@ -23,8 +23,10 @@ All handlers return JSON strings, following Hermes tool conventions. Tool output
   "success": true,
   "registration_state": "registered",
   "identity": {
-    "os_id": "os_...",
-    "soul_id": "soul_...",
+    "agent_id": "agent-...",
+    "os_id": "agent-...",
+    "soul_id": "soul-...",
+    "soul_hash": "hash...",
     "os_name": "Hermes",
     "account_id": "acct_..."
   },

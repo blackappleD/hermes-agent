@@ -15,6 +15,8 @@
 - Q: 世界事件已经可靠保存，但 Hermes 内部处理持续失败时，最多应该重试几次后停止自动重试？ → A: 最多 3 次，仍失败则标记为 failed 并等待人工处理。
 - Q: 授权 map 已存在但刷新失败或过期时，外部副作用应该怎么处理？ → A: 每次外部副作用都必须实时刷新授权 map，刷新失败则阻断。
 - Q: Linz World 原始事件 payload 应该如何保留？ → A: 保存受限审计用原始 payload；prompt 和普通输出只使用脱敏摘要。
+- Q: Hermes 原生身份接入应以哪个后端接口契约为准？ → A: 必须以 `OPEWorld-Tech/linz-world` 中 `linz-world-skill`/后端实际使用的接口为准，不得继续使用 Hermes 侧占位接口。已核对当前 `linz-world` 主分支：统一响应 envelope 为 `{"code":0,"message":"success","data":...}`；注册接口是 `POST /api/v1/auth/register`，请求字段为 `publicKey`、`publicKeyType`、`fingerprint`、`metadata`，成功数据字段为 `agentId`、`soulId`、`soulHash`、`accessToken`、`expiresIn`、`registeredAt`；事件登录接口是 `POST /api/v1/event/agents/login`，请求字段为 `agentId`、`signedNonce`，成功数据字段为 `token`、`expiresAt`、`subjectClaims`、`credentialId`。依据: OPE-108 issue 描述和 OPE-88 评论 `f9f266fc-2cd3-4360-ae16-0ebc677891c7`、`e835f8ea-1408-4d55-8072-257f7c23e202`。
+- Q: 用户提供的 Linz World 服务地址如何落地？ → A: 当前配置应支持 `http://8.156.84.202:17878` 和 `http://8.156.84.202:17878/api/v1` 两种输入并归一化，避免重复拼接 `/api/v1` 或遗漏版本前缀；用户可见配置文档使用 `service_url`，不再混用 `server_url`。
 
 ## 非目标
 
@@ -93,6 +95,8 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - 旧 linz-world-skill 本地身份导入、同步和迁移不属于当前版本范围；系统不得提供 legacy identity 入口，也不得尝试读取、覆盖、迁移或同步旧身份。
 - 未安装 linz-world-skill 时，所有原生命令和工具仍必须可发现；缺少 Linz World 服务配置时返回可操作的配置错误。
 - 世界事件 payload 不是对象、subject/event_type 不在正式目录或使用旧协议名称时，系统必须拒绝处理或降级为不可执行记录。
+- HTTP 服务返回不符合 Linz World 统一 envelope、`code` 非 0、`data` 缺失或使用 Hermes 占位字段名时，系统必须按可诊断服务错误处理，不能把响应误判为成功。
+- `service_url` 被配置为 origin 根地址或 `/api/v1` 根地址时，HTTP client 必须只拼接一次 API 版本前缀。
 - 重复世界事件、乱序事件或处理失败事件必须保留可追踪状态；处理失败事件最多自动重试 3 次，仍失败后标记为 failed 并等待人工处理。
 - 发布成功但 receipt 回写失败时，系统必须暴露“投递结果不确定”的状态，避免宣称已完整完成。
 - 用户关闭上线监听、自动响应或外部发布时，该模块不得通过默认值绕过用户选择。
@@ -104,10 +108,10 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 ### 功能需求
 
 - **FR-001**: 系统必须在未安装 linz-world-skill 的情况下提供 Linz World 原生身份、状态、授权、事件、发布、世界算力、Soul Memory 和关系能力。
-- **FR-002**: 系统必须为每个 Hermes profile 维护一个稳定的 Linz World original spirit 身份记录，至少包含 profile 标识、os_id、os_name、soul_id、account_id、授权状态和记忆摘要可用性。
+- **FR-002**: 系统必须为每个 Hermes profile 维护一个稳定的 Linz World original spirit 身份记录，至少包含 profile 标识、agent_id/agentId、兼容别名 os_id、os_name、soul_id、soul_hash、account_id、授权状态和记忆摘要可用性。
 - **FR-003**: 系统必须在 agent persona 创建或加载时检查 Linz World 身份状态；已注册身份必须被复用，缺失身份必须触发注册尝试。
 - **FR-004**: 系统必须保证身份注册按 Hermes profile 幂等执行，重复加载同一 profile 不得产生多个 Linz World 身份。
-- **FR-005**: 注册成功后，系统必须把 os_id、soul_id、os_name、account_id 和注册状态保存到当前 Hermes profile 的 Linz World 身份记录中。
+- **FR-005**: 注册成功后，系统必须把 Linz World 返回的 agentId、soulId、soulHash、accessToken 引用、expiresIn/过期时间和注册状态保存到当前 Hermes profile 的 Linz World 身份记录或 secret/runtime store 中；内部 os_id 只能作为 agentId 的兼容别名。
 - **FR-006**: 注册失败或服务不可用时，系统必须保存 pending 或 failed 状态、最后错误和下一步诊断，并阻止该 agent persona 加载，直到注册成功。
 - **FR-007**: 系统不得在当前版本中实现旧 linz-world-skill 本地身份导入、同步或迁移入口，也不得读取、导入、覆盖、迁移或同步旧身份来源。
 - **FR-008**: 用户必须能够通过 Hermes 原生命令查看 Linz World 状态、登录、退出、授权 map、近期事件和发布入口。
@@ -128,11 +132,19 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **FR-023**: 系统必须支持读取 Linz World 关系状态和添加 ACTIVE 关系，并把关系摘要作为后续自治层可消费的关系信号。
 - **FR-024**: 系统必须默认不启用自驱动、自动上线监听、自动响应或自动外部发布；这些行为只能由用户配置或显式命令开启。
 - **FR-025**: 所有注册、登录、事件接收、发布、算力、记忆和关系操作必须产生用户可追踪的状态或审计结果。
+- **FR-026**: Linz World HTTP client 必须解析 Linz World 统一响应 envelope：只有 `code == 0` 且 `data` 为对象时才视为成功；非 0 code、HTTP 错误、缺失 data 或字段不匹配必须转为用户可诊断错误。
+- **FR-027**: 身份注册必须调用 Linz World 当前后端/skill 契约 `POST /api/v1/auth/register`，请求字段为 `publicKey`、`publicKeyType`、`fingerprint`、`metadata`；不得调用 Hermes 占位路径 `/identity/original-spirit`。成功后必须从 `data.agentId`、`data.soulId`、`data.soulHash`、`data.accessToken`、`data.expiresIn`、`data.registeredAt` 建立当前 profile 身份和登录状态；内部可保留 `os_id` 别名，但对外接口不得发送 `os_id` 替代 `agentId`。
+- **FR-028**: 登录与刷新必须匹配 Linz World 事件模块接口：登录调用 `POST /api/v1/event/agents/login`，请求字段为 `agentId`、`signedNonce`；刷新调用 `POST /api/v1/event/agents/refresh`，请求字段为 `token`；成功结果必须读取 `data.token`、`data.expiresAt`、`data.subjectClaims`、`data.credentialId`，并禁止在用户可见输出中泄露 token。
+- **FR-029**: 授权 map 不得调用未在 `linz-world` 后端或 skill 中存在的占位接口；当前版本必须从登录/凭证响应的 `subjectClaims`、`publishScopeSnapshot`、`subscribeScopeSnapshot` 以及 `GET /api/v1/event/subjects` 的主题定义组合授权摘要，若后端缺少必要数据则返回可诊断的 unsupported/unknown 状态并阻断外部副作用。
+- **FR-030**: 世界算力调用必须匹配 `POST /api/v1/compute/chat`，使用 `Authorization: Bearer <token>`，请求至少包含 `model`、`messages`、`stream`、`temperature`、`metadata`；系统不得要求用户手工输入裸 compute API key。
+- **FR-031**: Soul Memory 相关能力必须匹配 Linz World Memory 模块路由：人格种子使用 `/api/v1/memory/seeds`，Soul Memory 使用 `/api/v1/memory/soul`，记忆事件归档使用 `/api/v1/memory/events`，投影/快照/lineage 使用对应 `/api/v1/memory/...` 路由；不得调用未确认的 Hermes 占位 memory sink 路径。
+- **FR-032**: 发布与事件接收必须匹配 Linz World 事件系统实际契约：NATS subject 使用 `wsp.{agentId}.sys` 等正式主题；HTTP `POST /api/v1/event/publish` 当前在后端仅为占位返回，除非后端/skill 契约确认其真实 payload 和持久化语义，否则 Hermes 不得把它当作可靠发布成功依据。
+- **FR-033**: 配置必须使用 `linz_world.service_url` 作为用户可见服务地址键，并支持将 origin 根地址和 `/api/v1` 根地址归一化为同一 HTTP 调用行为；旧文档中的 `server_url` 只能作为兼容输入读取，不得作为新文档主键。
 
 ### 关键实体 *(如果功能涉及数据则包含)*
 
 - **Hermes Profile**: 用户当前使用的 Hermes 身份和配置边界；每个 profile 拥有自己的 Linz World 身份记录、授权状态和运行期状态。
-- **World Identity**: Hermes profile 在 Linz World 中的 original spirit 身份，包含 os_id、os_name、soul_id、account_id、注册状态和授权摘要。
+- **World Identity**: Hermes profile 在 Linz World 中的 original spirit 身份，包含 agent_id/agentId、兼容别名 os_id、os_name、soul_id、soul_hash、account_id、注册状态和授权摘要。
 - **Registration State**: 身份注册生命周期状态，表示 pending、registered 或 failed，并包含最近诊断信息。
 - **Authorization Map**: Linz World 授权摘要，说明当前身份可以读取、发布或调用哪些世界能力；它是治理输入，不是 prompt 中的自由文本。
 - **World Event**: 来自 Linz World 的外部事件，具有事件 id、subject/event_type、来源、脱敏 payload 摘要、受限审计 payload 和原始引用。
@@ -161,11 +173,16 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **SC-011**: 100% 的世界事件内部处理失败会在第 3 次自动重试后停止自动重试，标记为 failed，并暴露人工处理状态。
 - **SC-012**: 100% 的发布、世界算力、Soul Memory 写入和关系变更请求在授权 map 实时刷新失败时会被阻断，并返回用户可理解原因。
 - **SC-013**: 100% 的世界事件 prompt 注入、普通工具结果和用户默认视图只显示脱敏摘要；原始 payload 只能通过受限审计路径访问。
+- **SC-014**: 使用 `service_url: "http://8.156.84.202:17878"` 或 `service_url: "http://8.156.84.202:17878/api/v1"` 时，注册请求都会落到单一规范路径 `/api/v1/auth/register`，不会出现 `/api/v1/api/v1/...` 或遗漏 `/api/v1`。
+- **SC-015**: 身份注册测试中 100% 的请求 payload 使用 `publicKey`、`publicKeyType`、`fingerprint`、`metadata`，并从响应 envelope 的 `data.agentId`、`data.soulId`、`data.soulHash`、`data.accessToken` 等字段建模；不得出现 `/identity/original-spirit`、`hermes_profile`、`os_name` 作为远端注册契约字段。
+- **SC-016**: 登录/授权测试中 100% 的登录请求使用 `POST /api/v1/event/agents/login` + `agentId`/`signedNonce`，并从 `subjectClaims` 或 credential scope snapshot 生成授权摘要；若授权数据缺失，发布、compute、memory、relationship 外部副作用全部阻断。
+- **SC-017**: Contract fixture 或 fake service 测试必须覆盖 Linz World 统一响应 envelope 成功、非 0 code、缺失 data、字段缺失和 HTTP 错误，且所有错误都会保存 failed/pending 状态和用户可诊断 next_action。
 
 ## 假设
 
 - Hermes profile 是本功能的身份边界；同一 profile 共享一个 Linz World original spirit，不同 profile 允许拥有不同身份。
 - Linz World 注册、登录、授权 map、事件、发布、世界算力、Soul Memory 和关系服务由外部 Linz World 提供，本功能负责 Hermes 原生接入和治理边界。
+- Linz World 后端/skill 接口是跨仓库契约源；Hermes spec/实现必须定期对照 `OPEWorld-Tech/linz-world` 的 docs、specs 和 handler/service 测试，避免 Hermes 侧自造路径或字段名。
 - Linz World original spirit 身份是 agent persona 加载的硬性前置条件；没有已注册身份时，该 persona 不进入普通对话运行状态。
 - 旧 linz-world-skill 身份导入和同步不属于当前版本范围；新运行期不依赖用户继续安装或调用该 skill，也不提供 legacy identity 迁移入口。
 - 默认交互模式是被动和用户可控的；自驱动、自动响应、上线监听和外部发布由后续模块或显式配置控制。

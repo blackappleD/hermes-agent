@@ -21,9 +21,8 @@ Set non-secret settings in the current Hermes profile config:
 ```yaml
 linz_world:
   enabled: true
-  auto_register_on_agent_create: true
-  registration_failure_mode: fail_agent_create
-  server_url: "https://linz-world.example"
+  identity_required_on_agent_load: true
+  service_url: "http://8.156.84.202:17878/api/v1"
   nats_url: ""
   nats:
     enabled: false
@@ -36,8 +35,19 @@ Place tokens or credentials only in the profile's secret/runtime store. Do not p
 1. Start with a Hermes profile that has no `linz_world.original_spirit`.
 2. Load or create an agent persona.
 3. Expected: Hermes attempts registration.
-4. If registration succeeds, `hermes linz status` shows `registered` with `os_id` and `soul_id`.
+4. If registration succeeds, `hermes linz status` shows `registered` with canonical `agent_id`, compatibility `os_id`, and `soul_id`.
 5. If registration fails, the persona load is blocked and status shows `pending` or `failed` with a diagnostic.
+
+## 3A. Linz World API Compatibility Scenario
+
+1. Configure `service_url` first as `http://8.156.84.202:17878`, then as `http://8.156.84.202:17878/api/v1`.
+2. Trigger identity bootstrap with a fake HTTP service or request recorder.
+3. Expected: both settings call exactly `POST /api/v1/auth/register`.
+4. Expected: registration request uses `publicKey`, `publicKeyType`, `fingerprint`, and `metadata`.
+5. Expected: registration success is parsed from unified envelope `data.agentId`, `data.soulId`, `data.soulHash`, `data.accessToken`, `data.expiresIn`, and `data.registeredAt`.
+6. Expected: no call is made to `/identity/original-spirit`, and no remote request uses `os_id` as the Linz World agent identifier.
+7. Trigger login with a fake HTTP service or request recorder.
+8. Expected: login calls `POST /api/v1/event/agents/login` with `agentId` and `signedNonce`; token output is stored as a secret/runtime reference and is not printed.
 
 ## 4. Scope Exclusion Scenario
 
@@ -80,6 +90,7 @@ Place tokens or credentials only in the profile's secret/runtime store. Do not p
 
 ```powershell
 python -m pytest tests\linz_world
+python -m pytest tests\linz_world\test_api_contract.py
 python -m pytest tests\gateway\test_platform_registry.py tests\gateway\test_internal_event_bypass_pairing.py
 python -m pytest tests\tools\test_registry.py tests\test_toolsets.py
 python -m pytest tests\hermes_cli\test_config.py tests\hermes_cli\test_commands.py

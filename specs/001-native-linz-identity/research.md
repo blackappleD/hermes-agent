@@ -33,6 +33,16 @@
 - 注册失败但普通 agent 继续可用: 用户拒绝，且会产生“无世界身份 agent”。
 - 隐藏 Linz 工具但继续对话: 仍会破坏“Agent 天然是 Linz World original spirit”的身份模型。
 
+## Decision: 远端接口以 Linz World 后端/skill 实际契约为准
+
+**Rationale**: OPE-108 明确要求 Hermes 本次身份接入接口和 `linz-world-skill` 调用的后端接口保持一致。核对 `OPEWorld-Tech/linz-world` 当前源码后，真实注册契约是统一 response envelope 下的 `POST /api/v1/auth/register`，字段为 `publicKey`、`publicKeyType`、`fingerprint`、`metadata`，返回 `agentId`、`soulId`、`soulHash`、`accessToken`、`expiresIn`、`registeredAt`。真实登录契约是 `POST /api/v1/event/agents/login`，字段为 `agentId`、`signedNonce`，返回 `token`、`expiresAt`、`subjectClaims`、`credentialId`。Hermes 原先 contract 中的 `/identity/original-spirit` 属于占位设计，不能用于真实服务接入。
+
+**Alternatives considered**:
+
+- 继续维护 Hermes 抽象占位接口: 会让实现通过本地 fake 测试但无法接入真实 Linz World 服务。
+- 让用户手工配置任意 endpoint mapping: 增加配置复杂度，也无法保证和 skill 一致。
+- 等 Linz World 后端补齐所有 publish/map/relationship 接口后再推进: 会阻塞已明确的注册、登录、compute、memory 一致性修复；缺失能力应 fail-closed 或标记 unsupported。
+
 ## Decision: 授权 map 对所有外部副作用实时刷新
 
 **Rationale**: 用户选择每次外部副作用前实时刷新授权 map，刷新失败即阻断。该策略最保守，覆盖 publish、compute、Soul Memory 写入和 relationship 变更。

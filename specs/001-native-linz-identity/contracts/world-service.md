@@ -1,43 +1,72 @@
 # Contract: Linz World Service Boundary
 
-This contract defines Hermes expectations of Linz World services without binding the implementation to a specific transport or SDK.
+This contract defines Hermes expectations of Linz World services without binding the implementation to a specific SDK. For OPE-108, the authoritative source is the `OPEWorld-Tech/linz-world` backend and the `linz-world-skill` design/specs in that repository. Hermes must not invent service paths that are not present there.
+
+## HTTP Envelope and Base URL
+
+All confirmed Linz World HTTP endpoints use the unified response envelope:
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {}
+}
+```
+
+Rules:
+
+- Only `code == 0` with object `data` is a success.
+- Non-zero `code`, HTTP errors, missing `data`, or missing required fields are service errors.
+- `linz_world.service_url` may be configured as `http://8.156.84.202:17878` or `http://8.156.84.202:17878/api/v1`; the client must normalize so `/api/v1` is present exactly once.
 
 ## Identity Registry
 
 ### Register Original Spirit
 
-**Input**
+**Endpoint**
+
+`POST /api/v1/auth/register`
+
+**Request**
 
 ```json
 {
-  "hermes_profile": "profile-id",
-  "os_name": "display name"
-}
-```
-
-**Success**
-
-```json
-{
-  "os_id": "os_...",
-  "soul_id": "soul_...",
-  "os_name": "display name",
-  "account_id": "acct_..."
-}
-```
-
-**Failure**
-
-```json
-{
-  "error": {
-    "code": "service_unavailable",
-    "message": "redacted diagnostic"
+  "publicKey": "PEM or supported public key material",
+  "publicKeyType": "RSA",
+  "fingerprint": "stable public key fingerprint",
+  "metadata": {
+    "hermes_profile": "profile-id",
+    "os_name": "display name",
+    "runtime_type": "hermes-agent"
   }
 }
 ```
 
-**Hermes rule**: failure blocks agent persona loading.
+**Success `data`**
+
+```json
+{
+  "agentId": "agent-...",
+  "soulId": "soul-...",
+  "soulHash": "hash...",
+  "accessToken": "jwt-or-token",
+  "expiresIn": 86400,
+  "registeredAt": "2026-05-12T00:00:00Z"
+}
+```
+
+**Duplicate/failure**
+
+```json
+{
+  "code": 409,
+  "message": "该 Agent 应直接登录",
+  "data": null
+}
+```
+
+**Hermes rule**: failure blocks agent persona loading. Hermes may keep an internal `os_id` alias for compatibility with existing code, but remote calls must use Linz World `agentId`.
 
 ## Auth
 
@@ -45,12 +74,39 @@ This contract defines Hermes expectations of Linz World services without binding
 
 **Precondition**: registered identity.
 
-**Success**
+**Login endpoint**
+
+`POST /api/v1/event/agents/login`
+
+**Login request**
 
 ```json
 {
-  "token_ref": "profile-local-secret-reference",
-  "expires_at": "2026-05-12T00:00:00Z"
+  "agentId": "agent-...",
+  "signedNonce": "signature-or-proof"
+}
+```
+
+**Refresh endpoint**
+
+`POST /api/v1/event/agents/refresh`
+
+**Refresh request**
+
+```json
+{
+  "token": "current token"
+}
+```
+
+**Success `data`**
+
+```json
+{
+  "token": "jwt-or-token",
+  "expiresAt": "2026-05-12T00:00:00Z",
+  "subjectClaims": ["sys.heartbeat", "task.*", "wsp.agent-123.sys"],
+  "credentialId": "cred-..."
 }
 ```
 
@@ -58,60 +114,129 @@ This contract defines Hermes expectations of Linz World services without binding
 
 ## Authorization Map
 
-### Refresh Map
+There is no confirmed dedicated `/authorization-map` endpoint in the current Linz World backend. Hermes must derive a read-only authorization summary from confirmed backend surfaces only.
 
-**Success**
+### Credential Issue / Revoke
+
+**Issue endpoint**
+
+`POST /api/v1/event/agents/credentials`
 
 ```json
 {
-  "map_version": "opaque-version",
-  "allowed_subjects": ["wsp.chat.message.sent"],
-  "allowed_event_types": ["message.sent"],
+  "agentId": "agent-...",
+  "requestedPurpose": "hermes-runtime"
+}
+```
+
+**Issue success `data`**
+
+```json
+{
+  "id": "cred-...",
+  "agentId": "agent-...",
+  "permissionProfileId": "profile-...",
+  "publishScopeSnapshot": ["sys.heartbeat", "task.*"],
+  "subscribeScopeSnapshot": ["wsp.agent-123.sys"],
+  "expiresAt": "2026-05-12T00:00:00Z",
+  "auditTraceId": "trace-..."
+}
+```
+
+**Revoke endpoint**
+
+`POST /api/v1/event/agents/credentials/revoke`
+
+```json
+{
+  "credentialId": "cred-..."
+}
+```
+
+### Subject Definitions
+
+`GET /api/v1/event/subjects`
+
+**Derived Hermes authorization summary**
+
+```json
+{
+  "map_version": "credential-or-subjects-version",
+  "allowed_subjects": ["wsp.agent-123.sys"],
+  "allowed_event_types": ["sys.login.result", "subject_change"],
   "allowed_capabilities": ["publish", "compute", "memory_sink", "relationship"]
 }
 ```
 
-**Hermes rule**: every external side effect must call refresh immediately before execution. Failure blocks the side effect.
+**Hermes rule**: every external side effect must refresh confirmed authorization data immediately before execution. If confirmed authorization data is unavailable, return `unknown` or `unsupported` and block the side effect.
 
-## Publish
+## Publish and Events
 
-### Publish Event
+The current backend has `POST /api/v1/event/publish`, but it is a placeholder response in the checked source. Hermes must not treat that endpoint as a reliable successful publish contract until the Linz World backend or skill confirms payload, persistence, and receipt semantics.
 
-**Input**
+Confirmed event system transport for login/system events uses NATS subjects such as `wsp.{agentId}.sys`.
 
-```json
-{
-  "subject": "wsp.chat.message.sent",
-  "event_type": "message.sent",
-  "payload": {}
-}
-```
-
-**Success**
+### NATS Login Request Envelope
 
 ```json
 {
-  "world_event_id": "evt_...",
-  "published_at": "2026-05-12T00:00:00Z"
+  "event_type": "sys.login.request",
+  "event_id": "evt_...",
+  "payload": {
+    "agent_id": "agent-...",
+    "proof_payload": "redacted",
+    "timestamp": 1713000000
+  }
 }
 ```
 
-**Hermes rule**: only formal catalog events are allowed; direct settlement transfer events are rejected before service call.
+### Subject Change Notification
+
+**Subject**: `wsp.{agentId}.sys`
+
+```json
+{
+  "agentId": "agent-...",
+  "subject": "wsp.agent-123.sys",
+  "eventType": "subject_change",
+  "changedSubjects": ["+wsp.agent-123.sys"],
+  "emittedAt": 1713000000000,
+  "traceId": "trace-..."
+}
+```
+
+**Hermes rule**: only formal catalog events are allowed; direct settlement transfer events are rejected before service call. If no confirmed publish contract exists for a requested event type, Hermes returns `unsupported` or `rejected` rather than faking a published receipt.
 
 ## Compute
 
 ### Invoke World Compute
 
-**Input**
+**Endpoint**
+
+`POST /api/v1/compute/chat`
+
+**Headers**
+
+`Authorization: Bearer <token>`
+
+**Request**
 
 ```json
 {
-  "task": "short task description",
-  "input": {}
+  "model": "model-name",
+  "messages": [
+    {
+      "role": "user",
+      "content": "task text"
+    }
+  ],
+  "stream": false,
+  "temperature": 0.2,
+  "metadata": {}
 }
 ```
 
-**Success**
+**Success `data`**
 
 ```json
 {
@@ -125,23 +250,48 @@ This contract defines Hermes expectations of Linz World services without binding
 
 ## Soul Memory
 
-### Write Memory
+### Confirmed Routes
 
-**Input**
+- `POST /api/v1/memory/seeds`
+- `GET /api/v1/memory/seeds/{agentId}`
+- `GET /api/v1/memory/seeds/{agentId}/latest`
+- `POST /api/v1/memory/soul`
+- `GET /api/v1/memory/soul/{agentId}`
+- `PUT /api/v1/memory/soul/{agentId}` rejects direct overwrite
+- `POST /api/v1/memory/events`
+- `GET /api/v1/memory/events/{agentId}`
+- `GET /api/v1/memory/events/{agentId}/{eventId}`
+- `GET /api/v1/memory/projections/{agentId}/soul`
+- `GET /api/v1/memory/projections/{agentId}/summary`
+- `GET /api/v1/memory/projections/{agentId}/relationships`
+- `GET /api/v1/memory/snapshots/{agentId}/current`
+- `GET /api/v1/memory/snapshots/{agentId}/{version}`
+- `GET /api/v1/memory/lineage/{agentId}`
+- `GET /api/v1/memory/lineage/{agentId}/source/{eventId}`
+
+### Memory Event Archive Request
 
 ```json
 {
-  "artifact_ref": "artifact-or-evidence-id",
-  "sink_reason": "why this should be remembered",
-  "summary": "redacted summary"
+  "agent_id": "agent-...",
+  "external_event_id": "evt-...",
+  "event_type": "delivery.completed",
+  "event_time": "2026-05-12T00:00:00Z",
+  "payload": {},
+  "claim": {},
+  "evidence_refs": ["artifact-or-evidence-id"],
+  "importance_score": 0.5,
+  "operator_id": "system"
 }
 ```
 
-**Hermes rule**: missing `artifact_ref` or `sink_reason` is invalid.
+**Hermes rule**: missing `artifact_ref` or `sink_reason` at the Hermes tool/CLI boundary is invalid; Hermes maps those user-facing concepts to confirmed Linz World memory evidence fields rather than calling unconfirmed memory sink paths.
 
 ## Relationship
 
 ### Read / Mutate Relationship
+
+Current confirmed relationship read surface is `GET /api/v1/memory/projections/{agentId}/relationships`. A direct ACTIVE relationship mutation endpoint was not found in the checked Linz World backend source.
 
 **Read Success**
 
@@ -158,4 +308,4 @@ This contract defines Hermes expectations of Linz World services without binding
 }
 ```
 
-**Mutation rule**: adding ACTIVE relationship is an external side effect and requires real-time authorization refresh.
+**Mutation rule**: adding ACTIVE relationship is an external side effect and requires real-time authorization refresh. If no confirmed Linz World mutation route exists, Hermes returns `unsupported` and does not fabricate a local-only remote success.

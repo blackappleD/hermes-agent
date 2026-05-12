@@ -14,7 +14,7 @@ Shows current profile Linz World identity and registration status.
 **Success includes**
 
 - registration state: `registered | pending | failed`
-- `os_id`, `soul_id`, `os_name`, `account_id` when available
+- canonical Linz World `agent_id`, compatibility `os_id`, `soul_id`, `soul_hash`, `os_name`, `account_id` when available
 - login state summary
 - authorization state summary
 - next action if blocked

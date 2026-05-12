@@ -31,10 +31,14 @@ Represents the Hermes profile's Linz World original spirit.
 **Fields**
 
 - `hermes_profile`: profile id or display name.
-- `os_id`: Linz World original spirit id.
+- `agent_id`: canonical Linz World `agentId` returned by `POST /api/v1/auth/register`.
+- `os_id`: local compatibility alias for `agent_id` where existing Hermes code still names the actor as OS; this must not be sent to Linz World as a remote field name.
 - `os_name`: user-facing original spirit name.
 - `soul_id`: Linz World soul id.
+- `soul_hash`: Linz World `soulHash` returned by registration.
 - `account_id`: owning or linked account id.
+- `token_ref`: profile-local secret/runtime reference for `accessToken` or login `token`; raw token is never prompt-visible.
+- `token_expires_at`: remote token expiration timestamp or derived expiry.
 - `authorization_state`: `unknown | current | failed`.
 - `memory_summary_available`: boolean.
 - `registration_state`: reference to `Registration State`.
@@ -47,9 +51,10 @@ Represents the Hermes profile's Linz World original spirit.
 
 **Validation Rules**
 
-- `os_id` and `soul_id` are required before agent persona may load.
+- `agent_id` and `soul_id` are required before agent persona may load.
 - The same Hermes profile must not register more than one active original spirit.
 - Missing identity fields force `Registration State = pending | failed` and block persona loading.
+- Registration response parsing must use the Linz World envelope `data.agentId`, `data.soulId`, `data.soulHash`, `data.accessToken`, `data.expiresIn`, and `data.registeredAt`.
 
 ## Entity: Registration State
 
@@ -89,6 +94,10 @@ Read-only governance input refreshed before every external side effect.
 - `allowed_subjects`: list of allowed subject patterns.
 - `allowed_event_types`: list of allowed event types.
 - `allowed_capabilities`: list including `publish`, `compute`, `memory_sink`, `relationship`.
+- `subject_claims`: claims returned by `POST /api/v1/event/agents/login` or refresh.
+- `publish_scope_snapshot`: scope returned by `POST /api/v1/event/agents/credentials`.
+- `subscribe_scope_snapshot`: scope returned by `POST /api/v1/event/agents/credentials`.
+- `credential_id`: Linz World credential id, if issued.
 - `refresh_error`: redacted diagnostic, optional.
 
 **Relationships**
@@ -101,6 +110,7 @@ Read-only governance input refreshed before every external side effect.
 - Every external side effect must trigger a real-time refresh.
 - Refresh failure or `unknown` state blocks the side effect.
 - Cached map may be displayed for read-only status but must not authorize side effects.
+- The map must be derived from confirmed Linz World login/credential/subject routes; unconfirmed map endpoints must not be called.
 
 ## Entity: World Event
 
@@ -166,7 +176,7 @@ A structured request to publish a Linz World event.
 **Fields**
 
 - `request_id`: local unique id.
-- `actor_os_id`: identity attempting publish.
+- `actor_agent_id`: canonical Linz World `agentId` attempting publish.
 - `subject`: formal subject.
 - `event_type`: formal event type.
 - `payload`: structured object.
@@ -213,7 +223,7 @@ World compute invocation through Linz World login session.
 **Fields**
 
 - `request_id`: local unique id.
-- `actor_os_id`: identity invoking compute.
+- `actor_agent_id`: canonical Linz World `agentId` invoking compute.
 - `input_summary`: redacted prompt/request summary.
 - `provider_summary`: provider/model or equivalent source summary.
 - `authorization_map_version`: version used for decision.
@@ -234,7 +244,7 @@ Structured memory write to Linz World side memory.
 **Fields**
 
 - `entry_id`: local id.
-- `actor_os_id`: identity writing memory.
+- `actor_agent_id`: canonical Linz World `agentId` writing memory.
 - `artifact_ref`: delivery/evidence/artifact reference.
 - `sink_reason`: why this memory should be written.
 - `summary`: redacted content summary.
@@ -256,7 +266,7 @@ Relationship read or ACTIVE relationship mutation.
 **Fields**
 
 - `relationship_id`: world relationship id.
-- `actor_os_id`: current identity.
+- `actor_agent_id`: current canonical Linz World `agentId`.
 - `counterparty_id`: related actor.
 - `state`: e.g. `ACTIVE`.
 - `summary`: redacted relationship summary.
@@ -275,7 +285,7 @@ Decision record for externally meaningful actions.
 **Fields**
 
 - `decision_id`: local unique id.
-- `actor_os_id`: identity.
+- `actor_agent_id`: canonical Linz World `agentId`.
 - `action_family`: `publish | compute | memory_sink | relationship | event_ingest`.
 - `decision`: `allow | reject | require_manual | skipped`.
 - `reason`: human-readable explanation.

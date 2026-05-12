@@ -37,6 +37,7 @@
 - [ ] T012 [P] Add foundation tests for config validation and profile scoping in `tests/linz_world/test_config.py`
 - [ ] T013 [P] Add foundation tests for event catalog and redaction behavior in `tests/linz_world/test_event_catalog.py`
 - [ ] T014 [P] Add foundation tests for event state idempotency and receipt state transitions in `tests/linz_world/test_event_state.py`
+- [ ] T014A [P] Add Linz World HTTP envelope, service_url normalization, registration, login, credential, compute, and memory contract fixture tests in `tests/linz_world/test_api_contract.py`
 
 **Checkpoint**: Shared foundation is ready; user stories can be implemented incrementally.
 
@@ -63,6 +64,7 @@
 - [ ] T022 [US1] Add Linz status data provider for registered, pending, and failed states in `agent/linz_world/status.py`
 - [ ] T023 [US1] Wire `hermes linz status` registration diagnostics in `hermes_cli/linz.py`
 - [ ] T024 [US1] Register the `linz` CLI command group in `hermes_cli/commands.py`
+- [ ] T024A [US1] Replace any Hermes placeholder registration route such as `/identity/original-spirit` with `POST /api/v1/auth/register`, using `publicKey`, `publicKeyType`, `fingerprint`, `metadata`, and parsing `data.agentId`, `data.soulId`, `data.soulHash`, `data.accessToken`, `data.expiresIn`, `data.registeredAt`
 
 **Checkpoint**: US1 is independently usable and satisfies MVP identity behavior.
 
@@ -88,6 +90,7 @@
 - [ ] T031 [US2] Register Linz tools with the existing tool registry in `tools/registry.py`
 - [ ] T032 [US2] Expose Linz toolset entries in `toolsets.py`
 - [ ] T033 [US2] Ensure command and tool outputs use redacted summaries in `agent/linz_world/status.py`
+- [ ] T033A [US2] Align login, refresh, credential issue/revoke, and authorization summary with `POST /api/v1/event/agents/login`, `POST /api/v1/event/agents/refresh`, `POST /api/v1/event/agents/credentials`, `POST /api/v1/event/agents/credentials/revoke`, and `GET /api/v1/event/subjects`; do not call unconfirmed authorization-map endpoints
 
 **Checkpoint**: US2 is independently visible through CLI and tools, with no skill dependency.
 
@@ -140,6 +143,7 @@
 - [ ] T051 [US4] Implement relationship read and ACTIVE mutation governance in `agent/linz_world/relationship.py`
 - [ ] T052 [US4] Update `tools/linz_world_tools.py` to route publish, compute, memory, and relationship calls through governance helpers
 - [ ] T053 [US4] Update `hermes_cli/linz.py` publish path to surface `published`, `rejected`, `failed`, and `uncertain` outcomes
+- [ ] T053A [US4] Align compute with `POST /api/v1/compute/chat` and memory with `/api/v1/memory/seeds`, `/api/v1/memory/soul`, `/api/v1/memory/events`, `/api/v1/memory/projections`, `/api/v1/memory/snapshots`, and `/api/v1/memory/lineage`; block or mark unsupported any publish path that only maps to the current Linz World placeholder `POST /api/v1/event/publish`
 
 **Checkpoint**: US4 external side effects are governed and auditable.
 
@@ -154,6 +158,7 @@
 - [ ] T056 Run `python -m pytest tests/linz_world` and record any failures in the implementation handoff
 - [ ] T057 Run targeted regressions from `specs/001-native-linz-identity/quickstart.md`
 - [ ] T058 Audit CLI, tool, gateway, and logs for raw token/private field/restricted payload exposure in `agent/linz_world/`, `hermes_cli/linz.py`, and `tools/linz_world_tools.py`
+- [ ] T059 Audit `agent/linz_world/api_client.py`, `auth.py`, `identity.py`, `compute.py`, `memory.py`, `publisher.py`, tests, and docs for placeholder paths or field names (`/identity/original-spirit`, remote `os_id`, `hermes_profile` as top-level register field, `server_url` as primary config key)
 
 ---
 
@@ -171,6 +176,7 @@
 
 - T002-T004 can run in parallel after T001.
 - T006-T008 and T012-T014 can run in parallel once T005 establishes config shape.
+- T014A can run in parallel with other foundation tests after T010 defines the HTTP client boundary.
 - US2 CLI tests (T025, T027) and tool tests (T026) can run in parallel.
 - US3 adapter, duplicate, and retry tests (T034-T036) can run in parallel.
 - US4 governance, publish, compute/memory/relationship, and privacy tests (T043-T046) can run in parallel.
@@ -198,3 +204,4 @@
 - Do not add a hard NATS dependency unless the task is explicitly revised and approved.
 - Treat authorization refresh failure as a blocker for every external side effect.
 - Do not implement legacy identity import, sync, or migration paths, and never read, import, sync, or migrate old `linz-world-skill` identity state in this feature.
+- Treat `OPEWorld-Tech/linz-world` backend/skill contracts as authoritative. Do not keep Hermes-only placeholder service paths; if a Linz World capability is not backed by a confirmed route or NATS contract, surface `unsupported` or `unknown` and fail closed.
