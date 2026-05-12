@@ -1,4 +1,5 @@
 import pytest
+from types import SimpleNamespace
 
 from agent.linz_world.bootstrap import LinzBootstrapError, ensure_linz_identity_for_persona
 from agent.linz_world.event_state import LinzStateRepository
@@ -36,3 +37,23 @@ def test_partial_identity_fails_closed(linz_home):
     identity = ensure_original_spirit_identity(repo, PartialService())
     assert identity.registration_state.value == "failed"
     assert "missing" in identity.last_error
+
+
+def test_run_agent_default_identity_gate_blocks_persona_load(monkeypatch):
+    from run_agent import AIAgent
+
+    monkeypatch.setattr(
+        "agent.linz_world.config.load_linz_world_config",
+        lambda: SimpleNamespace(identity_required_on_agent_load=True),
+    )
+
+    def _blocked():
+        raise RuntimeError("linz identity blocked")
+
+    monkeypatch.setattr(
+        "agent.linz_world.runtime_bridge.ensure_linz_identity_for_persona",
+        _blocked,
+    )
+
+    with pytest.raises(RuntimeError, match="linz identity blocked"):
+        AIAgent(model="test", skip_context_files=True, skip_memory=True)

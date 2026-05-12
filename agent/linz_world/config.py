@@ -8,7 +8,7 @@ from typing import Any
 
 DEFAULT_LINZ_WORLD_CONFIG: dict[str, Any] = {
     "enabled": True,
-    "identity_required_on_agent_load": False,
+    "identity_required_on_agent_load": True,
     "service_url": "",
     "os_name": "Hermes",
     "auto_listen": False,
@@ -23,7 +23,7 @@ DEFAULT_LINZ_WORLD_CONFIG: dict[str, Any] = {
 @dataclass(frozen=True)
 class LinzWorldConfig:
     enabled: bool = True
-    identity_required_on_agent_load: bool = False
+    identity_required_on_agent_load: bool = True
     service_url: str = ""
     os_name: str = "Hermes"
     auto_listen: bool = False
@@ -65,7 +65,7 @@ def load_linz_world_config(config: dict[str, Any] | None = None) -> LinzWorldCon
     return LinzWorldConfig(
         enabled=_bool_value(merged.get("enabled"), True),
         identity_required_on_agent_load=_bool_value(
-            merged.get("identity_required_on_agent_load"), False
+            merged.get("identity_required_on_agent_load"), True
         ),
         service_url=str(merged.get("service_url") or "").strip(),
         os_name=str(merged.get("os_name") or "Hermes").strip() or "Hermes",

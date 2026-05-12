@@ -27,3 +27,22 @@ def test_publish_rejects_forbidden_event_before_service_call(linz_home, FakeLinz
 
     assert receipt.status.value == "rejected"
     assert svc.publish_calls == 0
+
+
+def test_publish_success_with_receipt_persistence_failure_returns_uncertain(linz_home, FakeLinzService):
+    class FailingReceiptRepository(LinzStateRepository):
+        def append_list(self, key, value):
+            if key == "receipts":
+                raise OSError("disk full")
+            return super().append_list(key, value)
+
+    repo = FailingReceiptRepository(root=linz_home / "linz_world", profile_id="test-profile")
+    svc = FakeLinzService()
+    ensure_original_spirit_identity(repo, svc)
+    auth.login(repo, svc)
+
+    receipt = publish_event("wsp.chat.message.sent", "message.sent", {"text": "hi"}, repo, svc)
+
+    assert receipt.status.value == "uncertain"
+    assert receipt.world_event_id == "evt_published"
+    assert "receipt persistence failed" in receipt.message

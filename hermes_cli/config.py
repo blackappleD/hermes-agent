@@ -442,7 +442,7 @@ DEFAULT_CONFIG = {
     "toolsets": ["hermes-cli"],
     "linz_world": {
         "enabled": True,
-        "identity_required_on_agent_load": False,
+        "identity_required_on_agent_load": True,
         "service_url": "",
         "os_name": "Hermes",
         "auto_listen": False,

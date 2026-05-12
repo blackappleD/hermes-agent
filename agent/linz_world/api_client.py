@@ -109,4 +109,7 @@ def default_service(config=None) -> LinzWorldService:
     cfg = load_linz_world_config(config)
     if cfg.service_url:
         return HttpLinzWorldService(cfg.service_url)
-    return LocalLinzWorldService()
+    raise LinzWorldServiceError(
+        "missing_service_config",
+        "Linz World service_url is not configured. Set linz_world.service_url before using native Linz World runtime.",
+    )

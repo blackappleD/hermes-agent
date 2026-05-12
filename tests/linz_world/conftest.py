@@ -11,7 +11,7 @@ def linz_home(tmp_path, monkeypatch):
     return home
 
 
-class FakeLinzService:
+class _FakeLinzService:
     def __init__(self, *, fail_register: bool = False, fail_auth: bool = False):
         self.fail_register = fail_register
         self.fail_auth = fail_auth
@@ -60,3 +60,8 @@ class FakeLinzService:
 
     def add_active_relationship(self, token_ref, counterparty_id, summary=""):
         return {"relationship_id": "rel_1", "counterparty_id": counterparty_id, "state": "ACTIVE", "summary": summary}
+
+
+@pytest.fixture
+def FakeLinzService():
+    return _FakeLinzService
