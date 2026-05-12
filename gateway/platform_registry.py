@@ -242,3 +242,8 @@ class PlatformRegistry:
 
 # Module-level singleton
 platform_registry = PlatformRegistry()
+
+try:
+    import agent.linz_world.gateway_adapter  # noqa: F401
+except Exception:
+    logger.debug("Linz World platform adapter registration skipped", exc_info=True)

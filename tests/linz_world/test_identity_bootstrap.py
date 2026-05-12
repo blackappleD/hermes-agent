@@ -1,0 +1,38 @@
+import pytest
+
+from agent.linz_world.bootstrap import LinzBootstrapError, ensure_linz_identity_for_persona
+from agent.linz_world.event_state import LinzStateRepository
+from agent.linz_world.identity import ensure_original_spirit_identity
+
+
+def test_identity_registration_is_profile_idempotent(linz_home, FakeLinzService):
+    repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
+    svc = FakeLinzService()
+
+    first = ensure_original_spirit_identity(repo, svc)
+    second = ensure_original_spirit_identity(repo, svc)
+
+    assert first.os_id == second.os_id
+    assert svc.register_calls == 1
+
+
+def test_failed_registration_blocks_persona(linz_home, FakeLinzService):
+    repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
+
+    with pytest.raises(LinzBootstrapError):
+        ensure_linz_identity_for_persona(repo, FakeLinzService(fail_register=True))
+
+    saved = repo.get_identity()
+    assert saved.registration_state.value == "failed"
+    assert "registry down" in saved.last_error
+
+
+def test_partial_identity_fails_closed(linz_home):
+    class PartialService:
+        def register_original_spirit(self, hermes_profile, os_name):
+            return {"os_id": "os_1", "os_name": os_name}
+
+    repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
+    identity = ensure_original_spirit_identity(repo, PartialService())
+    assert identity.registration_state.value == "failed"
+    assert "missing" in identity.last_error

@@ -1165,6 +1165,14 @@ class AIAgent:
         """
         _install_safe_stdio()
 
+        from agent.linz_world.config import load_linz_world_config
+
+        _linz_cfg = load_linz_world_config()
+        if _linz_cfg.identity_required_on_agent_load:
+            from agent.linz_world.runtime_bridge import ensure_linz_identity_for_persona
+
+            ensure_linz_identity_for_persona()
+
         self.model = model
         self.max_iterations = max_iterations
         # Shared iteration budget — parent creates, children inherit.
