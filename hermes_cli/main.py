@@ -9155,7 +9155,7 @@ _BUILTIN_SUBCOMMANDS = frozenset(
         "computer-use",
         "config", "cron", "curator", "dashboard", "debug", "doctor",
         "dump", "fallback", "gateway", "hooks", "import", "insights",
-        "kanban", "login", "logout", "logs", "mcp", "memory", "model",
+        "kanban", "linz", "login", "logout", "logs", "mcp", "memory", "model",
         "pairing", "plugins", "profile", "sessions", "setup", "skills",
         "slack", "status", "tools", "uninstall", "update", "version",
         "webhook", "whatsapp", "chat",
@@ -11506,6 +11506,13 @@ Examples:
     profile_info.add_argument("profile_name", help="Profile to inspect")
 
     profile_parser.set_defaults(func=cmd_profile)
+
+    # =========================================================================
+    # linz command
+    # =========================================================================
+    from hermes_cli.linz import build_parser as _build_linz_parser
+
+    _build_linz_parser(subparsers)
 
     # =========================================================================
     # completion command

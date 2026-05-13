@@ -440,6 +440,18 @@ DEFAULT_CONFIG = {
     "fallback_providers": [],
     "credential_pool_strategies": {},
     "toolsets": ["hermes-cli"],
+    "linz_world": {
+        "enabled": True,
+        "identity_required_on_agent_load": True,
+        "service_url": "",
+        "os_name": "Hermes",
+        "auto_listen": False,
+        "auto_respond": False,
+        "auto_publish": False,
+        "self_drive": False,
+        "event_retry_limit": 3,
+        "event_query_limit": 20,
+    },
     "agent": {
         "max_turns": 90,
         # Inactivity timeout for gateway agent execution (seconds).
