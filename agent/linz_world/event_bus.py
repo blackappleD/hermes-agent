@@ -36,7 +36,16 @@ def project_to_message_event(record: EventDispatchRecord) -> MessageEvent:
         text=text,
         message_type=MessageType.TEXT,
         source=source,
-        raw_message={"event_id": record.event_id, "audit_ref": record.audit_ref},
+        raw_message={
+            "event_id": record.event_id,
+            "audit_ref": record.audit_ref,
+            "subject": record.subject,
+            "event_type": record.event_type,
+            "sequence_key": record.sequence_key,
+            "nats_sequence": record.nats_sequence,
+            "os_id": record.os_id,
+            "soul_id": record.soul_id,
+        },
         message_id=record.event_id,
         internal=False,
     )
