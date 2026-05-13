@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import time
+from json import JSONDecodeError
 from typing import Any, Protocol
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
+
+from hermes_constants import get_hermes_home
 
 from .models import utc_now_iso
 
@@ -20,6 +25,45 @@ class LinzWorldServiceError(RuntimeError):
 
 
 _RUNTIME_SECRETS: dict[str, str] = {}
+_SECRETS_FILE = "secrets.json"
+
+
+def _persistent_secrets_path():
+    return get_hermes_home() / "linz_world" / _SECRETS_FILE
+
+
+def _load_persistent_secrets() -> dict[str, Any]:
+    path = _persistent_secrets_path()
+    if not path.exists():
+        return {"secrets": {}}
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, JSONDecodeError, ValueError):
+        return {"secrets": {}}
+    if not isinstance(data, dict):
+        return {"secrets": {}}
+    secrets = data.get("secrets")
+    if not isinstance(secrets, dict):
+        data["secrets"] = {}
+    return data
+
+
+def _save_persistent_secrets(data: dict[str, Any]) -> None:
+    path = _persistent_secrets_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=True)
+    try:
+        os.chmod(tmp, 0o600)
+    except OSError:
+        pass
+    tmp.replace(path)
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
 
 
 def store_runtime_secret(kind: str, value: str) -> str:
@@ -29,6 +73,13 @@ def store_runtime_secret(kind: str, value: str) -> str:
     digest = hashlib.sha256(f"{kind}:{secret}".encode("utf-8")).hexdigest()[:16]
     ref = f"linz_secret:{kind}:{digest}"
     _RUNTIME_SECRETS[ref] = secret
+    data = _load_persistent_secrets()
+    data.setdefault("secrets", {})[ref] = {
+        "kind": kind,
+        "value": secret,
+        "updated_at": utc_now_iso(),
+    }
+    _save_persistent_secrets(data)
     return ref
 
 
@@ -38,7 +89,32 @@ def resolve_secret_ref(ref: str) -> str:
         return ""
     if ref.startswith("env:"):
         return os.getenv(ref[4:].strip(), "").strip()
-    return _RUNTIME_SECRETS.get(ref, "")
+    if ref in _RUNTIME_SECRETS:
+        return _RUNTIME_SECRETS[ref]
+    if ref.startswith("linz_secret:"):
+        entry = _load_persistent_secrets().get("secrets", {}).get(ref)
+        if isinstance(entry, dict):
+            value = str(entry.get("value") or "")
+        else:
+            value = str(entry or "")
+        if value:
+            _RUNTIME_SECRETS[ref] = value
+            return value
+    return ""
+
+
+def delete_runtime_secret(ref: str) -> None:
+    ref = str(ref or "").strip()
+    if not ref:
+        return
+    _RUNTIME_SECRETS.pop(ref, None)
+    if not ref.startswith("linz_secret:"):
+        return
+    data = _load_persistent_secrets()
+    secrets = data.get("secrets")
+    if isinstance(secrets, dict) and ref in secrets:
+        secrets.pop(ref, None)
+        _save_persistent_secrets(data)
 
 
 def _resolve_bearer_value(ref: str, *, code: str, message: str) -> str:
@@ -64,7 +140,17 @@ def normalize_api_base_url(service_url: str) -> str:
 
 
 class LinzWorldService(Protocol):
-    def register_original_spirit(self, hermes_profile: str, os_name: str) -> dict[str, Any]: ...
+    def register_original_spirit(
+        self,
+        hermes_profile: str,
+        os_name: str,
+        persona_seed: str = "",
+        os_type: str = "USER",
+        runtime_type: str = "Hermes",
+        public_key: str = "",
+        public_key_type: str = "RSA",
+        fingerprint: str = "",
+    ) -> dict[str, Any]: ...
     def login(self, identity: dict[str, Any]) -> dict[str, Any]: ...
     def logout(self, token_ref: str) -> dict[str, Any]: ...
     def refresh_authorization_map(self, identity: dict[str, Any], token_ref: str) -> dict[str, Any]: ...
@@ -78,7 +164,17 @@ class LinzWorldService(Protocol):
 class LocalLinzWorldService:
     """Deterministic local service used when no remote service URL is configured."""
 
-    def register_original_spirit(self, hermes_profile: str, os_name: str) -> dict[str, Any]:
+    def register_original_spirit(
+        self,
+        hermes_profile: str,
+        os_name: str,
+        persona_seed: str = "",
+        os_type: str = "USER",
+        runtime_type: str = "Hermes",
+        public_key: str = "",
+        public_key_type: str = "RSA",
+        fingerprint: str = "",
+    ) -> dict[str, Any]:
         digest = hashlib.sha256(hermes_profile.encode("utf-8")).hexdigest()[:12]
         return {
             "agentId": f"agent_{digest}",
@@ -88,6 +184,8 @@ class LocalLinzWorldService:
             "expiresIn": 86400,
             "registeredAt": utc_now_iso(),
             "os_name": os_name,
+            "type": os_type,
+            "runtime_type": runtime_type,
         }
 
     def login(self, identity: dict[str, Any]) -> dict[str, Any]:
@@ -161,13 +259,26 @@ class HttpLinzWorldService(LocalLinzWorldService):
                 headers=headers,
                 timeout=self.timeout,
             )
-            envelope = response.json()
-        except Exception as exc:
+        except httpx.RequestError as exc:
             raise LinzWorldServiceError("service_unavailable", f"Linz World service unavailable: {exc}") from exc
+        try:
+            envelope = response.json()
+        except (JSONDecodeError, ValueError) as exc:
+            body = _response_text_preview(response)
+            raise LinzWorldServiceError(
+                "invalid_response",
+                (
+                    f"Linz World service returned non-JSON response for "
+                    f"{method.upper()} {path} (HTTP {response.status_code}): {body}"
+                ),
+            ) from exc
         if not isinstance(envelope, dict):
             raise LinzWorldServiceError("invalid_response", "Linz World service returned an invalid response.")
         if response.status_code >= 400:
-            raise LinzWorldServiceError(str(envelope.get("code") or response.status_code), str(envelope.get("message") or response.reason_phrase))
+            raise LinzWorldServiceError(
+                str(envelope.get("code") or response.status_code),
+                str(envelope.get("message") or response.reason_phrase),
+            )
         if envelope.get("code") != 0:
             raise LinzWorldServiceError(str(envelope.get("code") or "service_error"), str(envelope.get("message") or "Linz World service error"))
         data = envelope.get("data")
@@ -187,18 +298,41 @@ class HttpLinzWorldService(LocalLinzWorldService):
     ) -> Any:
         return self._request("GET", path, headers=headers, require_object_data=require_object_data)
 
-    def register_original_spirit(self, hermes_profile: str, os_name: str) -> dict[str, Any]:
-        fingerprint = hashlib.sha256(hermes_profile.encode("utf-8")).hexdigest()
+    def register_original_spirit(
+        self,
+        hermes_profile: str,
+        os_name: str,
+        persona_seed: str = "",
+        os_type: str = "USER",
+        runtime_type: str = "Hermes",
+        public_key: str = "",
+        public_key_type: str = "RSA",
+        fingerprint: str = "",
+    ) -> dict[str, Any]:
+        public_key = str(public_key or "")
+        fingerprint = str(fingerprint or "").strip()
+        if not public_key.strip() or not fingerprint:
+            raise LinzWorldServiceError(
+                "key_material_missing",
+                "Linz World registration requires profile-local public key material.",
+            )
+        seed = str(persona_seed or "").strip()
         return self._post(
             "/auth/register",
             {
-                "publicKey": f"hermes-profile:{hermes_profile}",
-                "publicKeyType": "RSA",
+                "publicKey": public_key,
+                "publicKeyType": public_key_type or "RSA",
                 "fingerprint": fingerprint,
+                "agent_name": os_name,
+                "persona_seed": seed,
+                "type": os_type,
+                "runtime_type": runtime_type,
                 "metadata": {
                     "hermes_profile": hermes_profile,
                     "os_name": os_name,
-                    "runtime_type": "hermes-agent",
+                    "runtime_type": runtime_type,
+                    "persona_seed": seed,
+                    "type": os_type,
                 },
             },
         )
@@ -207,8 +341,20 @@ class HttpLinzWorldService(LocalLinzWorldService):
         agent_id = identity.get("agent_id") or identity.get("agentId") or identity.get("os_id")
         if not agent_id:
             raise LinzWorldServiceError("identity_missing", "Linz World agentId is missing.")
-        signed_nonce = hashlib.sha256(f"hermes-login:{agent_id}".encode("utf-8")).hexdigest()
-        return self._post("/event/agents/login", {"agentId": agent_id, "signedNonce": signed_nonce})
+        private_key_path = str(identity.get("private_key_path") or "").strip()
+        if not private_key_path:
+            raise LinzWorldServiceError(
+                "key_material_missing",
+                "Linz World login signing key is missing; re-run identity registration.",
+            )
+        timestamp = _epoch_millis()
+        from .key_material import sign_with_private_key
+
+        signed_nonce = sign_with_private_key(private_key_path, f"{agent_id}.{timestamp}")
+        return self._post(
+            "/auth/login",
+            {"osId": agent_id, "signedNonce": signed_nonce, "timestamp": timestamp},
+        )
 
     def refresh_authorization_map(self, identity: dict[str, Any], token_ref: str) -> dict[str, Any]:
         agent_id = identity.get("agent_id") or identity.get("agentId") or identity.get("os_id")
@@ -220,14 +366,8 @@ class HttpLinzWorldService(LocalLinzWorldService):
         if not agent_id or not token:
             raise LinzWorldServiceError("login_missing", "Linz World login token is missing.")
         headers = {"Authorization": f"Bearer {token}"}
-        refreshed = self._post("/event/agents/refresh", {"token": token}, headers=headers)
-        credential = self._post(
-            "/event/agents/credentials",
-            {"agentId": agent_id, "requestedPurpose": "hermes-runtime"},
-            headers=headers,
-        )
-        subjects = self._get("/event/subjects", headers=headers, require_object_data=False)
-        return derive_authorization_summary(refreshed, credential, subjects)
+        view = self._post("/event/agents/listener/bootstrap", {}, headers=headers)
+        return derive_listener_authorization_summary(agent_id, view)
 
     def publish_event(self, token_ref: str, subject: str, event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
         raise LinzWorldServiceError(
@@ -236,13 +376,13 @@ class HttpLinzWorldService(LocalLinzWorldService):
         )
 
     def invoke_compute(self, token_ref: str, task: str, input_data: dict[str, Any]) -> dict[str, Any]:
-        api_key = _resolve_bearer_value(
+        token = _resolve_bearer_value(
             token_ref,
-            code="compute_key_missing",
-            message="Linz World compute API key secret is unavailable.",
+            code="login_secret_missing",
+            message="Linz World login token secret is unavailable.",
         )
-        if not api_key:
-            raise LinzWorldServiceError("compute_key_missing", "Linz World compute API key is missing.")
+        if not token:
+            raise LinzWorldServiceError("login_missing", "Linz World login token is missing.")
         payload = {
             "model": str(input_data.get("model") or "default"),
             "messages": input_data.get("messages") if isinstance(input_data.get("messages"), list) else [{"role": "user", "content": task}],
@@ -250,7 +390,7 @@ class HttpLinzWorldService(LocalLinzWorldService):
             "temperature": float(input_data.get("temperature", 0.2)),
             "metadata": input_data.get("metadata") if isinstance(input_data.get("metadata"), dict) else {},
         }
-        data = self._post("/compute/chat", payload, headers={"Authorization": f"Bearer {api_key}"})
+        data = self._post("/compute/chat", payload, headers={"Authorization": f"Bearer {token}"})
         required = ("request_id", "os_id", "provider", "model", "choices", "reservation", "usage")
         missing = [name for name in required if name not in data]
         if missing:
@@ -333,6 +473,22 @@ def derive_authorization_summary(
     }
 
 
+def derive_listener_authorization_summary(agent_id: str, view: dict[str, Any]) -> dict[str, Any]:
+    allowed_subjects = _string_list(view.get("allowedSubjects") or view.get("allowed_subjects"))
+    target_inbox = f"wsp.{agent_id}" if agent_id else ""
+    if target_inbox and target_inbox not in allowed_subjects:
+        allowed_subjects.append(target_inbox)
+    allowed_event_types = _string_list(view.get("allowedEventTypes") or view.get("allowed_event_types"))
+    if not allowed_event_types:
+        allowed_event_types = list(allowed_subjects)
+    return {
+        "map_version": str(view.get("viewVersion") or view.get("view_version") or "listener-bootstrap"),
+        "allowed_subjects": sorted(set(allowed_subjects)),
+        "allowed_event_types": sorted(set(allowed_event_types)),
+        "allowed_capabilities": ["publish", "compute", "memory_sink", "relationship"],
+    }
+
+
 def _relationship_projection_summary(data: Any, counterparty_id: str = "") -> dict[str, Any]:
     if not isinstance(data, dict):
         raise LinzWorldServiceError("invalid_response", "Linz World relationship projection response missing object data.")
@@ -369,6 +525,21 @@ def _string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item) for item in value if str(item or "").strip()]
+
+
+def _response_text_preview(response: httpx.Response) -> str:
+    try:
+        text = response.text
+    except Exception:
+        return "<unreadable response body>"
+    text = " ".join(text.split())
+    if not text:
+        return "<empty response body>"
+    return text[:200]
+
+
+def _epoch_millis() -> int:
+    return int(time.time() * 1000)
 
 
 def default_service(config=None) -> LinzWorldService:

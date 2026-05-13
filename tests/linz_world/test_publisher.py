@@ -4,10 +4,13 @@ from agent.linz_world.identity import ensure_original_spirit_identity
 from agent.linz_world.publisher import publish_event
 
 
+_CONFIG = {"linz_world": {"persona_seed": "stable persona seed"}}
+
+
 def test_publish_success_records_receipt(linz_home, FakeLinzService):
     repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
     svc = FakeLinzService()
-    ensure_original_spirit_identity(repo, svc)
+    ensure_original_spirit_identity(repo, svc, config=_CONFIG)
     auth.login(repo, svc)
 
     receipt = publish_event("wsp.chat.message.sent", "message.sent", {"text": "hi"}, repo, svc)
@@ -20,7 +23,7 @@ def test_publish_success_records_receipt(linz_home, FakeLinzService):
 def test_publish_rejects_forbidden_event_before_service_call(linz_home, FakeLinzService):
     repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
     svc = FakeLinzService()
-    ensure_original_spirit_identity(repo, svc)
+    ensure_original_spirit_identity(repo, svc, config=_CONFIG)
     auth.login(repo, svc)
 
     receipt = publish_event("wsp.mrk.settlement.completed", "settlement.completed", {"amount": 1}, repo, svc)
@@ -38,7 +41,7 @@ def test_publish_success_with_receipt_persistence_failure_returns_uncertain(linz
 
     repo = FailingReceiptRepository(root=linz_home / "linz_world", profile_id="test-profile")
     svc = FakeLinzService()
-    ensure_original_spirit_identity(repo, svc)
+    ensure_original_spirit_identity(repo, svc, config=_CONFIG)
     auth.login(repo, svc)
 
     receipt = publish_event("wsp.chat.message.sent", "message.sent", {"text": "hi"}, repo, svc)

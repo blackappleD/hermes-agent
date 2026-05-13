@@ -19,6 +19,7 @@ import re
 import shutil
 import sys
 import copy
+import locale
 from pathlib import Path
 from typing import Optional, Dict, Any
 
@@ -201,18 +202,71 @@ def prompt(question: str, default: str = None, password: bool = False) -> str:
         display = f"{question}: "
 
     try:
-        if password:
-            import getpass
-
-            value = getpass.getpass(color(display, Colors.YELLOW))
-        else:
-            value = input(color(display, Colors.YELLOW))
-
+        value = _read_prompt_value(display, password=password)
         cleaned = _sanitize_pasted_input(value)
         return cleaned.strip() or default or ""
     except (KeyboardInterrupt, EOFError):
         print()
         sys.exit(1)
+
+
+def _read_prompt_value(display: str, password: bool = False) -> str:
+    """Read one setup prompt with Unicode-aware editing when available."""
+    prompt_text = color(display, Colors.YELLOW)
+
+    if _can_use_prompt_toolkit():
+        try:
+            from prompt_toolkit import prompt as pt_prompt
+            from prompt_toolkit.formatted_text import ANSI
+
+            return pt_prompt(ANSI(prompt_text), is_password=password)
+        except (KeyboardInterrupt, EOFError):
+            raise
+        except Exception as exc:
+            logger.debug("prompt_toolkit prompt failed; falling back to input(): %s", exc)
+
+    try:
+        if password:
+            import getpass
+
+            return getpass.getpass(prompt_text)
+        return input(prompt_text)
+    except UnicodeDecodeError:
+        if password:
+            raise
+        print()
+        print_warning("Input encoding was not UTF-8; retrying with terminal byte fallback.")
+        return _read_tty_line_with_encoding_fallback(display)
+
+
+def _can_use_prompt_toolkit() -> bool:
+    try:
+        return bool(sys.stdin and sys.stdin.isatty() and sys.stdout and sys.stdout.isatty())
+    except Exception:
+        return False
+
+
+def _read_tty_line_with_encoding_fallback(display: str) -> str:
+    prompt_bytes = color(display, Colors.YELLOW).encode(
+        sys.stdout.encoding or "utf-8",
+        errors="replace",
+    )
+    with open("/dev/tty", "rb", buffering=0) as tty_in, open("/dev/tty", "wb", buffering=0) as tty_out:
+        tty_out.write(prompt_bytes)
+        raw = tty_in.readline().rstrip(b"\r\n")
+
+    encodings = [
+        sys.stdin.encoding,
+        locale.getpreferredencoding(False),
+        "utf-8",
+        "gb18030",
+    ]
+    for encoding in dict.fromkeys(enc for enc in encodings if enc):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
 
 
 _BRACKETED_PASTE_PATTERN = re.compile(r"\x1b\[\s*200~|\x1b\[\s*201~")
@@ -1652,7 +1706,162 @@ def setup_terminal_backend(config: dict):
 
 
 # =============================================================================
-# Section 3: Agent Settings
+# Section 3: Linz World Identity
+# =============================================================================
+
+
+_LINZ_PERSONA_START = "<!-- LINZ_WORLD:PERSONA_SEED:START -->"
+_LINZ_PERSONA_END = "<!-- LINZ_WORLD:PERSONA_SEED:END -->"
+_LINZ_PERSONA_PATTERN = re.compile(
+    rf"{re.escape(_LINZ_PERSONA_START)}\s*\n(?P<body>.*?)\n{re.escape(_LINZ_PERSONA_END)}",
+    re.DOTALL,
+)
+
+
+def _read_soul_md_content(hermes_home) -> str:
+    soul_path = Path(hermes_home) / "SOUL.md"
+    try:
+        return soul_path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
+def _extract_linz_persona_seed_from_soul(content: str) -> str:
+    match = _LINZ_PERSONA_PATTERN.search(content or "")
+    if not match:
+        return ""
+    body = match.group("body").strip()
+    heading = "## Linz World Persona Seed"
+    if body.startswith(heading):
+        body = body[len(heading):].strip()
+    return body
+
+
+def _linz_persona_block(persona_seed: str) -> str:
+    seed = persona_seed.strip()
+    return (
+        f"{_LINZ_PERSONA_START}\n"
+        "## Linz World Persona Seed\n\n"
+        f"{seed}\n"
+        f"{_LINZ_PERSONA_END}"
+    )
+
+
+def _inject_linz_persona_seed(content: str, persona_seed: str) -> str:
+    block = _linz_persona_block(persona_seed)
+    existing = content or ""
+    if _LINZ_PERSONA_PATTERN.search(existing):
+        updated = _LINZ_PERSONA_PATTERN.sub(block, existing, count=1)
+    elif existing.strip():
+        updated = existing.rstrip() + "\n\n" + block + "\n"
+    else:
+        updated = block + "\n"
+    return updated if updated.endswith("\n") else updated + "\n"
+
+
+def _write_linz_persona_seed_to_soul(hermes_home, persona_seed: str) -> None:
+    soul_path = Path(hermes_home) / "SOUL.md"
+    soul_path.parent.mkdir(parents=True, exist_ok=True)
+    content = _read_soul_md_content(hermes_home)
+    soul_path.write_text(_inject_linz_persona_seed(content, persona_seed), encoding="utf-8")
+
+
+def _persona_seed_preview(seed: str) -> str:
+    normalized = " ".join(str(seed or "").split())
+    if len(normalized) <= 120:
+        return normalized
+    return normalized[:117] + "..."
+
+
+def _complete_linz_world_login(config: dict) -> bool:
+    """Register and log in the current profile after Linz setup."""
+
+    try:
+        from agent.linz_world import auth, identity
+        from agent.linz_world.event_state import LinzStateRepository
+        from agent.linz_world.models import AuthState, LoginState
+
+        repo = LinzStateRepository()
+        world_identity = identity.ensure_original_spirit_identity(repo, config=config)
+        if not world_identity.is_complete():
+            print_warning(world_identity.last_error or "Linz World identity registration failed.")
+            if world_identity.next_action:
+                print_info(world_identity.next_action)
+            return False
+        session = auth.login(repo, config=config)
+        auth_map = repo.get_auth_map()
+        if session.state == LoginState.LOGGED_IN:
+            print_success("接入灵治平台成功！")
+            if auth_map.state != AuthState.CURRENT and auth_map.last_error:
+                print_warning(f"Linz World authorization map is not current: {auth_map.last_error}")
+            return True
+        print_warning(session.last_error or "Linz World login failed.")
+        return False
+    except Exception as exc:
+        print_warning(f"Linz World login failed: {exc}")
+        return False
+
+
+def setup_linz_world(config: dict):
+    """Ensure the Linz World persona seed exists."""
+
+    from agent.linz_world.config import (
+        DEFAULT_LINZ_WORLD_NATS_URL,
+        DEFAULT_LINZ_WORLD_SERVICE_URL,
+    )
+
+    print_header("Linz World Identity")
+    print_info("Ensures the persona seed required for original-spirit registration exists.")
+    print_info("The persona seed is injected into a Linz World block in SOUL.md.")
+    print()
+
+    linz = config.setdefault("linz_world", {})
+    linz["enabled"] = True
+    linz["identity_required_on_agent_load"] = True
+    linz["service_url"] = str(linz.get("service_url") or DEFAULT_LINZ_WORLD_SERVICE_URL).strip()
+    linz["nats_url"] = str(linz.get("nats_url") or DEFAULT_LINZ_WORLD_NATS_URL).strip()
+    linz.pop("server_url", None)
+    linz.pop("compute_api_key_ref", None)
+    current_name = str(linz.get("os_name") or "Hermes").strip() or "Hermes"
+    linz["os_name"] = current_name
+    os_type = str(linz.get("os_type") or linz.get("type") or "USER").strip().upper()
+    linz["os_type"] = os_type if os_type in {"USER", "SEV", "GOV"} else "USER"
+    linz.pop("type", None)
+    linz["runtime_type"] = str(linz.get("runtime_type") or "Hermes").strip() or "Hermes"
+
+    hermes_home = get_hermes_home()
+    soul_content = _read_soul_md_content(hermes_home)
+    current_seed = str(linz.get("persona_seed") or "").strip()
+    if not current_seed:
+        current_seed = _extract_linz_persona_seed_from_soul(soul_content)
+    if current_seed:
+        print_info(f"Current persona seed: {_persona_seed_preview(current_seed)}")
+        linz["persona_seed"] = current_seed
+        _write_linz_persona_seed_to_soul(hermes_home, current_seed)
+        save_config(config)
+        print_success("Linz World persona seed already configured.")
+        _complete_linz_world_login(config)
+        return
+
+    agent_name = prompt("Linz World agent name", current_name).strip() or current_name
+    linz["os_name"] = agent_name
+
+    while True:
+        persona_seed = prompt("Persona seed").strip()
+        if persona_seed:
+            break
+        print_warning("Persona seed is required for Linz World registration.")
+
+    linz["persona_seed"] = persona_seed
+    _write_linz_persona_seed_to_soul(hermes_home, persona_seed)
+    save_config(config)
+    print_success("Linz World identity settings saved.")
+    print_info(f"SOUL.md updated: {Path(hermes_home) / 'SOUL.md'}")
+    _complete_linz_world_login(config)
+
+
+# =============================================================================
+# Section 4: Agent Settings
 # =============================================================================
 
 
@@ -3021,6 +3230,7 @@ SETUP_SECTIONS = [
     ("model", "Model & Provider", setup_model_provider),
     ("tts", "Text-to-Speech", setup_tts),
     ("terminal", "Terminal Backend", setup_terminal_backend),
+    ("linz", "Linz World Identity", setup_linz_world),
     ("gateway", "Messaging Platforms (Gateway)", setup_gateway),
     ("tools", "Tools", setup_tools),
     ("agent", "Agent Settings", setup_agent_settings),
@@ -3035,6 +3245,7 @@ def run_setup_wizard(args):
       hermes setup model     — just model/provider
       hermes setup tts       — just text-to-speech
       hermes setup terminal  — just terminal backend
+      hermes setup linz      — just Linz World identity
       hermes setup gateway   — just messaging platforms
       hermes setup tools     — just tool configuration
       hermes setup agent     — just agent settings
@@ -3175,7 +3386,7 @@ def run_setup_wizard(args):
         print_info("Press Enter to keep it, or type a new value to change it.")
         print_info("")
         print_info("Tip: jump straight to a section with 'hermes setup model|terminal|")
-        print_info("     gateway|tools|agent', or fill only missing items with --quick.")
+        print_info("     linz|gateway|tools|agent', or fill only missing items with --quick.")
         # Fall through to the "Full Setup — run all sections" block below.
         # --reconfigure is now the default on existing installs; the flag
         # is preserved for backwards compatibility but is a no-op here.
@@ -3226,15 +3437,19 @@ def run_setup_wizard(args):
     if not (migration_ran and _skip_configured_section(config, "terminal", "Terminal Backend")):
         setup_terminal_backend(config)
 
-    # Section 3: Agent Settings
+    # Section 3: Linz World Identity
+    if not (migration_ran and _skip_configured_section(config, "linz_world", "Linz World Identity")):
+        setup_linz_world(config)
+
+    # Section 4: Agent Settings
     if not (migration_ran and _skip_configured_section(config, "agent", "Agent Settings")):
         setup_agent_settings(config)
 
-    # Section 4: Messaging Platforms
+    # Section 5: Messaging Platforms
     if not (migration_ran and _skip_configured_section(config, "gateway", "Messaging Platforms")):
         setup_gateway(config)
 
-    # Section 5: Tools
+    # Section 6: Tools
     if not (migration_ran and _skip_configured_section(config, "tools", "Tools")):
         setup_tools(config, first_install=not is_existing)
 
@@ -3271,12 +3486,15 @@ def _run_first_time_quick_setup(config: dict, hermes_home, is_existing: bool):
     # Step 2: Terminal Backend — where commands run is a core decision
     setup_terminal_backend(config)
 
-    # Step 3: Apply defaults for everything else
+    # Step 3: Linz World identity — required before persona load
+    setup_linz_world(config)
+
+    # Step 4: Apply defaults for everything else
     _apply_default_agent_settings(config)
 
     save_config(config)
 
-    # Step 4: Offer messaging gateway setup
+    # Step 5: Offer messaging gateway setup
     print()
     gateway_choice = prompt_choice(
         "Connect a messaging platform? (Telegram, Discord, etc.)",

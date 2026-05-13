@@ -8,7 +8,7 @@ from typing import Any
 
 from agent.linz_world import auth, identity
 from agent.linz_world.event_state import LinzStateRepository
-from agent.linz_world.models import to_plain
+from agent.linz_world.models import LoginState, to_plain
 from agent.linz_world.publisher import publish_event
 from agent.linz_world.status import events_summary, status_summary
 
@@ -43,7 +43,12 @@ def linz_command(args) -> None:
         _print_json(status_summary(repo))
         return
     if action == "login":
-        _print_json({"success": True, "login": auth.login(repo)})
+        session = auth.login(repo)
+        _print_json({
+            "success": session.state == LoginState.LOGGED_IN,
+            "message": "接入灵治平台成功！" if session.state == LoginState.LOGGED_IN else session.last_error,
+            "login": session,
+        })
         return
     if action == "logout":
         _print_json({"success": True, "login": auth.logout(repo)})
@@ -61,6 +66,10 @@ def linz_command(args) -> None:
             _print_json({"success": False, "error": {"code": "invalid_json", "message": str(exc)}})
             return
         receipt = publish_event(args.subject, args.event_type, payload, repository=repo)
-        _print_json({"success": receipt.status.value == "published", "status": receipt.status.value, "receipt": receipt})
+        _print_json({
+            "success": receipt.status.value == "published",
+            "status": receipt.status.value,
+            "receipt": receipt,
+        })
         return
     _print_json({"success": False, "error": {"code": "unknown_command", "message": f"Unknown linz command: {action}"}})

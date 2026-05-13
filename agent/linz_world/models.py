@@ -22,6 +22,7 @@ class LoginState(str, Enum):
     LOGGED_OUT = "logged_out"
     LOGGED_IN = "logged_in"
     EXPIRED = "expired"
+    UNVERIFIED = "unverified"
 
 
 class AuthState(str, Enum):
@@ -66,7 +67,10 @@ class WorldIdentity:
     access_token_expires_at: str = ""
     registered_at: str = ""
     credential_id: str = ""
-    compute_api_key_ref: str = ""
+    private_key_path: str = ""
+    public_key_path: str = ""
+    public_key_type: str = ""
+    public_key_fingerprint: str = ""
     registration_state: RegistrationStatus = RegistrationStatus.PENDING
     authorization_state: AuthState = AuthState.UNKNOWN
     memory_summary_available: bool = False
@@ -94,6 +98,10 @@ class LoginSession:
     credential_id: str = ""
     subject_claims: list[str] = field(default_factory=list)
     last_error: str = ""
+    online: bool = False
+    listener_pid: int = 0
+    listener_started_at: str = ""
+    server_checked_at: str = ""
     updated_at: str = field(default_factory=utc_now_iso)
 
 

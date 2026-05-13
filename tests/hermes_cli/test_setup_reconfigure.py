@@ -112,6 +112,7 @@ class TestExistingInstallDefault:
                 quick="hermes_cli.setup._run_quick_setup",
                 model="hermes_cli.setup.setup_model_provider",
                 terminal="hermes_cli.setup.setup_terminal_backend",
+                linz="hermes_cli.setup.setup_linz_world",
                 agent="hermes_cli.setup.setup_agent_settings",
                 gateway="hermes_cli.setup.setup_gateway",
                 tools="hermes_cli.setup.setup_tools",
@@ -123,9 +124,10 @@ class TestExistingInstallDefault:
         m["prompt_choice"].assert_not_called()
         # Quick-setup path NOT taken.
         m["quick"].assert_not_called()
-        # All five sections ran.
+        # All six sections ran.
         m["model"].assert_called_once()
         m["terminal"].assert_called_once()
+        m["linz"].assert_called_once()
         m["agent"].assert_called_once()
         m["gateway"].assert_called_once()
         m["tools"].assert_called_once()
@@ -140,6 +142,7 @@ class TestExistingInstallDefault:
                 prompt_choice="hermes_cli.setup.prompt_choice",
                 model="hermes_cli.setup.setup_model_provider",
                 terminal="hermes_cli.setup.setup_terminal_backend",
+                linz="hermes_cli.setup.setup_linz_world",
                 agent="hermes_cli.setup.setup_agent_settings",
                 gateway="hermes_cli.setup.setup_gateway",
                 tools="hermes_cli.setup.setup_tools",
@@ -150,6 +153,7 @@ class TestExistingInstallDefault:
         m["prompt_choice"].assert_not_called()
         m["model"].assert_called_once()
         m["terminal"].assert_called_once()
+        m["linz"].assert_called_once()
         m["agent"].assert_called_once()
         m["gateway"].assert_called_once()
         m["tools"].assert_called_once()
@@ -167,6 +171,7 @@ class TestQuickFlag:
                 quick="hermes_cli.setup._run_quick_setup",
                 model="hermes_cli.setup.setup_model_provider",
                 terminal="hermes_cli.setup.setup_terminal_backend",
+                linz="hermes_cli.setup.setup_linz_world",
                 agent="hermes_cli.setup.setup_agent_settings",
                 gateway="hermes_cli.setup.setup_gateway",
                 tools="hermes_cli.setup.setup_tools",
@@ -178,6 +183,7 @@ class TestQuickFlag:
         # Full reconfigure sections must NOT run.
         m["model"].assert_not_called()
         m["terminal"].assert_not_called()
+        m["linz"].assert_not_called()
         m["agent"].assert_not_called()
         m["gateway"].assert_not_called()
         m["tools"].assert_not_called()

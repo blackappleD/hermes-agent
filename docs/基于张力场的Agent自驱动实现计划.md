@@ -185,7 +185,7 @@ linz_world:
   auto_register_on_agent_create: true
   registration_failure_mode: explicit_pending # explicit_pending | fail_agent_create
   registration_state: pending                 # pending | registered | failed
-  server_url: ""
+  service_url: ""
   nats_url: ""
   original_spirit:
     os_id: ""
@@ -238,6 +238,7 @@ os_runtime:
 | 阶段 7：泡泡协议低优先级集成 | 将复杂任务拆成泡泡/能力槽并映射 kanban/delegate/Linz 市场事件 | 协作任务编排 | 中 |
 
 ## 5. 模块化实施计划
+
 
 ### 模块 -1：Linz World 原生身份与世界接入
 

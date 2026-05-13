@@ -132,7 +132,7 @@
 
 - [ ] T043 [P] [US4] Add authorization and governance preflight tests in `tests/linz_world/test_auth_and_authorization.py`
 - [ ] T044 [P] [US4] Add NATS publish success, reject, failure, missing transport, and uncertain receipt tests in `tests/linz_world/test_publisher.py`; verify HTTP `/api/v1/event/publish` is never called for native publish
-- [ ] T045 [P] [US4] Add compute, memory, and relationship side-effect tests in `tests/linz_world/test_compute_memory_relationship.py`, including missing compute API key reference fail-closed behavior
+- [ ] T045 [P] [US4] Add compute, memory, and relationship side-effect tests in `tests/linz_world/test_compute_memory_relationship.py`, including missing login token reference fail-closed behavior
 - [ ] T045A [P] [US4] Add Linz World compute contract fixtures in `tests/linz_world/test_api_contract.py` covering `Authorization: Bearer <compute_api_key>`, missing/invalid/revoked key 401 envelopes, and successful `data.request_id/os_id/provider/model/choices/reservation/usage` parsing
 - [ ] T045B [P] [US4] Add Linz World relationship projection contract fixtures in `tests/linz_world/test_api_contract.py` covering `GET /api/v1/memory/projections/{agentId}/relationships` MemoryProjection fields `projection_id/agent_id/projection_type/source_version/content/generated_at/generated_by` and ensuring projection content is not discarded when parsed relationships are empty
 - [ ] T046 [P] [US4] Add no-credential-leak regression tests for tools and CLI in `tests/linz_world/test_tools.py`
@@ -141,7 +141,7 @@
 
 - [ ] T047 [US4] Implement real-time authorization refresh for all side effects in `agent/linz_world/auth.py`
 - [ ] T048 [US4] Implement publish request validation, governance, NATS transport publish, ack/sequence diagnostic receipt, and receipt persistence in `agent/linz_world/publisher.py`
-- [ ] T049 [US4] Implement world compute invocation in `agent/linz_world/compute.py` using a profile-local compute API key secret reference, with request_id receipt, provider/model summary, usage/reservation diagnostics, and no raw key exposure
+- [ ] T049 [US4] Implement world compute invocation in `agent/linz_world/compute.py` using the profile-local Linz World login token reference, with request_id receipt, provider/model summary, usage/reservation diagnostics, and no raw token exposure
 - [ ] T050 [US4] Implement Soul Memory write validation with `artifact_ref` and `sink_reason` in `agent/linz_world/memory.py`
 - [ ] T051 [US4] Implement relationship read as MemoryProjection preservation plus optional parsed relationships, and ACTIVE mutation governance in `agent/linz_world/relationship.py`
 - [ ] T052 [US4] Update `tools/linz_world_tools.py` to route publish, compute, memory, and relationship calls through governance helpers
@@ -161,7 +161,7 @@
 - [ ] T056 Run `python -m pytest tests/linz_world` and record any failures in the implementation handoff
 - [ ] T057 Run targeted regressions from `specs/001-native-linz-identity/quickstart.md`
 - [ ] T058 Audit CLI, tool, gateway, and logs for raw token/private field/restricted payload exposure in `agent/linz_world/`, `hermes_cli/linz.py`, and `tools/linz_world_tools.py`
-- [ ] T059 Audit `agent/linz_world/api_client.py`, `auth.py`, `identity.py`, `compute.py`, `memory.py`, `publisher.py`, tests, and docs for placeholder paths or field names (`/identity/original-spirit`, remote `os_id`, `hermes_profile` as top-level register field, `server_url` as primary config key)
+- [ ] T059 Audit `agent/linz_world/api_client.py`, `auth.py`, `identity.py`, `compute.py`, `memory.py`, `publisher.py`, tests, and docs for placeholder paths or field names (`/identity/original-spirit`, remote `os_id`, `hermes_profile` as top-level register field, extra legacy service URL config key)
 
 ---
 

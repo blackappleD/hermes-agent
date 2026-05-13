@@ -16,7 +16,7 @@
 - Q: 授权 map 已存在但刷新失败或过期时，外部副作用应该怎么处理？ → A: 每次外部副作用都必须实时刷新授权 map，刷新失败则阻断。
 - Q: Linz World 原始事件 payload 应该如何保留？ → A: 保存受限审计用原始 payload；prompt 和普通输出只使用脱敏摘要。
 - Q: Hermes 原生身份接入应以哪个后端接口契约为准？ → A: 必须以 `OPEWorld-Tech/linz-world` 中 `linz-world-skill`/后端实际使用的接口为准，不得继续使用 Hermes 侧占位接口。已核对当前 `linz-world` 主分支：统一响应 envelope 为 `{"code":0,"message":"success","data":...}`；注册接口是 `POST /api/v1/auth/register`，请求字段为 `publicKey`、`publicKeyType`、`fingerprint`、`metadata`，成功数据字段为 `agentId`、`soulId`、`soulHash`、`accessToken`、`expiresIn`、`registeredAt`；事件登录接口是 `POST /api/v1/event/agents/login`，请求字段为 `agentId`、`signedNonce`，成功数据字段为 `token`、`expiresAt`、`subjectClaims`、`credentialId`。依据: OPE-108 issue 描述和 OPE-88 评论 `f9f266fc-2cd3-4360-ae16-0ebc677891c7`、`e835f8ea-1408-4d55-8072-257f7c23e202`。
-- Q: 用户提供的 Linz World 服务地址如何落地？ → A: 当前配置应支持 `http://8.156.84.202:17878` 和 `http://8.156.84.202:17878/api/v1` 两种输入并归一化，避免重复拼接 `/api/v1` 或遗漏版本前缀；用户可见配置文档使用 `service_url`，不再混用 `server_url`。
+- Q: 用户提供的 Linz World 服务地址如何落地？ → A: 当前配置应支持 `http://8.156.84.202:17878` 和 `http://8.156.84.202:17878/api/v1` 两种输入并归一化，避免重复拼接 `/api/v1` 或遗漏版本前缀；用户可见配置只使用 `service_url`。
 - Q: `publish` 应该走 HTTP `/api/v1/event/publish` 还是沿用 `linz-world-skill` 的 NATS 发布逻辑？ → A: `publish` 是 `linz-world-skill` 中用于世界交互的通用 NATS 事件发布指令，不是 HTTP 接口；Hermes 原生实现必须按原逻辑向授权 NATS subject 发布事件，并保留 receipt/ack 诊断。依据: OPE-108 人类评论 `c5f73a92-7f17-465a-b77a-05c104b7317c`。
 - Q: Linz World HTTP envelope 的 `data` 是否总是 object？ → A: 否。统一 envelope 仍是 `{code,message,data}`，但 `data` 形状以 endpoint 为准；当前 `GET /api/v1/event/subjects` 成功 `data` 是 `PredefinedSubject[]` 数组，必须作为成功授权目录处理。依据: OPE-108 Spec Reviewer 评论 `163234b0-3d57-4508-81fd-1bc7222aa054` 与 `linz-world` contract test。
 - Q: Relationship read 应如何消费 `/memory/projections/{agentId}/relationships`？ → A: 真实响应是 `MemoryProjection` 对象，必须保留 `projection_id`、`agent_id`、`projection_type`、`source_version`、`content`、`generated_at`、`generated_by`；只有当 `content` 可解析出结构化 `relationships/items` 时才派生关系列表，否则保留 projection content，不得静默退化为空关系列表。依据: OPE-108 Spec Reviewer 评论 `163234b0-3d57-4508-81fd-1bc7222aa054` 与 `linz-world` memory projection handler。
@@ -129,7 +129,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **FR-017**: 系统必须把可处理的世界消息、需求、任务、订单、交付、结算和治理事件映射为 Hermes 内部事件类别，供后续张力场和用户界面消费。
 - **FR-018**: 系统必须在对话上下文、普通工具结果和用户默认视图中只暴露脱敏摘要和必要引用，不得暴露原始凭据、私密字段或完整未筛选 payload。
 - **FR-019**: 世界事件发布必须沿用 `linz-world-skill` 的 NATS 事件发布逻辑：通过当前 NATS transport/credential 向授权 subject 发布结构化事件，而不是调用 HTTP `/api/v1/event/publish`；发布成功后必须记录 publish receipt，发布失败时必须记录失败原因、被拒绝的 subject/event_type 摘要和治理结果。
-- **FR-020**: 世界算力调用必须使用当前 Hermes profile 的 Linz World compute API key secret reference 调用当前后端，不得通过工具参数、prompt、普通 CLI 输出或日志接受/回显裸凭据；缺少 compute API key reference 时必须返回 blocked/unsupported 诊断，而不是尝试使用登录 token 代替。
+- **FR-020**: 世界算力调用必须使用当前 Hermes profile 的 Linz World 登录 token reference 调用当前后端，不得通过工具参数、prompt、普通 CLI 输出或日志接受/回显裸凭据；缺少有效登录 token reference 时必须返回 blocked/unsupported 诊断。
 - **FR-021**: Soul Memory 写入必须包含 artifact_ref 或等价交付物引用、sink_reason 和证据摘要；系统不得只写入无来源的自由文本。
 - **FR-022**: 系统必须兼容旧 Soul Memory sink 命名输入并归一为新的记忆写入语义，确保旧命名调用不会因名称差异失败。
 - **FR-023**: 系统必须支持读取 Linz World 关系状态和添加 ACTIVE 关系；关系读取必须按 Linz World `MemoryProjection` 响应建模，保留 projection 元数据和 `content`，并在可解析时从 `content.relationships`、`content.items` 或等价结构派生关系列表，作为后续自治层可消费的关系信号。
@@ -142,7 +142,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **FR-030**: 世界算力调用必须匹配当前 Linz World Compute Gateway 契约 `POST /api/v1/compute/chat`，使用 `Authorization: Bearer <compute_api_key>`，请求至少包含 `model`、`messages`、`stream`、`temperature`、`metadata`；成功响应必须从统一 envelope 的 `data.request_id`、`data.os_id`、`data.provider`、`data.model`、`data.choices`、`data.reservation`、`data.usage` 建模，并把 `request_id` 作为主要 receipt。缺失 Authorization、无效或吊销 compute key 的 401 响应必须保留为用户可诊断失败。
 - **FR-031**: Soul Memory 相关能力必须匹配 Linz World Memory 模块路由：人格种子使用 `/api/v1/memory/seeds`，Soul Memory 使用 `/api/v1/memory/soul`，记忆事件归档使用 `/api/v1/memory/events`，投影/快照/lineage 使用对应 `/api/v1/memory/...` 路由；不得调用未确认的 Hermes 占位 memory sink 路径。
 - **FR-032**: 发布与事件接收必须匹配 Linz World 事件系统实际契约：NATS subject 使用 `sys.*`、`mrk.*`、`wsp.{agentId}.*`、`apl.*`、`rent.*`、`poca.*` 等正式主题族；`publish` 必须走 NATS publish transport，并使用 event id 去重、subject 授权和 receipt 记录。HTTP `POST /api/v1/event/publish` 不是本功能的 publish 实现路径，不得作为成功发布依据或 fallback。
-- **FR-033**: 配置必须使用 `linz_world.service_url` 作为用户可见服务地址键，并支持将 origin 根地址和 `/api/v1` 根地址归一化为同一 HTTP 调用行为；旧文档中的 `server_url` 只能作为兼容输入读取，不得作为新文档主键。
+- **FR-033**: 配置必须使用 `linz_world.service_url` 作为唯一用户可见服务地址键，并支持将 origin 根地址和 `/api/v1` 根地址归一化为同一 HTTP 调用行为。
 
 ### 关键实体 *(如果功能涉及数据则包含)*
 
@@ -154,7 +154,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **Event Dispatch Record**: Hermes 对世界事件接收、去重、排队、处理、失败或跳过的可靠性状态，包含自动重试次数和是否需要人工处理。
 - **Publish Request**: 用户或 agent 试图发布到 Linz World 的结构化事件请求，必须通过身份、登录、授权、目录和治理检查。
 - **Publish Receipt**: 世界事件发布后的可追踪结果，记录成功的 world event id 或失败原因。
-- **World Compute Request**: 使用 profile secret store 中的 Linz World compute API key reference 发起的世界算力调用，带有 request_id、provider、model、usage、reservation、choices 摘要、结果或诊断错误。
+- **World Compute Request**: 使用 profile secret store 中的 Linz World 登录 token reference 发起的世界算力调用，带有 request_id、provider、model、usage、reservation、choices 摘要、结果或诊断错误。
 - **Soul Memory Entry**: 写入 Linz World 记忆侧的证据、交付物引用、规则或摘要，必须说明写入原因。
 - **Relationship Record**: Linz World 关系状态或 ACTIVE 关系变更，用于后续关系信号和治理判断。
 - **Governance Result**: 对发布、算力、记忆和关系动作的允许、拒绝、降级或需审批结论及其理由。
@@ -180,7 +180,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **SC-015**: 身份注册测试中 100% 的请求 payload 使用 `publicKey`、`publicKeyType`、`fingerprint`、`metadata`，并从响应 envelope 的 `data.agentId`、`data.soulId`、`data.soulHash`、`data.accessToken` 等字段建模；不得出现 `/identity/original-spirit`、`hermes_profile`、`os_name` 作为远端注册契约字段。
 - **SC-016**: 登录/授权测试中 100% 的登录请求使用 `POST /api/v1/event/agents/login` + `agentId`/`signedNonce`，并从 `subjectClaims` 或 credential scope snapshot 生成授权摘要；若授权数据缺失，发布、compute、memory、relationship 外部副作用全部阻断。
 - **SC-017**: Contract fixture 或 fake service 测试必须覆盖 Linz World 统一响应 envelope 成功、非 0 code、缺失 data、字段缺失和 HTTP 错误，且所有错误都会保存 failed/pending 状态和用户可诊断 next_action。
-- **SC-018**: `POST /api/v1/compute/chat` contract fixture 必须覆盖缺失 Authorization、无效或吊销 compute API key 的 401 envelope，以及成功 envelope 中 `request_id`、`os_id`、`provider`、`model`、`choices`、`reservation`、`usage` 字段解析；缺少 compute API key reference 时 Hermes compute 外部副作用必须 fail-closed。
+- **SC-018**: `POST /api/v1/compute/chat` contract fixture 必须覆盖缺失 Authorization、无效或吊销登录 token 的 401 envelope，以及成功 envelope 中 `request_id`、`os_id`、`provider`、`model`、`choices`、`reservation`、`usage` 字段解析；缺少登录 token reference 时 Hermes compute 外部副作用必须 fail-closed。
 - **SC-019**: publish contract fixture 必须覆盖 NATS subject/event payload、授权通过后的 publish ack/sequence 或 diagnostic receipt、NATS 不可用 fail-closed、未授权 subject 拒绝，以及确认不会调用 HTTP `/api/v1/event/publish`。
 - **SC-020**: subjects contract fixture 必须覆盖 `GET /api/v1/event/subjects` 返回 `{code:0,message:"success",data:[...]}` 和 `{code:0,data:[]}`；两者都必须被视为成功 envelope，并用于授权摘要生成或空目录诊断，不得因 `data` 是数组而错误阻断授权刷新。
 - **SC-021**: relationship projection contract fixture 必须覆盖 `GET /api/v1/memory/projections/{agentId}/relationships` 返回 MemoryProjection envelope，且工具/CLI 结果必须保留 `projection_id`、`agent_id`、`projection_type`、`source_version`、`content`、`generated_at`、`generated_by`；如果无法从 `content` 派生关系列表，也不得丢弃 projection 或退化为只有空 `relationships` list。
@@ -190,7 +190,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - Hermes profile 是本功能的身份边界；同一 profile 共享一个 Linz World original spirit，不同 profile 允许拥有不同身份。
 - Linz World 注册、登录、授权 map、事件、发布、世界算力、Soul Memory 和关系服务由外部 Linz World 提供，本功能负责 Hermes 原生接入和治理边界。
 - Linz World 后端/skill 接口是跨仓库契约源；Hermes spec/实现必须定期对照 `OPEWorld-Tech/linz-world` 的 docs、specs 和 handler/service 测试，避免 Hermes 侧自造路径或字段名。
-- 当前 `linz-world` compute gateway 使用 compute API key 鉴权，而不是 event login token 鉴权；除非后端后续提供已确认的登录 token 换取/代理 compute 机制，Hermes 不得把登录 token 当作 compute Bearer 凭证。
+- 当前 `linz-world` compute gateway 使用成功登录后的 JWT token 作为 Bearer 凭证。
 - Linz World original spirit 身份是 agent persona 加载的硬性前置条件；没有已注册身份时，该 persona 不进入普通对话运行状态。
 - 旧 linz-world-skill 身份导入和同步不属于当前版本范围；新运行期不依赖用户继续安装或调用该 skill，也不提供 legacy identity 迁移入口。
 - 默认交互模式是被动和用户可控的；自驱动、自动响应、上线监听和外部发布由后续模块或显式配置控制。

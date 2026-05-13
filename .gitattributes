@@ -1,2 +1,5 @@
 # Auto-generated files — collapse diffs and exclude from language stats
 web/package-lock.json linguist-generated=true
+
+# Shell scripts must stay LF-only so bash can execute them on Linux/WSL.
+*.sh text eol=lf

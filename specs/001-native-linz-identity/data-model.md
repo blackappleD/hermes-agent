@@ -228,13 +228,13 @@ Auditable outcome of a publish request.
 
 ## Entity: World Compute Request
 
-World compute invocation through the Linz World Compute Gateway using a profile-local compute API key secret reference.
+World compute invocation through the Linz World Compute Gateway using the current successful Linz World login token reference.
 
 **Fields**
 
 - `request_id`: local unique id.
 - `actor_agent_id`: canonical Linz World `agentId` invoking compute.
-- `compute_api_key_ref`: profile-local secret reference; raw key is never stored in prompt-visible config.
+- `token_ref`: profile-local login token reference; raw token is never stored in prompt-visible config.
 - `input_summary`: redacted prompt/request summary.
 - `provider_summary`: provider/model or equivalent source summary.
 - `remote_request_id`: `data.request_id` returned by Linz World; primary remote receipt.
@@ -249,9 +249,9 @@ World compute invocation through the Linz World Compute Gateway using a profile-
 
 **Validation Rules**
 
-- Must use a configured compute API key secret reference for `Authorization: Bearer <compute_api_key>`; login tokens are not valid compute credentials unless Linz World later adds an explicit exchange/proxy contract.
-- Raw API keys in tool parameters, prompt-visible config, ordinary CLI output, or logs are invalid.
-- Missing compute API key reference blocks the external side effect with a diagnostic.
+- Must use the current successful Linz World login token for `Authorization: Bearer <jwt_token>`.
+- Raw tokens or credentials in tool parameters, prompt-visible config, ordinary CLI output, or logs are invalid.
+- Missing or expired login token blocks the external side effect with a diagnostic.
 - Real-time authorization refresh is required before invocation.
 - Result must parse current Linz World response fields: `request_id`, `os_id`, `provider`, `model`, `choices`, `reservation`, and `usage`.
 - Result must not expose tokens, API keys, or credentials.
