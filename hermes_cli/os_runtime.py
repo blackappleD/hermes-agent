@@ -47,6 +47,12 @@ def handle_os_runtime_command(
     subcommand = (parts[0].lower() if parts else "status") or "status"
     rest = parts[1].strip() if len(parts) > 1 else ""
 
+    if subcommand == "autonomous":
+        from hermes_cli.os_runtime_autonomous import handle_autonomous_command
+
+        result = handle_autonomous_command(rest or "status", session_id=session_id, config=cfg)
+        return OSRuntimeCommandResult(result.output, decision=result.decision)
+
     if subcommand == "status":
         return OSRuntimeCommandResult(_status_line(runtime.state, cfg))
 
@@ -114,7 +120,7 @@ def handle_os_runtime_command(
         )
 
     return OSRuntimeCommandResult(
-        "Usage: /os_runtime status|passive|goal <text>|pause|resume|clear|tick"
+        "Usage: /os_runtime status|passive|goal <text>|pause|resume|clear|tick|autonomous <command>"
     )
 
 

@@ -40,7 +40,12 @@ class LinzWorldPlatformAdapter(BasePlatformAdapter):
         raw_event: dict[str, Any],
         repository: LinzStateRepository | None = None,
     ) -> "WorldEventDispatchResult":
-        return await dispatch_world_event(raw_event, self.handle_message, repository)
+        return await dispatch_world_event(
+            raw_event,
+            self.handle_message,
+            repository,
+            session_store=getattr(self, "_session_store", None),
+        )
 
 
 @dataclass
@@ -82,6 +87,7 @@ async def dispatch_world_event(
     repository: LinzStateRepository | None = None,
     *,
     retry_limit: int = 3,
+    session_store: Any = None,
 ) -> WorldEventDispatchResult:
     repo = repository or LinzStateRepository()
     persisted = persist_world_event_for_gateway(raw_event, repo)
@@ -91,6 +97,11 @@ async def dispatch_world_event(
             handled=False,
             record=persisted.record,
         )
+
+    _wake_autonomous_runtime(
+        persisted,
+        session_store=session_store,
+    )
 
     try:
         maybe_result = handle_message(persisted.message_event)
@@ -115,6 +126,72 @@ async def dispatch_world_event(
         handled=True,
         record=handled,
     )
+
+
+def _wake_autonomous_runtime(
+    persisted: PersistedWorldEvent,
+    *,
+    session_store: Any = None,
+) -> None:
+    message = persisted.message_event
+    if message is None:
+        return
+    try:
+        from hermes_cli.os_runtime import load_runtime_config
+
+        config = load_runtime_config()
+        autonomous = getattr(config, "autonomous", None)
+        if (
+            not config.enabled
+            or autonomous is None
+            or not autonomous.enabled
+            or not autonomous.respond_to_world_events
+        ):
+            return
+
+        session_id = _resolve_session_id(message, session_store=session_store)
+        if not session_id:
+            return
+
+        from agent.os_runtime.world_event_waker import WorldEventWaker
+
+        WorldEventWaker(
+            session_id,
+            profile_id=getattr(session_store, "profile_id", "") if session_store is not None else "",
+            config=config,
+        ).handle_persisted_event(
+            {
+                "event_id": persisted.record.event_id,
+                "event_type": "world_event",
+                "source": "linz_world",
+                "trace_id": persisted.record.event_id,
+                "session_id": session_id,
+                "summary": persisted.record.payload_summary,
+                "metadata": dict(message.raw_message or {}),
+                "content_ref": persisted.record.audit_ref,
+                "status": "recorded",
+            }
+        )
+    except Exception:
+        return
+
+
+def _resolve_session_id(message: MessageEvent, *, session_store: Any = None) -> str:
+    if session_store is not None:
+        try:
+            entry = session_store.get_or_create_session(message.source)
+            session_id = str(getattr(entry, "session_id", "") or "")
+            if session_id:
+                return session_id
+        except Exception:
+            pass
+    source = message.source
+    if source is None:
+        return ""
+    platform = getattr(source.platform, "value", None) or str(source.platform or "linz_world")
+    chat_id = str(getattr(source, "chat_id", "") or "")
+    user_id = str(getattr(source, "user_id", "") or "")
+    return f"{platform}:{chat_id}:{user_id}".strip(":")
 
 
 def register_platform() -> None:

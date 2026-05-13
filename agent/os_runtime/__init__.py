@@ -1,11 +1,17 @@
 """Stable protocol entrypoint for Hermes os_runtime."""
 
 from agent.os_runtime.config import (
+    AutonomousRuntimeConfig,
     DEFAULT_OS_RUNTIME_CONFIG,
     OSRuntimeConfig,
     OSRuntimeRiskConfig,
     default_os_runtime_config,
     load_os_runtime_config,
+)
+from agent.os_runtime.autonomous_state import (
+    AutonomousRuntimeState,
+    AutonomousRuntimeStatus,
+    AutonomousWakeRecord,
 )
 from agent.os_runtime.domain import (
     ActionPotential,
@@ -56,6 +62,10 @@ from agent.os_runtime.driver import (
 __all__ = [
     "ActionPotential",
     "AgentContextView",
+    "AutonomousRuntimeConfig",
+    "AutonomousRuntimeState",
+    "AutonomousRuntimeStatus",
+    "AutonomousWakeRecord",
     "ArbitrationDecision",
     "ArbitrationResult",
     "BubbleLifecycle",

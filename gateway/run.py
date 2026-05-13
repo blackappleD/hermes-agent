@@ -6682,6 +6682,14 @@ class GatewayRunner:
         _run_generation = self._begin_session_run_generation(_quick_key)
 
         try:
+            try:
+                session_entry = self.session_store.get_or_create_session(source)
+                await self._pre_turn_os_runtime_autonomous_hook(
+                    session_entry=session_entry,
+                    event=event,
+                )
+            except Exception as _osr_pre_exc:
+                logger.debug("os_runtime autonomous pre-turn hook failed: %s", _osr_pre_exc)
             _agent_result = await self._handle_message_with_agent(event, source, _quick_key, _run_generation)
             # Goal continuation: after the agent returns a final response
             # for this turn, check any standing /goal — the judge will
@@ -6710,6 +6718,11 @@ class GatewayRunner:
                             final_response=_final_text,
                         )
                         await self._post_turn_os_runtime_continuation(
+                            session_entry=session_entry,
+                            source=source,
+                            final_response=_final_text,
+                        )
+                        await self._post_turn_os_runtime_autonomous_hook(
                             session_entry=session_entry,
                             source=source,
                             final_response=_final_text,
@@ -9682,6 +9695,46 @@ class GatewayRunner:
                 self._enqueue_fifo(_quick_key, cont_event, adapter)
         except Exception as exc:
             logger.debug("os_runtime continuation: enqueue failed: %s", exc)
+
+    async def _pre_turn_os_runtime_autonomous_hook(
+        self,
+        *,
+        session_entry: Any,
+        event: "MessageEvent",
+    ) -> None:
+        try:
+            from agent.os_runtime.autonomous_scheduler import AutonomousScheduler
+            from hermes_cli.os_runtime import load_runtime_config
+        except Exception as exc:
+            logger.debug("os_runtime autonomous pre-turn: module unavailable: %s", exc)
+            return
+
+        cfg = load_runtime_config()
+        auto = getattr(cfg, "autonomous", None)
+        if not cfg.enabled or auto is None or not auto.enabled:
+            return
+        sid = getattr(session_entry, "session_id", "") or ""
+        if not sid:
+            return
+        if auto.start_with_gateway or auto.start_on_agent_load:
+            try:
+                AutonomousScheduler(sid, config=cfg).start()
+            except Exception as exc:
+                logger.debug("os_runtime autonomous scheduler start failed: %s", exc)
+        # All-turn observation and optional SelfPrompt injection are handled in
+        # AIAgent.run_conversation(), the shared CLI/TUI/gateway pre-LLM path.
+
+    async def _post_turn_os_runtime_autonomous_hook(
+        self,
+        *,
+        session_entry: Any,
+        source: Any,
+        final_response: str,
+    ) -> None:
+        # The shared AIAgent post-LLM path records autonomous after_turn
+        # evidence for CLI, TUI, and gateway. This gateway hook remains as a
+        # compatibility no-op so existing call sites do not need branching.
+        return
 
     async def _handle_undo_command(self, event: MessageEvent) -> str:
         """Handle /undo command - remove the last user/assistant exchange."""
