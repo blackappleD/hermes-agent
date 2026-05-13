@@ -64,7 +64,14 @@ def normalize_api_base_url(service_url: str) -> str:
 
 
 class LinzWorldService(Protocol):
-    def register_original_spirit(self, hermes_profile: str, os_name: str) -> dict[str, Any]: ...
+    def register_original_spirit(
+        self,
+        hermes_profile: str,
+        os_name: str,
+        persona_seed: str = "",
+        os_type: str = "USER",
+        runtime_type: str = "Hermes",
+    ) -> dict[str, Any]: ...
     def login(self, identity: dict[str, Any]) -> dict[str, Any]: ...
     def logout(self, token_ref: str) -> dict[str, Any]: ...
     def refresh_authorization_map(self, identity: dict[str, Any], token_ref: str) -> dict[str, Any]: ...
@@ -78,7 +85,14 @@ class LinzWorldService(Protocol):
 class LocalLinzWorldService:
     """Deterministic local service used when no remote service URL is configured."""
 
-    def register_original_spirit(self, hermes_profile: str, os_name: str) -> dict[str, Any]:
+    def register_original_spirit(
+        self,
+        hermes_profile: str,
+        os_name: str,
+        persona_seed: str = "",
+        os_type: str = "USER",
+        runtime_type: str = "Hermes",
+    ) -> dict[str, Any]:
         digest = hashlib.sha256(hermes_profile.encode("utf-8")).hexdigest()[:12]
         return {
             "agentId": f"agent_{digest}",
@@ -88,6 +102,8 @@ class LocalLinzWorldService:
             "expiresIn": 86400,
             "registeredAt": utc_now_iso(),
             "os_name": os_name,
+            "type": os_type,
+            "runtime_type": runtime_type,
         }
 
     def login(self, identity: dict[str, Any]) -> dict[str, Any]:
@@ -187,18 +203,32 @@ class HttpLinzWorldService(LocalLinzWorldService):
     ) -> Any:
         return self._request("GET", path, headers=headers, require_object_data=require_object_data)
 
-    def register_original_spirit(self, hermes_profile: str, os_name: str) -> dict[str, Any]:
+    def register_original_spirit(
+        self,
+        hermes_profile: str,
+        os_name: str,
+        persona_seed: str = "",
+        os_type: str = "USER",
+        runtime_type: str = "Hermes",
+    ) -> dict[str, Any]:
         fingerprint = hashlib.sha256(hermes_profile.encode("utf-8")).hexdigest()
+        seed = str(persona_seed or "").strip()
         return self._post(
             "/auth/register",
             {
                 "publicKey": f"hermes-profile:{hermes_profile}",
                 "publicKeyType": "RSA",
                 "fingerprint": fingerprint,
+                "agent_name": os_name,
+                "persona_seed": seed,
+                "type": os_type,
+                "runtime_type": runtime_type,
                 "metadata": {
                     "hermes_profile": hermes_profile,
                     "os_name": os_name,
-                    "runtime_type": "hermes-agent",
+                    "runtime_type": runtime_type,
+                    "persona_seed": seed,
+                    "type": os_type,
                 },
             },
         )

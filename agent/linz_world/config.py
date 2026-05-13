@@ -13,6 +13,9 @@ DEFAULT_LINZ_WORLD_CONFIG: dict[str, Any] = {
     "server_url": "",
     "compute_api_key_ref": "",
     "os_name": "Hermes",
+    "os_type": "USER",
+    "runtime_type": "Hermes",
+    "persona_seed": "",
     "auto_listen": False,
     "auto_respond": False,
     "auto_publish": False,
@@ -29,6 +32,9 @@ class LinzWorldConfig:
     service_url: str = ""
     compute_api_key_ref: str = ""
     os_name: str = "Hermes"
+    os_type: str = "USER"
+    runtime_type: str = "Hermes"
+    persona_seed: str = ""
     auto_listen: bool = False
     auto_respond: bool = False
     auto_publish: bool = False
@@ -66,6 +72,9 @@ def load_linz_world_config(config: dict[str, Any] | None = None) -> LinzWorldCon
     service_url = str(merged.get("service_url") or merged.get("server_url") or "").strip()
     retry_limit = int(merged.get("event_retry_limit") or 3)
     query_limit = int(merged.get("event_query_limit") or 20)
+    os_type = str(merged.get("os_type") or merged.get("type") or "USER").strip().upper()
+    if os_type not in {"USER", "SEV", "GOV"}:
+        os_type = "USER"
     return LinzWorldConfig(
         enabled=_bool_value(merged.get("enabled"), True),
         identity_required_on_agent_load=_bool_value(
@@ -74,6 +83,9 @@ def load_linz_world_config(config: dict[str, Any] | None = None) -> LinzWorldCon
         service_url=service_url,
         compute_api_key_ref=str(merged.get("compute_api_key_ref") or "").strip(),
         os_name=str(merged.get("os_name") or "Hermes").strip() or "Hermes",
+        os_type=os_type,
+        runtime_type=str(merged.get("runtime_type") or "Hermes").strip() or "Hermes",
+        persona_seed=str(merged.get("persona_seed") or "").strip(),
         auto_listen=_bool_value(merged.get("auto_listen")),
         auto_respond=_bool_value(merged.get("auto_respond")),
         auto_publish=_bool_value(merged.get("auto_publish")),

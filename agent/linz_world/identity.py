@@ -20,9 +20,20 @@ def ensure_original_spirit_identity(
         return existing
 
     cfg = load_linz_world_config(config)
+    if not cfg.persona_seed:
+        return repo.save_failed_identity(
+            "Linz World persona_seed is not configured.",
+            "Run hermes setup linz and provide a persona seed before loading this agent.",
+        )
     try:
         svc = service or default_service(config)
-        result = svc.register_original_spirit(repo.profile_id, cfg.os_name)
+        result = svc.register_original_spirit(
+            repo.profile_id,
+            cfg.os_name,
+            cfg.persona_seed,
+            cfg.os_type,
+            cfg.runtime_type,
+        )
     except LinzWorldServiceError as exc:
         return repo.save_failed_identity(
             exc.message,
@@ -34,7 +45,13 @@ def ensure_original_spirit_identity(
             "Retry after Linz World identity registry is reachable.",
         )
 
-    agent_id = str(result.get("agentId") or result.get("agent_id") or result.get("os_id") or "")
+    agent_id = str(
+        result.get("agentId")
+        or result.get("agent_id")
+        or result.get("os_id")
+        or result.get("osId")
+        or ""
+    )
     soul_id = str(result.get("soulId") or result.get("soul_id") or "")
     soul_hash = str(result.get("soulHash") or result.get("soul_hash") or "")
     required = {"agentId": agent_id, "soulId": soul_id, "soulHash": soul_hash}
@@ -45,16 +62,17 @@ def ensure_original_spirit_identity(
             "Check Linz World identity registry response and retry.",
         )
     access_token_ref = str(result.get("access_token_ref") or "")
-    if result.get("accessToken"):
-        access_token_ref = store_runtime_secret("access_token", str(result["accessToken"]))
-    expires_in = result.get("expiresIn")
+    token = result.get("accessToken") or result.get("access_token") or result.get("token")
+    if token:
+        access_token_ref = store_runtime_secret("access_token", str(token))
+    expires_in = result.get("expiresIn") or result.get("expires_in")
     identity = WorldIdentity(
         profile_id=repo.profile_id,
         agent_id=agent_id,
         os_id=agent_id,
         soul_id=soul_id,
         soul_hash=soul_hash,
-        os_name=str(result.get("os_name") or cfg.os_name),
+        os_name=str(result.get("os_name") or result.get("osName") or cfg.os_name),
         account_id=str(result.get("accountId") or result.get("account_id") or agent_id),
         access_token_ref=access_token_ref,
         access_token_expires_at=str(expires_in or ""),
