@@ -143,6 +143,9 @@ class LinzStateRepository:
             event_type=event.event_type,
             payload_summary=event.payload_summary,
             audit_ref=event.audit_ref,
+            os_id=event.os_id,
+            soul_id=event.soul_id,
+            nats_sequence=event.nats_sequence,
             sequence_key=event.sequence_key,
             source=event.source,
             occurred_at=event.occurred_at,
@@ -153,6 +156,18 @@ class LinzStateRepository:
             sequence_index[event.sequence_key] = event.event_id
         self.save(data)
         return record, True
+
+    def mark_processing(self, event_id: str) -> EventDispatchRecord:
+        data = self.load()
+        events = data.setdefault("events", {})
+        if event_id not in events:
+            raise LinzStateError(f"Unknown Linz World event: {event_id}")
+        record = _record_from_dict(events[event_id])
+        record.dispatch_status = DispatchStatus.PROCESSING
+        record.last_delivery_at = utc_now_iso()
+        events[event_id] = to_plain(record)
+        self.save(data)
+        return record
 
     def mark_processing_failure(self, event_id: str, error: str, retry_limit: int = 3) -> EventDispatchRecord:
         data = self.load()
@@ -215,19 +230,28 @@ def normalize_world_event(raw_event: dict[str, Any]) -> WorldEvent:
         raise LinzStateError(f"Unknown Linz World event subject/event_type: {subject} {event_type}")
     sequence = raw_event.get("sequence") or {}
     sequence_key = ""
+    nats_sequence = ""
     if isinstance(sequence, dict):
         stream = sequence.get("stream")
         consumer = sequence.get("consumer")
-        nats_sequence = sequence.get("nats_sequence")
-        if stream and consumer and nats_sequence is not None:
-            sequence_key = f"{stream}:{consumer}:{nats_sequence}"
+        raw_nats_sequence = sequence.get("nats_sequence")
+        if raw_nats_sequence is not None:
+            nats_sequence = str(raw_nats_sequence)
+        if stream and consumer and raw_nats_sequence is not None:
+            sequence_key = f"{stream}:{consumer}:{raw_nats_sequence}"
     source = raw_event.get("source") if isinstance(raw_event.get("source"), dict) else {}
+    identity = raw_event.get("identity") if isinstance(raw_event.get("identity"), dict) else {}
+    os_id = str(raw_event.get("os_id") or source.get("os_id") or identity.get("os_id") or "")
+    soul_id = str(raw_event.get("soul_id") or source.get("soul_id") or identity.get("soul_id") or "")
     return WorldEvent(
         event_id=event_id,
         subject=subject,
         event_type=event_type,
         payload_summary=payload_summary(payload),
         audit_ref=audit_ref_for_payload(payload),
+        os_id=os_id,
+        soul_id=soul_id,
+        nats_sequence=nats_sequence,
         source=source,
         sequence_key=sequence_key,
         occurred_at=str(raw_event.get("occurred_at") or utc_now_iso()),
@@ -264,6 +288,9 @@ def _record_from_dict(raw: dict[str, Any]) -> EventDispatchRecord:
         event_type=str(raw.get("event_type") or ""),
         payload_summary=str(raw.get("payload_summary") or ""),
         audit_ref=str(raw.get("audit_ref") or ""),
+        os_id=str(raw.get("os_id") or ""),
+        soul_id=str(raw.get("soul_id") or ""),
+        nats_sequence=str(raw.get("nats_sequence") or ""),
         dispatch_status=DispatchStatus(raw.get("dispatch_status", DispatchStatus.PERSISTED.value)),
         attempt_count=int(raw.get("attempt_count") or 0),
         last_error=str(raw.get("last_error") or ""),

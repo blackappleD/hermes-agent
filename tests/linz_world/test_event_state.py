@@ -7,7 +7,7 @@ def _event(event_id="evt_1", seq=1):
         "subject": "wsp.chat.message.sent",
         "event_type": "message.sent",
         "payload": {"text": "hello", "token": "secret"},
-        "source": {"room_id": "room_1", "actor_id": "actor_1"},
+        "source": {"room_id": "room_1", "actor_id": "actor_1", "os_id": "os_1", "soul_id": "soul_1"},
         "sequence": {"stream": "world-events", "consumer": "hermes-profile", "nats_sequence": seq},
     }
 
@@ -23,6 +23,10 @@ def test_event_persist_deduplicates_event_id_and_sequence(linz_home):
     assert created_second is False
     assert created_third is False
     assert first.event_id == second.event_id == third.event_id
+    assert first.os_id == "os_1"
+    assert first.soul_id == "soul_1"
+    assert first.nats_sequence == "1"
+    assert first.sequence_key == "world-events:hermes-profile:1"
     assert len(repo.recent_events()) == 1
 
 
@@ -30,10 +34,12 @@ def test_retry_stops_after_third_failure(linz_home):
     repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
     repo.persist_world_event(_event())
 
+    processing = repo.mark_processing("evt_1")
     repo.mark_processing_failure("evt_1", "try 1")
     repo.mark_processing_failure("evt_1", "try 2")
     failed = repo.mark_processing_failure("evt_1", "try 3")
 
+    assert processing.dispatch_status.value == "processing"
     assert failed.dispatch_status.value == "failed"
     assert failed.attempt_count == 3
     assert failed.requires_manual_handling is True

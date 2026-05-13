@@ -133,6 +133,9 @@ class WorldEvent:
     event_type: str
     payload_summary: str
     audit_ref: str
+    os_id: str = ""
+    soul_id: str = ""
+    nats_sequence: str = ""
     source: dict[str, Any] = field(default_factory=dict)
     sequence_key: str = ""
     occurred_at: str = field(default_factory=utc_now_iso)
@@ -145,6 +148,9 @@ class EventDispatchRecord:
     event_type: str
     payload_summary: str
     audit_ref: str
+    os_id: str = ""
+    soul_id: str = ""
+    nats_sequence: str = ""
     dispatch_status: DispatchStatus = DispatchStatus.PERSISTED
     attempt_count: int = 0
     last_error: str = ""
