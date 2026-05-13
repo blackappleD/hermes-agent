@@ -106,7 +106,7 @@ registry.register(
 registry.register(
     name="linz_compute",
     toolset="linz_world",
-    schema={"description": "Invoke Linz World compute using the current profile compute API key secret reference.", "parameters": {"type": "object", "required": ["task"], "properties": {"task": {"type": "string"}, "input": {"type": "object"}}, "additionalProperties": False}},
+    schema={"description": "Invoke Linz World compute using the current Linz World login token.", "parameters": {"type": "object", "required": ["task"], "properties": {"task": {"type": "string"}, "input": {"type": "object"}}, "additionalProperties": False}},
     handler=linz_compute,
     description="Invoke Linz World compute",
 )

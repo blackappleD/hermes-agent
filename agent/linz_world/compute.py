@@ -7,7 +7,7 @@ import uuid
 from .api_client import default_service, resolve_secret_ref
 from .event_state import LinzStateRepository
 from .governance import preflight_side_effect
-from .models import ComputeReceipt, ReceiptStatus
+from .models import ComputeReceipt, LoginState, ReceiptStatus
 from .redaction import payload_summary
 
 
@@ -15,19 +15,18 @@ def invoke_compute(task: str, input_data: dict | None = None, repository: LinzSt
     if input_data and any(str(k).lower() in {"token", "api_key", "secret"} for k in input_data):
         return ComputeReceipt(uuid.uuid4().hex, ReceiptStatus.REJECTED, message="Explicit credentials are not accepted.")
     repo = repository or LinzStateRepository()
-    identity = repo.get_identity()
-    compute_api_key_ref = identity.compute_api_key_ref if identity else ""
-    if not compute_api_key_ref:
+    session = repo.get_login()
+    if not session.token_ref or session.state != LoginState.LOGGED_IN:
         return ComputeReceipt(
             uuid.uuid4().hex,
             ReceiptStatus.REJECTED,
-            message="Linz World compute API key reference is missing; compute is blocked.",
+            message="Linz World login token reference is missing; compute is blocked.",
         )
-    if not resolve_secret_ref(compute_api_key_ref):
+    if not resolve_secret_ref(session.token_ref):
         return ComputeReceipt(
             uuid.uuid4().hex,
             ReceiptStatus.REJECTED,
-            message="Linz World compute API key secret is unavailable; compute is blocked.",
+            message="Linz World login token secret is unavailable; compute is blocked.",
         )
     try:
         svc = service or default_service()
@@ -37,7 +36,7 @@ def invoke_compute(task: str, input_data: dict | None = None, repository: LinzSt
     if not governance.allowed:
         return ComputeReceipt(uuid.uuid4().hex, ReceiptStatus.REJECTED, message=governance.message)
     try:
-        result = svc.invoke_compute(compute_api_key_ref, task, input_data or {})
+        result = svc.invoke_compute(session.token_ref, task, input_data or {})
         receipt = ComputeReceipt(
             str(result.get("request_id") or uuid.uuid4().hex),
             ReceiptStatus.PUBLISHED,

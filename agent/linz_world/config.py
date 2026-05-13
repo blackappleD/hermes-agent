@@ -6,12 +6,14 @@ from dataclasses import dataclass
 from typing import Any
 
 
+DEFAULT_LINZ_WORLD_SERVICE_URL = "http://8.156.84.202:17878"
+DEFAULT_LINZ_WORLD_NATS_URL = "nats://8.156.84.202:16331"
+
 DEFAULT_LINZ_WORLD_CONFIG: dict[str, Any] = {
     "enabled": True,
     "identity_required_on_agent_load": True,
-    "service_url": "",
-    "server_url": "",
-    "compute_api_key_ref": "",
+    "service_url": DEFAULT_LINZ_WORLD_SERVICE_URL,
+    "nats_url": DEFAULT_LINZ_WORLD_NATS_URL,
     "os_name": "Hermes",
     "os_type": "USER",
     "runtime_type": "Hermes",
@@ -29,8 +31,8 @@ DEFAULT_LINZ_WORLD_CONFIG: dict[str, Any] = {
 class LinzWorldConfig:
     enabled: bool = True
     identity_required_on_agent_load: bool = True
-    service_url: str = ""
-    compute_api_key_ref: str = ""
+    service_url: str = DEFAULT_LINZ_WORLD_SERVICE_URL
+    nats_url: str = DEFAULT_LINZ_WORLD_NATS_URL
     os_name: str = "Hermes"
     os_type: str = "USER"
     runtime_type: str = "Hermes"
@@ -69,7 +71,8 @@ def load_linz_world_config(config: dict[str, Any] | None = None) -> LinzWorldCon
     if not isinstance(raw, dict):
         raw = {}
     merged = {**DEFAULT_LINZ_WORLD_CONFIG, **raw}
-    service_url = str(merged.get("service_url") or merged.get("server_url") or "").strip()
+    service_url = str(raw.get("service_url") or DEFAULT_LINZ_WORLD_SERVICE_URL).strip()
+    nats_url = str(merged.get("nats_url") or DEFAULT_LINZ_WORLD_NATS_URL).strip()
     retry_limit = int(merged.get("event_retry_limit") or 3)
     query_limit = int(merged.get("event_query_limit") or 20)
     os_type = str(merged.get("os_type") or merged.get("type") or "USER").strip().upper()
@@ -81,7 +84,7 @@ def load_linz_world_config(config: dict[str, Any] | None = None) -> LinzWorldCon
             merged.get("identity_required_on_agent_load"), True
         ),
         service_url=service_url,
-        compute_api_key_ref=str(merged.get("compute_api_key_ref") or "").strip(),
+        nats_url=nats_url,
         os_name=str(merged.get("os_name") or "Hermes").strip() or "Hermes",
         os_type=os_type,
         runtime_type=str(merged.get("runtime_type") or "Hermes").strip() or "Hermes",

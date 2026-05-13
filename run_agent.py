@@ -1170,8 +1170,10 @@ class AIAgent:
         _linz_cfg = load_linz_world_config()
         if _linz_cfg.identity_required_on_agent_load:
             from agent.linz_world.runtime_bridge import ensure_linz_identity_for_persona
+            from agent.linz_world.auth import validate_login_session
 
             ensure_linz_identity_for_persona()
+            validate_login_session()
 
         self.model = model
         self.max_iterations = max_iterations

@@ -99,6 +99,10 @@ class LinzStateRepository:
             credential_id=str(raw.get("credential_id") or ""),
             subject_claims=list(raw.get("subject_claims") or []),
             last_error=str(raw.get("last_error") or ""),
+            online=bool(raw.get("online", False)),
+            listener_pid=int(raw.get("listener_pid") or 0),
+            listener_started_at=str(raw.get("listener_started_at") or ""),
+            server_checked_at=str(raw.get("server_checked_at") or ""),
             updated_at=str(raw.get("updated_at") or utc_now_iso()),
         )
 
@@ -247,7 +251,10 @@ def _identity_from_dict(raw: dict[str, Any]) -> WorldIdentity:
         access_token_expires_at=str(raw.get("access_token_expires_at") or ""),
         registered_at=str(raw.get("registered_at") or raw.get("registeredAt") or ""),
         credential_id=str(raw.get("credential_id") or ""),
-        compute_api_key_ref=str(raw.get("compute_api_key_ref") or ""),
+        private_key_path=str(raw.get("private_key_path") or ""),
+        public_key_path=str(raw.get("public_key_path") or ""),
+        public_key_type=str(raw.get("public_key_type") or ""),
+        public_key_fingerprint=str(raw.get("public_key_fingerprint") or ""),
         registration_state=RegistrationStatus(raw.get("registration_state", RegistrationStatus.PENDING.value)),
         authorization_state=AuthState(raw.get("authorization_state", AuthState.UNKNOWN.value)),
         memory_summary_available=bool(raw.get("memory_summary_available", False)),
