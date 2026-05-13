@@ -4,7 +4,7 @@
 
 说明：
 
-- 以下 issue 按计划文档“模块化实施计划”拆分，覆盖 `模块 -1` 到 `模块 11`。
+- 以下 issue 按计划文档“模块化实施计划”拆分，覆盖 `模块 -1` 到 `模块 11`，并新增 `模块 6.5` 用于常驻完全自驱动 runtime。
 - `模块 -1` 已有 spec-kit 拆解：`specs/001-native-linz-identity/`。后续实现应优先遵守该 spec 的范围收敛：不做旧 `linz-world-skill` 身份导入/同步/迁移；注册失败 fail-closed；外部副作用实时刷新授权 map；原始 payload 仅限受限审计。
 - 后续模块尚未发现对应 spec 目录，issue 以计划文档为准，适合继续生成 spec/plan/tasks 后再实现。
 
@@ -381,6 +381,85 @@ hermes-agent
 
 ---
 
+## [Feature]模块 6.5：常驻 Autonomous Runtime Loop 与世界事件自响应
+
+### 仓库
+
+hermes-agent
+
+### 计划文档
+
+`/docs/基于张力场的Agent自驱动实现计划.md`
+
+### 依赖
+
+- 依赖模块 -1 的 Linz World identity、event state、gateway adapter、event catalog 和 authorization map。
+- 依赖模块 1 到模块 5 的事件、上下文、信号、生命状态、张力、行动势能、SelfPrompt、OpenIntent 和 BoYueArbiter。
+- 依赖模块 6 的 driver state、turn-boundary decision 和 pause/resume/clear 控制语义，但不依赖用户输入 `/os_runtime goal`。
+
+### 目标
+
+实现真正的常驻元神自驱动 runtime：Agent/gateway 启动后可根据世界事件、时间 tick、内部反馈、生命状态、张力场和行动势能自动唤醒，生成 intent 并经裁判后执行低风险自主响应、草案、反思、evidence 或审批请求。该模块不应要求用户每次输入 `/os_runtime goal` 才进入自驱动。
+
+### 范围
+
+- 新增 `agent/os_runtime/autonomous_loop.py`
+- 新增 `agent/os_runtime/autonomous_state.py`
+- 新增 `agent/os_runtime/autonomous_scheduler.py`
+- 新增 `agent/os_runtime/world_event_waker.py`
+- 新增 `agent/os_runtime/autonomous_inbox.py`
+- 新增 `agent/os_runtime/adapters/runtime_queue.py`
+- 新增或扩展 `hermes_cli/os_runtime_autonomous.py`
+- 扩展 gateway/runtime 启动 hook，使 autonomous loop 可按配置启动
+- 扩展 Linz World event dispatch hook，使 world event 可唤醒 autonomous loop
+- 新增 `tests/os_runtime/test_autonomous_loop.py`
+- 新增 `tests/os_runtime/test_world_event_waker.py`
+- 新增 `tests/gateway/test_os_runtime_autonomous_loop.py`
+
+### 关键要求
+
+- 配置启用形态应支持：
+
+```yaml
+os_runtime:
+  enabled: true
+  mode: autonomous_low_risk
+  autonomous:
+    enabled: true
+    start_on_agent_load: true
+    start_with_gateway: true
+    respond_to_world_events: true
+    tick_interval_seconds: 30
+    idle_cooldown_seconds: 60
+    max_turns_per_wake: 3
+    max_wakes_per_hour: 20
+    allow_tool_execution: false
+    allow_world_publish: false
+    require_approval_for_world_publish: true
+```
+
+- `AutonomousRuntimeState` 必须记录 status、loop_id、profile/session、last_wake_reason、last_wake_event_id、last_tick_at、wakes_used、cooldown_until、last_intent_id、last_arbitration、last_action_summary 和 paused_reason。
+- `AutonomousRuntimeLoop.run_once()` 必须串联模块 1-5 的完整张力场链路，且在没有用户 goal 时也能由世界事件、生命状态和张力场生成低风险 intent。
+- `AutonomousScheduler` 必须提供 tick、idle cooldown、wake budget、per-wake max turns、pause/resume/stop，避免无限后台循环。
+- `WorldEventWaker` 必须在 Linz World raw event 持久化和去重后才唤醒 autonomous loop；重复 event 不得重复 wake。
+- 默认 autonomous 行动只允许 `report_only`、低风险回复/文档草案、内部反思、evidence package 或 `require_approval`。
+- 默认不得执行真实工具副作用、不得自动 `linz_publish`、不得发送外部消息、不得删除、支付或改权限。
+- 如果配置显式允许 world publish，仍必须通过 BoYueArbiter、PolicyEngine、Linz event catalog、authorization map、STVBGuard 和 evidence receipt。
+- 必须提供用户可观测命令：`status`、`pause`、`resume`、`stop`、`tick`、`inbox`、`events`、`intents`。
+
+### 验收标准
+
+- 启用 `os_runtime.mode=autonomous_low_risk` 与 `autonomous.enabled=true` 后，Agent/gateway 启动即进入 idle/sleeping 常驻状态，不需要用户输入 `/os_runtime goal`。
+- 注入合法 Linz World 消息事件后，runtime 自动 wake，并完成 context -> signals -> life -> tension -> action potential -> self prompt -> intent -> arbitration 链路。
+- 无用户 goal 时，Agent 仍能根据张力场/行动势能/生命状态生成低风险自主 intent。
+- 默认配置下，世界事件只生成回复草案、report 或审批请求，不自动发布正式 Linz World 事件。
+- tick wake 可在无世界事件时触发内部反思、未完成张力检查或休眠决策。
+- cooldown、wake budget、fatigue/restraint、pause/stop 能阻止无限自驱动。
+- 每次 wake 都有可查询 evidence：wake reason、event id、LifeState、top tensions、ActionPotential、OpenIntent、ArbitrationResult、action summary 和 stop reason。
+- `os_runtime.enabled=false` 或 `autonomous.enabled=false` 时，普通 CLI、gateway、TUI 和 `/goal` 行为不变。
+
+---
+
 ## [Feature]模块 7：工具执行适配与证据包
 
 ### 仓库
@@ -394,7 +473,7 @@ hermes-agent
 ### 依赖
 
 - 依赖模块 5 的 arbitration 和 permission 结果。
-- 依赖模块 6 的 runtime continuation。
+- 依赖模块 6 的 assisted runtime continuation 与模块 6.5 的 autonomous wake。
 - 依赖现有 `model_tools.py` post tool hook 和 `run_agent.py` LLM result 信息。
 
 ### 目标
