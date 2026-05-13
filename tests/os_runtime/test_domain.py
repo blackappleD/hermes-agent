@@ -12,6 +12,7 @@ from agent.os_runtime.domain import (
     EvidencePackage,
     ExecutionReceipt,
     LifeState,
+    LifeStateDelta,
     OpenActionFamily,
     OpenIntent,
     OpenSpace,
@@ -25,6 +26,7 @@ from agent.os_runtime.domain import (
     TargetDirection,
     TaskContextView,
     Tension,
+    TensionExplanation,
     TensionInterpretation,
     TensionNetworkDelta,
     TensionOperation,
@@ -166,6 +168,7 @@ def test_all_core_objects_round_trip_json():
         LifeState(
             energy=0.8,
             fatigue=0.1,
+            health=0.95,
             wakefulness=0.9,
             curiosity=0.4,
             boredom=0.1,
@@ -176,6 +179,20 @@ def test_all_core_objects_round_trip_json():
             life_cycle="active",
             recovery_cycle="normal",
             generated_intent_count=2,
+        ),
+        LifeStateDelta(
+            previous={"energy": 1.0},
+            current=LifeState(energy=0.8),
+            changes={"energy": {"before": 1.0, "after": 0.8, "delta": -0.2}},
+            reasons=["test transition"],
+            evidence=["evt-1"],
+        ),
+        TensionExplanation(
+            event_id="evt-1",
+            detected_conflicts=["value-vs-risk"],
+            operation_reasons=["test reason"],
+            evidence=["evt-1"],
+            summary="test explanation",
         ),
         TensionInterpretation(
             event_id="evt-1",
@@ -189,6 +206,7 @@ def test_all_core_objects_round_trip_json():
         TensionNetworkDelta(
             operations=[tension_op],
             propagation_edges=[{"from": "tension-1", "to": "tension-2", "weight": 0.4}],
+            eliminated_tensions=["tension-3"],
         ),
         ActionPotential(
             intent_id="intent-1",

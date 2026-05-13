@@ -233,6 +233,7 @@ class SignalSet(JSONRoundTripMixin):
 class LifeState(JSONRoundTripMixin):
     energy: float = 1.0
     fatigue: float = 0.0
+    health: float = 1.0
     wakefulness: float = 1.0
     curiosity: float = 0.0
     boredom: float = 0.0
@@ -247,6 +248,16 @@ class LifeState(JSONRoundTripMixin):
 
 
 @dataclass
+class LifeStateDelta(JSONRoundTripMixin):
+    previous: dict[str, Any] = field(default_factory=dict)
+    current: LifeState | None = None
+    changes: dict[str, dict[str, float]] = field(default_factory=dict)
+    reasons: list[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class TensionOperation(JSONRoundTripMixin):
     operation: TensionOperationType
     tension_id: str
@@ -254,6 +265,16 @@ class TensionOperation(JSONRoundTripMixin):
     intensity_delta: float = 0.0
     reason: str = ""
     evidence: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class TensionExplanation(JSONRoundTripMixin):
+    event_id: str = ""
+    detected_conflicts: list[str] = field(default_factory=list)
+    operation_reasons: list[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
+    summary: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -273,8 +294,10 @@ class Tension(JSONRoundTripMixin):
     tension_type: TensionType
     intensity: float = 0.0
     trend: float = 0.0
+    trend_slope: float = 0.0
     baseline: float = 0.0
     activation: float = 0.0
+    confidence: float = 0.0
     summary: str = ""
     evidence: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -284,6 +307,7 @@ class Tension(JSONRoundTripMixin):
 class TensionSet(JSONRoundTripMixin):
     core_tensions: list[Tension] = field(default_factory=list)
     dynamic_tensions: list[Tension] = field(default_factory=list)
+    propagation_edges: list[dict[str, Any]] = field(default_factory=list)
     timestamp: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -294,6 +318,8 @@ class TensionNetworkDelta(JSONRoundTripMixin):
     propagation_edges: list[dict[str, Any]] = field(default_factory=list)
     activated_tensions: list[str] = field(default_factory=list)
     hibernated_tensions: list[str] = field(default_factory=list)
+    eliminated_tensions: list[str] = field(default_factory=list)
+    rejected_operations: list[TensionOperation] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -440,6 +466,7 @@ __all__ = [
     "ExecutionReceipt",
     "JSONRoundTripMixin",
     "LifeState",
+    "LifeStateDelta",
     "OpenActionFamily",
     "OpenIntent",
     "OpenSpace",
@@ -453,6 +480,7 @@ __all__ = [
     "TargetDirection",
     "TaskContextView",
     "Tension",
+    "TensionExplanation",
     "TensionInterpretation",
     "TensionNetworkDelta",
     "TensionOperation",
