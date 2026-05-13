@@ -803,6 +803,20 @@ def handle_function_call(
         except Exception as _hook_err:
             logger.debug("post_tool_call hook error: %s", _hook_err)
 
+        try:
+            from agent.os_runtime.adapters.events import project_post_tool_call
+            project_post_tool_call(
+                tool_name=function_name,
+                args=function_args,
+                result=result,
+                task_id=task_id or "",
+                session_id=session_id or "",
+                tool_call_id=tool_call_id or "",
+                duration_ms=duration_ms,
+            )
+        except Exception as _hook_err:
+            logger.debug("os_runtime post_tool projection failed: %s", _hook_err)
+
         # Generic tool-result canonicalization seam: plugins receive the
         # final result string (JSON, usually) and may replace it by
         # returning a string from transform_tool_result. Runs after

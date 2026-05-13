@@ -15336,6 +15336,18 @@ class AIAgent:
                 )
             except Exception as exc:
                 logger.warning("post_llm_call hook failed: %s", exc)
+            try:
+                from agent.os_runtime.adapters.events import project_post_llm_call
+                project_post_llm_call(
+                    session_id=self.session_id or "",
+                    user_message=original_user_message or "",
+                    assistant_response=final_response or "",
+                    conversation_history=list(messages),
+                    model=self.model,
+                    platform=getattr(self, "platform", None) or "",
+                )
+            except Exception as exc:
+                logger.debug("os_runtime post_llm projection failed: %s", exc)
 
         # Extract reasoning from the CURRENT turn only.  Walk backwards
         # but stop at the user message that started this turn — anything

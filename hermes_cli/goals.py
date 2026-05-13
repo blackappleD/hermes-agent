@@ -564,10 +564,23 @@ class GoalManager:
             }
 
         save_goal(self.session_id, state)
+        continuation_prompt = self.next_continuation_prompt()
+        try:
+            from agent.os_runtime.adapters.events import project_goal_continuation
+            project_goal_continuation(
+                session_id=self.session_id,
+                continuation_prompt=continuation_prompt or "",
+                goal=state.goal,
+                reason=reason,
+                turns_used=state.turns_used,
+                max_turns=state.max_turns,
+            )
+        except Exception as exc:
+            logger.debug("os_runtime goal continuation projection failed: %s", exc)
         return {
             "status": "active",
             "should_continue": True,
-            "continuation_prompt": self.next_continuation_prompt(),
+            "continuation_prompt": continuation_prompt,
             "verdict": "continue",
             "reason": reason,
             "message": (

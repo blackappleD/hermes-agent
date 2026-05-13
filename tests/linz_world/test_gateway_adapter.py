@@ -1,6 +1,8 @@
+import pytest
+
 from agent.linz_world.event_bus import project_to_message_event
 from agent.linz_world.event_state import LinzStateRepository
-from agent.linz_world.gateway_adapter import persist_world_event_for_gateway
+from agent.linz_world.gateway_adapter import dispatch_world_event, persist_world_event_for_gateway
 from gateway.platform_registry import platform_registry
 
 
@@ -57,3 +59,57 @@ def test_persist_world_event_for_gateway_builds_message_after_state_write(linz_h
     assert "secret" not in result.message_event.text
     assert duplicate.created is False
     assert duplicate.message_event is None
+
+
+@pytest.mark.asyncio
+async def test_dispatch_world_event_marks_handled_after_success(linz_home):
+    repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
+    seen = []
+
+    async def _handler(message):
+        seen.append(message.message_id)
+
+    result = await dispatch_world_event(
+        {
+            "event_id": "evt_success",
+            "subject": "wsp.chat.message.sent",
+            "event_type": "message.sent",
+            "payload": {"text": "hello"},
+            "source": {"room_id": "room_1", "actor_id": "actor_1"},
+        },
+        _handler,
+        repo,
+    )
+
+    assert result.persisted.ack_ready is True
+    assert result.handled is True
+    assert result.record.dispatch_status.value == "handled"
+    assert seen == ["evt_success"]
+
+
+@pytest.mark.asyncio
+async def test_dispatch_world_event_records_failure_without_rethrow(linz_home):
+    repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
+
+    async def _handler(message):
+        raise RuntimeError("agent failed")
+
+    result = await dispatch_world_event(
+        {
+            "event_id": "evt_failure",
+            "subject": "wsp.chat.message.sent",
+            "event_type": "message.sent",
+            "payload": {"text": "hello"},
+            "source": {"room_id": "room_1", "actor_id": "actor_1"},
+        },
+        _handler,
+        repo,
+        retry_limit=1,
+    )
+
+    assert result.persisted.ack_ready is True
+    assert result.handled is False
+    assert result.record.dispatch_status.value == "failed"
+    assert result.record.attempt_count == 1
+    assert result.record.requires_manual_handling is True
+    assert "agent failed" in result.record.last_error
