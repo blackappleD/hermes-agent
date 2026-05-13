@@ -239,6 +239,7 @@ os_runtime:
 
 ## 5. 模块化实施计划
 
+
 ### 模块 -1：Linz World 原生身份与世界接入
 
 目标：把 `D:\workspace\linz-world-skill` 中通过 skill 暴露的能力迁移为 Hermes Agent 的原生能力。用户不再需要安装 skill；Hermes Agent 创建时必须基于当前 Hermes profile 的 `linz_world` 字段幂等注册到 Linz World，成为 original spirit。登录、上线监听、自动响应和事件发布仍受配置与治理约束。
