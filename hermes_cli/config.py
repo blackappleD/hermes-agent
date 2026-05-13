@@ -28,6 +28,9 @@ from typing import Dict, Any, Optional, List, Tuple
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_LINZ_WORLD_SERVICE_URL = "http://8.156.84.202:17878"
+_DEFAULT_LINZ_WORLD_NATS_URL = "nats://8.156.84.202:16331"
+
 # Track which (config_path, mtime_ns, size) tuples we've already warned about
 # so concurrent CLI/gateway loads of a broken config.yaml don't spam stderr
 # every time. Cleared automatically when the file changes (different mtime).
@@ -443,7 +446,8 @@ DEFAULT_CONFIG = {
     "linz_world": {
         "enabled": True,
         "identity_required_on_agent_load": True,
-        "service_url": "",
+        "service_url": _DEFAULT_LINZ_WORLD_SERVICE_URL,
+        "nats_url": _DEFAULT_LINZ_WORLD_NATS_URL,
         "os_name": "Hermes",
         "os_type": "USER",
         "runtime_type": "Hermes",

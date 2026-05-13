@@ -19,6 +19,7 @@ import re
 import shutil
 import sys
 import copy
+import locale
 from pathlib import Path
 from typing import Optional, Dict, Any
 
@@ -201,18 +202,71 @@ def prompt(question: str, default: str = None, password: bool = False) -> str:
         display = f"{question}: "
 
     try:
-        if password:
-            import getpass
-
-            value = getpass.getpass(color(display, Colors.YELLOW))
-        else:
-            value = input(color(display, Colors.YELLOW))
-
+        value = _read_prompt_value(display, password=password)
         cleaned = _sanitize_pasted_input(value)
         return cleaned.strip() or default or ""
     except (KeyboardInterrupt, EOFError):
         print()
         sys.exit(1)
+
+
+def _read_prompt_value(display: str, password: bool = False) -> str:
+    """Read one setup prompt with Unicode-aware editing when available."""
+    prompt_text = color(display, Colors.YELLOW)
+
+    if _can_use_prompt_toolkit():
+        try:
+            from prompt_toolkit import prompt as pt_prompt
+            from prompt_toolkit.formatted_text import ANSI
+
+            return pt_prompt(ANSI(prompt_text), is_password=password)
+        except (KeyboardInterrupt, EOFError):
+            raise
+        except Exception as exc:
+            logger.debug("prompt_toolkit prompt failed; falling back to input(): %s", exc)
+
+    try:
+        if password:
+            import getpass
+
+            return getpass.getpass(prompt_text)
+        return input(prompt_text)
+    except UnicodeDecodeError:
+        if password:
+            raise
+        print()
+        print_warning("Input encoding was not UTF-8; retrying with terminal byte fallback.")
+        return _read_tty_line_with_encoding_fallback(display)
+
+
+def _can_use_prompt_toolkit() -> bool:
+    try:
+        return bool(sys.stdin and sys.stdin.isatty() and sys.stdout and sys.stdout.isatty())
+    except Exception:
+        return False
+
+
+def _read_tty_line_with_encoding_fallback(display: str) -> str:
+    prompt_bytes = color(display, Colors.YELLOW).encode(
+        sys.stdout.encoding or "utf-8",
+        errors="replace",
+    )
+    with open("/dev/tty", "rb", buffering=0) as tty_in, open("/dev/tty", "wb", buffering=0) as tty_out:
+        tty_out.write(prompt_bytes)
+        raw = tty_in.readline().rstrip(b"\r\n")
+
+    encodings = [
+        sys.stdin.encoding,
+        locale.getpreferredencoding(False),
+        "utf-8",
+        "gb18030",
+    ]
+    for encoding in dict.fromkeys(enc for enc in encodings if enc):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
 
 
 _BRACKETED_PASTE_PATTERN = re.compile(r"\x1b\[\s*200~|\x1b\[\s*201~")
@@ -1719,51 +1773,61 @@ def _persona_seed_preview(seed: str) -> str:
     return normalized[:117] + "..."
 
 
+def _complete_linz_world_login(config: dict) -> bool:
+    """Register and log in the current profile after Linz setup."""
+
+    try:
+        from agent.linz_world import auth, identity
+        from agent.linz_world.event_state import LinzStateRepository
+        from agent.linz_world.models import AuthState, LoginState
+
+        repo = LinzStateRepository()
+        world_identity = identity.ensure_original_spirit_identity(repo, config=config)
+        if not world_identity.is_complete():
+            print_warning(world_identity.last_error or "Linz World identity registration failed.")
+            if world_identity.next_action:
+                print_info(world_identity.next_action)
+            return False
+        session = auth.login(repo, config=config)
+        auth_map = repo.get_auth_map()
+        if session.state == LoginState.LOGGED_IN:
+            print_success("接入灵治平台成功！")
+            if auth_map.state != AuthState.CURRENT and auth_map.last_error:
+                print_warning(f"Linz World authorization map is not current: {auth_map.last_error}")
+            return True
+        print_warning(session.last_error or "Linz World login failed.")
+        return False
+    except Exception as exc:
+        print_warning(f"Linz World login failed: {exc}")
+        return False
+
+
 def setup_linz_world(config: dict):
-    """Configure native Linz World identity registration and persona seed."""
+    """Ensure the Linz World persona seed exists."""
+
+    from agent.linz_world.config import (
+        DEFAULT_LINZ_WORLD_NATS_URL,
+        DEFAULT_LINZ_WORLD_SERVICE_URL,
+    )
 
     print_header("Linz World Identity")
-    print_info("Configures the native original-spirit registration used before persona load.")
+    print_info("Ensures the persona seed required for original-spirit registration exists.")
     print_info("The persona seed is injected into a Linz World block in SOUL.md.")
     print()
 
     linz = config.setdefault("linz_world", {})
-    current_enabled = bool(linz.get("enabled", True))
-    enabled = prompt_yes_no("Enable native Linz World identity registration?", current_enabled)
-    linz["enabled"] = enabled
-    linz["identity_required_on_agent_load"] = enabled
-    if not enabled:
-        save_config(config)
-        print_warning("Linz World identity registration disabled.")
-        return
-
-    current_url = str(linz.get("service_url") or linz.get("server_url") or "").strip()
-    while True:
-        service_url = prompt("Linz World service URL", current_url).strip()
-        if service_url:
-            break
-        print_warning("Linz World service URL is required for registration.")
-        if prompt_yes_no("Disable Linz World identity registration for now?", False):
-            linz["enabled"] = False
-            linz["identity_required_on_agent_load"] = False
-            save_config(config)
-            return
-    linz["service_url"] = service_url
+    linz["enabled"] = True
+    linz["identity_required_on_agent_load"] = True
+    linz["service_url"] = str(linz.get("service_url") or DEFAULT_LINZ_WORLD_SERVICE_URL).strip()
+    linz["nats_url"] = str(linz.get("nats_url") or DEFAULT_LINZ_WORLD_NATS_URL).strip()
     linz.pop("server_url", None)
-
+    linz.pop("compute_api_key_ref", None)
     current_name = str(linz.get("os_name") or "Hermes").strip() or "Hermes"
-    os_name = prompt("Linz World agent name", current_name).strip() or current_name
-    linz["os_name"] = os_name
-
-    type_choices = ["USER", "SEV", "GOV"]
-    current_type = str(linz.get("os_type") or linz.get("type") or "USER").strip().upper()
-    default_type = type_choices.index(current_type) if current_type in type_choices else 0
-    type_idx = prompt_choice("Original-spirit type:", type_choices, default_type)
-    linz["os_type"] = type_choices[type_idx]
+    linz["os_name"] = current_name
+    os_type = str(linz.get("os_type") or linz.get("type") or "USER").strip().upper()
+    linz["os_type"] = os_type if os_type in {"USER", "SEV", "GOV"} else "USER"
     linz.pop("type", None)
-
-    runtime_type = str(linz.get("runtime_type") or "Hermes").strip() or "Hermes"
-    linz["runtime_type"] = runtime_type
+    linz["runtime_type"] = str(linz.get("runtime_type") or "Hermes").strip() or "Hermes"
 
     hermes_home = get_hermes_home()
     soul_content = _read_soul_md_content(hermes_home)
@@ -1772,13 +1836,18 @@ def setup_linz_world(config: dict):
         current_seed = _extract_linz_persona_seed_from_soul(soul_content)
     if current_seed:
         print_info(f"Current persona seed: {_persona_seed_preview(current_seed)}")
-        print_info("Press Enter to keep it, or type a replacement.")
+        linz["persona_seed"] = current_seed
+        _write_linz_persona_seed_to_soul(hermes_home, current_seed)
+        save_config(config)
+        print_success("Linz World persona seed already configured.")
+        _complete_linz_world_login(config)
+        return
+
+    agent_name = prompt("Linz World agent name", current_name).strip() or current_name
+    linz["os_name"] = agent_name
 
     while True:
-        entered_seed = prompt(
-            "Persona seed" if not current_seed else "Persona seed (blank keeps current)"
-        ).strip()
-        persona_seed = entered_seed or current_seed
+        persona_seed = prompt("Persona seed").strip()
         if persona_seed:
             break
         print_warning("Persona seed is required for Linz World registration.")
@@ -1788,6 +1857,7 @@ def setup_linz_world(config: dict):
     save_config(config)
     print_success("Linz World identity settings saved.")
     print_info(f"SOUL.md updated: {Path(hermes_home) / 'SOUL.md'}")
+    _complete_linz_world_login(config)
 
 
 # =============================================================================
