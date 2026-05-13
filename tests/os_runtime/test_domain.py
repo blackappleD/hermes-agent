@@ -49,7 +49,19 @@ def test_core_enum_values_are_stable():
     assert EventSource.LINZ_WORLD.value == "linz_world"
     assert TensionType.VALUE_CONFLICT.value == "value_conflict"
     assert TensionOperationType.GENERATE.value == "generate"
-    assert OpenActionFamily.USE_TOOL.value == "use_tool"
+    assert [item.value for item in OpenActionFamily] == [
+        "communicate",
+        "learn",
+        "trade",
+        "collaborate",
+        "rest",
+        "create",
+        "new_tool",
+        "new_skill",
+    ]
+    assert "reply" not in {item.value for item in OpenActionFamily}
+    assert "draft" not in {item.value for item in OpenActionFamily}
+    assert "use_tool" not in {item.value for item in OpenActionFamily}
     assert RiskLevel.MEDIUM.value == "medium"
     assert BubbleLifecycle.PROPOSED.value == "proposed"
     assert [item.value for item in RuleMaturity] == ["R0", "R1", "R2", "R3", "R4"]
@@ -221,10 +233,19 @@ def test_all_core_objects_round_trip_json():
             state_summary="生命状态摘要",
             tension_summary="张力摘要",
             potential_summary="势能摘要",
+            open_space=OpenSpace(
+                space_id="space-1",
+                available_action_families=[OpenActionFamily.COMMUNICATE],
+            ),
+            target_direction=TargetDirection(
+                direction_id="direction-1",
+                success_condition="测试通过",
+                stop_condition="风险升高",
+            ),
         ),
         OpenSpace(
             space_id="space-1",
-            available_action_families=[OpenActionFamily.REPLY, OpenActionFamily.PLAN],
+            available_action_families=[OpenActionFamily.COMMUNICATE, OpenActionFamily.LEARN],
         ),
         TargetDirection(
             direction_id="direction-1",
@@ -233,9 +254,18 @@ def test_all_core_objects_round_trip_json():
         ),
         OpenIntent(
             intent_id="intent-1",
-            action_family=OpenActionFamily.DRAFT,
+            action_family=OpenActionFamily.COMMUNICATE,
             action_type="draft_response",
             why_now="低风险建议",
+            open_space=OpenSpace(
+                space_id="space-1",
+                available_action_families=[OpenActionFamily.COMMUNICATE],
+            ),
+            target_direction=TargetDirection(
+                direction_id="direction-1",
+                success_condition="用户可审阅",
+                stop_condition="需要审批",
+            ),
             tools_needed=["none"],
             success_condition="用户可审阅",
             stop_condition="需要审批",

@@ -41,15 +41,14 @@ class TensionOperationType(str, Enum):
 
 
 class OpenActionFamily(str, Enum):
-    REPLY = "reply"
-    DRAFT = "draft"
-    ASK_QUESTION = "ask_question"
-    PLAN = "plan"
-    DELEGATE = "delegate"
-    USE_TOOL = "use_tool"
-    RESEARCH = "research"
-    REMEMBER = "remember"
-    OBSERVE = "observe"
+    COMMUNICATE = "communicate"
+    LEARN = "learn"
+    TRADE = "trade"
+    COLLABORATE = "collaborate"
+    REST = "rest"
+    CREATE = "create"
+    NEW_TOOL = "new_tool"
+    NEW_SKILL = "new_skill"
 
 
 class ArbitrationDecision(str, Enum):
@@ -344,6 +343,8 @@ class SelfPrompt(JSONRoundTripMixin):
     memory_scope: list[str] = field(default_factory=list)
     constraint_scope: list[str] = field(default_factory=list)
     environment_scope: str = ""
+    open_space: OpenSpace | None = None
+    target_direction: TargetDirection | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -372,6 +373,8 @@ class OpenIntent(JSONRoundTripMixin):
     action_family: OpenActionFamily
     action_type: str = ""
     why_now: str = ""
+    open_space: OpenSpace | None = None
+    target_direction: TargetDirection | None = None
     tools_needed: list[str] = field(default_factory=list)
     proposed_new_tools: list[str] = field(default_factory=list)
     proposed_new_skills: list[str] = field(default_factory=list)
@@ -389,6 +392,16 @@ class ArbitrationResult(JSONRoundTripMixin):
     bo_score: float = 0.0
     yue_score: float = 0.0
     harmony_score: float = 0.0
+    innovation_score: float = 0.0
+    opportunity_score: float = 0.0
+    expansion_value: float = 0.0
+    risk_score: float = 0.0
+    permission_level: float = 0.0
+    compliance_fit: float = 0.0
+    trust_impact: float = 0.0
+    mutual_benefit_score: float = 0.0
+    long_term_net_value: float = 0.0
+    ecosystem_gain: float = 0.0
     rationale: str = ""
     required_approvals: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
