@@ -5,6 +5,7 @@ from __future__ import annotations
 from .api_client import LinzWorldService, LinzWorldServiceError, default_service, store_runtime_secret
 from .config import load_linz_world_config
 from .event_state import LinzStateRepository
+from .key_material import ensure_key_material
 from .models import AuthState, RegistrationStatus, WorldIdentity
 
 
@@ -16,7 +17,7 @@ def ensure_original_spirit_identity(
 ) -> WorldIdentity:
     repo = repository or LinzStateRepository()
     existing = repo.get_identity()
-    if existing and existing.is_complete():
+    if existing and existing.is_complete() and existing.private_key_path and existing.public_key_fingerprint:
         return existing
 
     cfg = load_linz_world_config(config)
@@ -25,6 +26,11 @@ def ensure_original_spirit_identity(
             "Linz World persona_seed is not configured.",
             "Run hermes setup linz and provide a persona seed before loading this agent.",
         )
+    key_material = ensure_key_material(
+        repo.profile_id,
+        private_key_path=existing.private_key_path if existing else "",
+        public_key_path=existing.public_key_path if existing else "",
+    )
     try:
         svc = service or default_service(config)
         result = svc.register_original_spirit(
@@ -33,6 +39,9 @@ def ensure_original_spirit_identity(
             cfg.persona_seed,
             cfg.os_type,
             cfg.runtime_type,
+            key_material.public_key_pem,
+            key_material.public_key_type,
+            key_material.fingerprint,
         )
     except LinzWorldServiceError as exc:
         return repo.save_failed_identity(
@@ -77,7 +86,10 @@ def ensure_original_spirit_identity(
         access_token_ref=access_token_ref,
         access_token_expires_at=str(expires_in or ""),
         registered_at=str(result.get("registeredAt") or result.get("registered_at") or ""),
-        compute_api_key_ref=str(result.get("compute_api_key_ref") or cfg.compute_api_key_ref or ""),
+        private_key_path=key_material.private_key_path,
+        public_key_path=key_material.public_key_path,
+        public_key_type=key_material.public_key_type,
+        public_key_fingerprint=key_material.fingerprint,
         registration_state=RegistrationStatus.REGISTERED,
         authorization_state=AuthState.UNKNOWN,
         last_error="",
