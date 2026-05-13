@@ -141,6 +141,39 @@ def test_tool_result_redacts_sensitive_fields(tmp_path):
         repo.close()
 
 
+def test_tool_result_redacts_sensitive_json_string(tmp_path):
+    repo, adapter = _adapter(tmp_path, max_summary_chars=160)
+    try:
+        result = adapter.tool_result(
+            "json_tool",
+            '{"token":"secret123","ok":true}',
+            session_id="session_1",
+        )
+
+        assert result.written
+        assert "secret123" not in result.event.summary
+        assert "[REDACTED]" in result.event.summary
+        assert '"ok": true' in result.event.summary
+    finally:
+        repo.close()
+
+
+def test_tool_result_redacts_authorization_bearer_string(tmp_path):
+    repo, adapter = _adapter(tmp_path, max_summary_chars=160)
+    try:
+        result = adapter.tool_result(
+            "header_tool",
+            "Authorization: Bearer abc123",
+            session_id="session_1",
+        )
+
+        assert result.written
+        assert "abc123" not in result.event.summary
+        assert "Bearer [REDACTED]" in result.event.summary
+    finally:
+        repo.close()
+
+
 def test_post_llm_runtime_hook_writes_when_enabled_and_skips_when_disabled(tmp_path, monkeypatch):
     enabled_home = tmp_path / "enabled_home"
     _write_config(enabled_home, enabled=True)

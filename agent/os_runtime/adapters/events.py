@@ -19,7 +19,16 @@ from .session_store import OSRuntimeEvent, OSRuntimeEventRepository
 
 MAX_SUMMARY_CHARS = 1024
 _SENSITIVE_ASSIGNMENT_RE = re.compile(
-    r"(?i)\b(token|api[_-]?key|password|secret|private[_-]?key|authorization)\b\s*[:=]\s*([^\s,;&]+)"
+    r"(?i)(\b(?:token|api[_-]?key|password|secret|private[_-]?key|authorization)\b\s*[:=]\s*)"
+    r"(?!Bearer\s+\[REDACTED\])"
+    r"(\"[^\"]*\"|'[^']*'|[^\s,;&]+)"
+)
+_SENSITIVE_QUOTED_KEY_RE = re.compile(
+    r"(?i)([\"'](?:token|api[_-]?key|password|secret|private[_-]?key|authorization)[\"']\s*:\s*)"
+    r"([\"'])(.*?)(\2)"
+)
+_AUTH_BEARER_RE = re.compile(
+    r"(?i)(\bAuthorization\s*:\s*Bearer\s+)([A-Za-z0-9._~+/=-]+)"
 )
 
 
@@ -264,7 +273,18 @@ def bounded_summary(value: Any, *, max_chars: int = MAX_SUMMARY_CHARS, content_r
 
 def redact_for_summary(value: Any) -> Any:
     if isinstance(value, str):
-        return _SENSITIVE_ASSIGNMENT_RE.sub(lambda m: f"{m.group(1)}=[REDACTED]", value)
+        try:
+            parsed = json.loads(value)
+        except (TypeError, json.JSONDecodeError):
+            parsed = None
+        if isinstance(parsed, (dict, list)):
+            return redact_value(parsed)
+        redacted = _AUTH_BEARER_RE.sub(lambda m: f"{m.group(1)}[REDACTED]", value)
+        redacted = _SENSITIVE_QUOTED_KEY_RE.sub(
+            lambda m: f"{m.group(1)}{m.group(2)}[REDACTED]{m.group(2)}",
+            redacted,
+        )
+        return _SENSITIVE_ASSIGNMENT_RE.sub(lambda m: f"{m.group(1)}[REDACTED]", redacted)
     return redact_value(value)
 
 
