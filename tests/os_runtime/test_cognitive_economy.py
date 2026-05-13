@@ -200,6 +200,36 @@ def test_missing_token_secret_and_explicit_credentials_block_world_compute():
     assert not called
 
 
+def test_nested_explicit_credentials_block_world_compute_without_calling_gateway():
+    called = []
+
+    def compute_stub(*args, **kwargs):
+        called.append((args, kwargs))
+        return ComputeReceipt("req-1", ReceiptStatus.PUBLISHED)
+
+    recommendation = CognitiveEconomyController(
+        config={"allow_world_compute": True},
+        compute_gateway=compute_stub,
+    ).recommend(
+        action_potential=_potential(score=0.84, learning=0.6, risk=0.1),
+        signal_set=SignalSet(agent_context=_world_context()),
+        tension_set=_uncertain_tensions(),
+        life_state=LifeState(restraint=0.2),
+        world_input={
+            "payload": [
+                {"Api_Key": "raw-secret"},
+                {"nested": {"secret": "raw-secret", "detail": "kept local"}},
+            ],
+            "metadata": {"token": "raw-token"},
+        },
+    )
+
+    assert recommendation.selected_path != CognitiveEconomyPath.WORLD_COMPUTE
+    assert recommendation.downgrade_reason == "explicit_credentials_rejected"
+    assert recommendation.metadata["world_compute_eligibility"]["reason"] == "explicit_credentials_rejected"
+    assert not called
+
+
 def test_rejected_or_failed_world_compute_receipt_downgrades_and_records_status():
     def rejected_stub(task, input_data=None, repository=None):
         return ComputeReceipt("req-rejected", ReceiptStatus.REJECTED, message="governance rejected")

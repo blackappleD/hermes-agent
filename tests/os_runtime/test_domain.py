@@ -68,6 +68,20 @@ def test_arbitration_decision_uses_new_protocol_values_only():
     assert "allow_sandbox" not in {item.value for item in ArbitrationDecision}
 
 
+def test_module4_protocol_objects_are_exported_from_stable_entrypoint():
+    from agent.os_runtime import (
+        CognitiveEconomyPath as EntrypointCognitiveEconomyPath,
+        CognitiveEconomyRecommendation as EntrypointCognitiveEconomyRecommendation,
+        RecommendedDepth as EntrypointRecommendedDepth,
+        WorldComputeEligibility as EntrypointWorldComputeEligibility,
+    )
+
+    assert EntrypointRecommendedDepth.CONTINUE_TURN.value == "continue_turn"
+    assert EntrypointCognitiveEconomyPath.WORLD_COMPUTE.value == "world_compute"
+    assert EntrypointCognitiveEconomyRecommendation().selected_path == EntrypointCognitiveEconomyPath.RULE_PATH
+    assert EntrypointWorldComputeEligibility(reason="config_disabled").reason == "config_disabled"
+
+
 def test_world_identity_ref_is_read_only_identity_view():
     names = {item.name for item in fields(WorldIdentityRef)}
     assert {"os_id", "soul_id", "os_name", "account_id"} <= names

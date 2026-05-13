@@ -23,6 +23,7 @@ from agent.os_runtime.domain import (
 
 
 ComputeGateway = Callable[..., Any]
+CREDENTIAL_KEYS = {"token", "api_key", "secret"}
 
 
 class CognitiveEconomyController:
@@ -326,16 +327,31 @@ def _receipt_summary(receipt: Any) -> dict[str, Any]:
     }
 
 
-def _has_explicit_credential(input_data: dict[str, Any]) -> bool:
-    return any(str(key).lower() in {"token", "api_key", "secret"} for key in input_data)
+def _has_explicit_credential(value: Any) -> bool:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if str(key).lower() in CREDENTIAL_KEYS:
+                return True
+            if _has_explicit_credential(item):
+                return True
+        return False
+    if isinstance(value, (list, tuple)):
+        return any(_has_explicit_credential(item) for item in value)
+    return False
 
 
-def _safe_world_input(input_data: dict[str, Any]) -> dict[str, Any]:
-    return {
-        key: value
-        for key, value in input_data.items()
-        if str(key).lower() not in {"token", "api_key", "secret"}
-    }
+def _safe_world_input(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _safe_world_input(item)
+            for key, item in value.items()
+            if str(key).lower() not in CREDENTIAL_KEYS
+        }
+    if isinstance(value, list):
+        return [_safe_world_input(item) for item in value]
+    if isinstance(value, tuple):
+        return [_safe_world_input(item) for item in value]
+    return value
 
 
 def _depth_value(action_potential: ActionPotential) -> str:
