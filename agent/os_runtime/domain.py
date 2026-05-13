@@ -84,6 +84,25 @@ class RuleMaturity(str, Enum):
     R4 = "R4"
 
 
+class RecommendedDepth(str, Enum):
+    NONE = "none"
+    REPORT = "report"
+    DRAFT = "draft"
+    CONTINUE_TURN = "continue_turn"
+    SANDBOX = "sandbox"
+    TOOL = "tool"
+    WORLD_PUBLISH = "world_publish"
+    BUBBLE = "bubble"
+
+
+class CognitiveEconomyPath(str, Enum):
+    RULE_PATH = "rule_path"
+    AUXILIARY_SMALL = "auxiliary_small"
+    MAIN_MODEL = "main_model"
+    WORLD_COMPUTE = "world_compute"
+    HIGH_REASONING = "high_reasoning"
+
+
 T = TypeVar("T", bound="JSONRoundTripMixin")
 
 
@@ -331,7 +350,33 @@ class ActionPotential(JSONRoundTripMixin):
     learning_potential: float = 0.0
     risk_cost: float = 0.0
     overall_score: float = 0.0
+    recommended_depth: RecommendedDepth = RecommendedDepth.NONE
     rationale: str = ""
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class CognitiveEconomyRecommendation(JSONRoundTripMixin):
+    selected_path: CognitiveEconomyPath = CognitiveEconomyPath.RULE_PATH
+    reason: str = ""
+    budget_hint: str = "minimal"
+    downgrade_reason: str = ""
+    receipt_summary: dict[str, Any] = field(default_factory=dict)
+    evidence: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class WorldComputeEligibility(JSONRoundTripMixin):
+    eligible: bool = False
+    reason: str = ""
+    login_state: str = "unknown"
+    token_ref_present: bool = False
+    token_secret_available: bool = False
+    memory_summary_available: bool = False
+    authorization_state: str = "unknown"
+    config_enabled: bool = False
+    receipt_status: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -461,6 +506,8 @@ __all__ = [
     "ArbitrationResult",
     "BubbleLifecycle",
     "BubbleSpec",
+    "CognitiveEconomyPath",
+    "CognitiveEconomyRecommendation",
     "EventSource",
     "EvidencePackage",
     "ExecutionReceipt",
@@ -472,6 +519,7 @@ __all__ = [
     "OpenSpace",
     "OSRuntimeEventRef",
     "PermissionTicket",
+    "RecommendedDepth",
     "RiskLevel",
     "RuleCrystal",
     "RuleMaturity",
@@ -487,5 +535,6 @@ __all__ = [
     "TensionOperationType",
     "TensionSet",
     "TensionType",
+    "WorldComputeEligibility",
     "WorldIdentityRef",
 ]
