@@ -4,10 +4,13 @@ from agent.linz_world.identity import ensure_original_spirit_identity
 from agent.linz_world.publisher import publish_event
 
 
+_CONFIG = {"linz_world": {"persona_seed": "stable persona seed"}}
+
+
 def test_publish_rejects_without_login(linz_home, FakeLinzService):
     repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
     svc = FakeLinzService()
-    ensure_original_spirit_identity(repo, svc)
+    ensure_original_spirit_identity(repo, svc, config=_CONFIG)
 
     receipt = publish_event("wsp.chat.message.sent", "message.sent", {"text": "hi"}, repo, svc)
 
@@ -19,7 +22,7 @@ def test_publish_rejects_without_login(linz_home, FakeLinzService):
 def test_authorization_refresh_failure_blocks_side_effect(linz_home, FakeLinzService):
     repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
     svc = FakeLinzService(fail_auth=True)
-    ensure_original_spirit_identity(repo, svc)
+    ensure_original_spirit_identity(repo, svc, config=_CONFIG)
     auth.login(repo, svc)
 
     receipt = publish_event("wsp.chat.message.sent", "message.sent", {"text": "hi"}, repo, svc)

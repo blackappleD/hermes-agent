@@ -6,9 +6,12 @@ from agent.linz_world.memory import write_memory
 from agent.linz_world.relationship import add_active_relationship
 
 
+_CONFIG = {"linz_world": {"persona_seed": "stable persona seed"}}
+
+
 def _ready_repo(linz_home, svc):
     repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
-    ensure_original_spirit_identity(repo, svc)
+    ensure_original_spirit_identity(repo, svc, config=_CONFIG)
     auth.login(repo, svc)
     return repo
 

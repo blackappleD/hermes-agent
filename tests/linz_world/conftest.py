@@ -20,10 +20,19 @@ class _FakeLinzService:
         self.register_calls = 0
         self.publish_calls = 0
 
-    def register_original_spirit(self, hermes_profile: str, os_name: str):
+    def register_original_spirit(
+        self,
+        hermes_profile: str,
+        os_name: str,
+        persona_seed: str = "",
+        os_type: str = "USER",
+        runtime_type: str = "Hermes",
+    ):
         self.register_calls += 1
         if self.fail_register:
             raise RuntimeError("registry down")
+        if not persona_seed:
+            raise RuntimeError("persona seed missing")
         return {
             "agentId": f"agent_{hermes_profile}",
             "soulId": f"soul_{hermes_profile}",
@@ -32,6 +41,8 @@ class _FakeLinzService:
             "expiresIn": 86400,
             "registeredAt": "2026-05-12T00:00:00Z",
             "os_name": os_name,
+            "type": os_type,
+            "runtime_type": runtime_type,
         }
 
     def login(self, identity):

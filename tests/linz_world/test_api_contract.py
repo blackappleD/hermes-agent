@@ -48,12 +48,27 @@ def test_register_uses_linz_world_auth_register_contract(monkeypatch):
 
     monkeypatch.setattr("httpx.request", fake_request)
 
-    result = HttpLinzWorldService("http://linz.test").register_original_spirit("profile-1", "Hermes")
+    result = HttpLinzWorldService("http://linz.test").register_original_spirit(
+        "profile-1",
+        "Hermes",
+        "reliable, direct, and careful",
+    )
 
     assert result["agentId"] == "agent-1"
     assert calls[0][0] == "POST"
     assert calls[0][1] == "http://linz.test/api/v1/auth/register"
-    assert set(calls[0][2]) == {"publicKey", "publicKeyType", "fingerprint", "metadata"}
+    assert set(calls[0][2]) == {
+        "publicKey",
+        "publicKeyType",
+        "fingerprint",
+        "agent_name",
+        "persona_seed",
+        "type",
+        "runtime_type",
+        "metadata",
+    }
+    assert calls[0][2]["persona_seed"] == "reliable, direct, and careful"
+    assert calls[0][2]["metadata"]["persona_seed"] == "reliable, direct, and careful"
     assert "hermes_profile" not in {k for k in calls[0][2] if k != "metadata"}
 
 
@@ -63,14 +78,22 @@ def test_envelope_nonzero_and_missing_data_are_errors(monkeypatch):
         lambda *args, **kwargs: _Response({"code": 123, "message": "nope", "data": None}),
     )
     with pytest.raises(LinzWorldServiceError, match="nope"):
-        HttpLinzWorldService("http://linz.test").register_original_spirit("profile-1", "Hermes")
+        HttpLinzWorldService("http://linz.test").register_original_spirit(
+            "profile-1",
+            "Hermes",
+            "seed",
+        )
 
     monkeypatch.setattr(
         "httpx.request",
         lambda *args, **kwargs: _Response({"code": 0, "message": "success"}),
     )
     with pytest.raises(LinzWorldServiceError, match="missing object data"):
-        HttpLinzWorldService("http://linz.test").register_original_spirit("profile-1", "Hermes")
+        HttpLinzWorldService("http://linz.test").register_original_spirit(
+            "profile-1",
+            "Hermes",
+            "seed",
+        )
 
 
 def test_compute_uses_api_key_bearer_and_parses_current_response(monkeypatch):

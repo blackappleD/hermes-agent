@@ -24,3 +24,19 @@ def test_missing_service_url_is_actionable_configuration_error():
 def test_server_url_is_only_compatibility_input():
     cfg = load_linz_world_config({"linz_world": {"server_url": "http://linz.test"}})
     assert cfg.service_url == "http://linz.test"
+
+
+def test_persona_seed_and_registration_metadata_config():
+    cfg = load_linz_world_config(
+        {
+            "linz_world": {
+                "persona_seed": "  careful collaborator  ",
+                "os_type": "sev",
+                "runtime_type": "Codex",
+            }
+        }
+    )
+
+    assert cfg.persona_seed == "careful collaborator"
+    assert cfg.os_type == "SEV"
+    assert cfg.runtime_type == "Codex"
