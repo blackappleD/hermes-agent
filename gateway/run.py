@@ -9639,6 +9639,19 @@ class GatewayRunner:
         if driver.state is None or driver.state.status not in {"passive", "assisted", "paused"}:
             return
 
+        adapter = self.adapters.get(source.platform) if source is not None else None
+        _quick_key = self._session_key_for_source(source) if source is not None else None
+        if driver.state.status == "assisted" and adapter and _quick_key:
+            try:
+                if self._queue_depth(_quick_key, adapter=adapter) > 0:
+                    logger.debug(
+                        "os_runtime continuation: skipping because pending queue already has work for %s",
+                        _quick_key,
+                    )
+                    return
+            except Exception as exc:
+                logger.debug("os_runtime continuation: queue-depth check failed: %s", exc)
+
         recent_event = OSRuntimeEvent(
             event_id=f"osr-gateway-turn-{uuid.uuid4().hex}",
             event_type="assistant_turn",
@@ -9658,8 +9671,6 @@ class GatewayRunner:
             return
 
         try:
-            adapter = self.adapters.get(source.platform)
-            _quick_key = self._session_key_for_source(source)
             if adapter and _quick_key:
                 cont_event = MessageEvent(
                     text=decision.continuation_prompt,

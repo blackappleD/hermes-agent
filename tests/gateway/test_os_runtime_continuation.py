@@ -47,6 +47,7 @@ def hermes_home(tmp_path, monkeypatch):
 @pytest.mark.asyncio
 async def test_assisted_continuation_enqueues_plain_message_event(monkeypatch, hermes_home):
     runner = _runner()
+    _FakeDriver.evaluate_calls = 0
     monkeypatch.setattr("hermes_cli.os_runtime.load_runtime_config", lambda: OSRuntimeConfig(enabled=True, mode="assisted"))
     monkeypatch.setattr("agent.os_runtime.driver.OSRuntimeDriver", _FakeDriver)
 
@@ -60,6 +61,32 @@ async def test_assisted_continuation_enqueues_plain_message_event(monkeypatch, h
     assert isinstance(event, MessageEvent)
     assert event.text.startswith(OS_RUNTIME_CONTINUATION_MARKER)
     assert event.message_type == MessageType.TEXT
+
+
+@pytest.mark.asyncio
+async def test_assisted_continuation_skips_when_goal_continuation_pending(monkeypatch, hermes_home):
+    runner = _runner()
+    adapter = runner.adapters[Platform.TELEGRAM]
+    session_key = "telegram:user:123"
+    goal_event = MessageEvent(
+        text="[Continuing toward your standing goal]\nGoal: write docs",
+        source=_source(),
+        message_type=MessageType.TEXT,
+    )
+    adapter._pending_messages[session_key] = goal_event
+    _FakeDriver.evaluate_calls = 0
+    monkeypatch.setattr("hermes_cli.os_runtime.load_runtime_config", lambda: OSRuntimeConfig(enabled=True, mode="assisted"))
+    monkeypatch.setattr("agent.os_runtime.driver.OSRuntimeDriver", _FakeDriver)
+
+    await runner._post_turn_os_runtime_continuation(
+        session_entry=SimpleNamespace(session_id="session-1"),
+        source=_source(),
+        final_response="draft started",
+    )
+
+    assert adapter._pending_messages[session_key] is goal_event
+    assert runner._queued_events == {}
+    assert _FakeDriver.evaluate_calls == 0
 
 
 def test_pause_clear_removes_only_os_runtime_synthetic_continuations(hermes_home):
@@ -114,11 +141,13 @@ def _source():
 
 class _FakeDriver:
     state = SimpleNamespace(status="assisted")
+    evaluate_calls = 0
 
     def __init__(self, *args, **kwargs):
         pass
 
     def evaluate_after_turn(self, *args, **kwargs):
+        type(self).evaluate_calls += 1
         return SimpleNamespace(
             should_continue=True,
             continuation_prompt=f"{OS_RUNTIME_CONTINUATION_MARKER}\nGoal: draft",
