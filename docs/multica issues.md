@@ -4,7 +4,7 @@
 
 说明：
 
-- 以下 issue 按计划文档“模块化实施计划”拆分，覆盖 `模块 -1` 到 `模块 11`，并新增 `模块 6.5` 用于常驻完全自驱动 runtime。
+- 以下 issue 按计划文档“模块化实施计划”拆分，覆盖 `模块 -1` 到 `模块 11`，并新增 `模块 6.5` 用于常驻完全自驱动 runtime 与普通对话全 turn 张力治理。
 - `模块 -1` 已有 spec-kit 拆解：`specs/001-native-linz-identity/`。后续实现应优先遵守该 spec 的范围收敛：不做旧 `linz-world-skill` 身份导入/同步/迁移；注册失败 fail-closed；外部副作用实时刷新授权 map；原始 payload 仅限受限审计。
 - 后续模块尚未发现对应 spec 目录，issue 以计划文档为准，适合继续生成 spec/plan/tasks 后再实现。
 
@@ -381,7 +381,7 @@ hermes-agent
 
 ---
 
-## [Feature]模块 6.5：常驻 Autonomous Runtime Loop 与世界事件自响应
+## [Feature]模块 6.5：常驻 Autonomous Runtime Loop、全 Turn 张力治理与世界事件自响应
 
 ### 仓库
 
@@ -396,10 +396,17 @@ hermes-agent
 - 依赖模块 -1 的 Linz World identity、event state、gateway adapter、event catalog 和 authorization map。
 - 依赖模块 1 到模块 5 的事件、上下文、信号、生命状态、张力、行动势能、SelfPrompt、OpenIntent 和 BoYueArbiter。
 - 依赖模块 6 的 driver state、turn-boundary decision 和 pause/resume/clear 控制语义，但不依赖用户输入 `/os_runtime goal`。
+- 依赖 CLI、TUI、gateway 与 Linz World MessageEvent 的 turn 边界，可在不重写主循环的前提下接入 before_turn/after_turn hook。
 
 ### 目标
 
-实现真正的常驻元神自驱动 runtime：Agent/gateway 启动后可根据世界事件、时间 tick、内部反馈、生命状态、张力场和行动势能自动唤醒，生成 intent 并经裁判后执行低风险自主响应、草案、反思、evidence 或审批请求。该模块不应要求用户每次输入 `/os_runtime goal` 才进入自驱动。
+实现真正的常驻元神自驱动 runtime：普通 Agent 以当前 Hermes profile 的 Linz World original spirit 身份运行，Agent/gateway 启动后可根据世界事件、时间 tick、内部反馈、生命状态、张力场和行动势能自动唤醒；普通 CLI/TUI/gateway 对话也必须进入张力场观测/治理，可选注入 ephemeral SelfPrompt。该模块不应要求用户每次输入 `/os_runtime goal` 才进入自驱动。
+
+目标分层：
+
+- Level 1 `identity-native`：普通 Agent 天然是 Linz World original spirit，由模块 -1 保证。
+- Level 2 `tension-observed`：所有普通对话、世界事件、tick、工具反馈和 assistant response 都进入 `os_runtime` 事件投影并更新 LifeState/Tension/ActionPotential/evidence。
+- Level 3 `tension-driven`：所有 turn 前/turn 后可被张力场影响，包括 ephemeral SelfPrompt、行动深度、是否继续、是否休眠、是否审批和是否拒绝外部行动。本模块交付 Level 2/3 运行入口。
 
 ### 范围
 
@@ -408,11 +415,15 @@ hermes-agent
 - 新增 `agent/os_runtime/autonomous_scheduler.py`
 - 新增 `agent/os_runtime/world_event_waker.py`
 - 新增 `agent/os_runtime/autonomous_inbox.py`
+- 新增 `agent/os_runtime/turn_hooks.py`
+- 新增 `agent/os_runtime/self_prompt_injector.py`
 - 新增 `agent/os_runtime/adapters/runtime_queue.py`
 - 新增或扩展 `hermes_cli/os_runtime_autonomous.py`
 - 扩展 gateway/runtime 启动 hook，使 autonomous loop 可按配置启动
+- 扩展 CLI/TUI/gateway/Linz turn 边界 hook，使普通对话也能进入张力场
 - 扩展 Linz World event dispatch hook，使 world event 可唤醒 autonomous loop
 - 新增 `tests/os_runtime/test_autonomous_loop.py`
+- 新增 `tests/os_runtime/test_turn_hooks.py`
 - 新增 `tests/os_runtime/test_world_event_waker.py`
 - 新增 `tests/gateway/test_os_runtime_autonomous_loop.py`
 
@@ -428,6 +439,10 @@ os_runtime:
     enabled: true
     start_on_agent_load: true
     start_with_gateway: true
+    apply_to_all_turns: true
+    pre_turn_evaluation: true
+    post_turn_evaluation: true
+    inject_self_prompt: true
     respond_to_world_events: true
     tick_interval_seconds: 30
     idle_cooldown_seconds: 60
@@ -438,7 +453,14 @@ os_runtime:
     require_approval_for_world_publish: true
 ```
 
+- `apply_to_all_turns=false` 时不得影响普通对话，只保留模块 6 assisted 行为。
+- `apply_to_all_turns=true` 且 `inject_self_prompt=false` 时，普通对话只进入张力观测、状态更新和 evidence，不改变模型输入。
+- `inject_self_prompt=true` 时，只向当前轮 user context 注入 ephemeral SelfPrompt；不得修改稳定 system prompt 或 prompt cache 前缀。
 - `AutonomousRuntimeState` 必须记录 status、loop_id、profile/session、last_wake_reason、last_wake_event_id、last_tick_at、wakes_used、cooldown_until、last_intent_id、last_arbitration、last_action_summary 和 paused_reason。
+- `TurnTensionHook.before_turn()` 必须把普通用户消息、Linz World MessageEvent、scheduled tick 等投影为 `os_runtime` event，并构建 context/signals/life/tension/action/self_prompt。
+- `TurnTensionHook.after_turn()` 必须把 assistant response、tool result 和 runtime feedback 投影回 `os_runtime`，更新 LifeState/TensionSet/ActionPotential/evidence。
+- `SelfPromptInjector` 必须只注入张力摘要、open_space、target_direction、约束和 evidence refs，不得暴露 token、raw payload 或 restricted audit content。
+- turn hook 失败时必须 fail-open 保持普通对话可用，fail-closed 阻断外部副作用。
 - `AutonomousRuntimeLoop.run_once()` 必须串联模块 1-5 的完整张力场链路，且在没有用户 goal 时也能由世界事件、生命状态和张力场生成低风险 intent。
 - `AutonomousScheduler` 必须提供 tick、idle cooldown、wake budget、per-wake max turns、pause/resume/stop，避免无限后台循环。
 - `WorldEventWaker` 必须在 Linz World raw event 持久化和去重后才唤醒 autonomous loop；重复 event 不得重复 wake。
@@ -450,6 +472,9 @@ os_runtime:
 ### 验收标准
 
 - 启用 `os_runtime.mode=autonomous_low_risk` 与 `autonomous.enabled=true` 后，Agent/gateway 启动即进入 idle/sleeping 常驻状态，不需要用户输入 `/os_runtime goal`。
+- 启用 `apply_to_all_turns=true` 后，普通 CLI/TUI/gateway 用户消息即使没有 `/os_runtime goal` 也会投影为 `os_runtime` event，并更新 LifeState、TensionSet、ActionPotential 和 evidence。
+- 启用 `inject_self_prompt=true` 后，普通对话当前轮会收到张力场生成的 ephemeral SelfPrompt；稳定 system prompt 和 prompt cache 前缀保持不变。
+- 关闭 `inject_self_prompt` 时，普通对话只被观测和记录，不改变模型输入。
 - 注入合法 Linz World 消息事件后，runtime 自动 wake，并完成 context -> signals -> life -> tension -> action potential -> self prompt -> intent -> arbitration 链路。
 - 无用户 goal 时，Agent 仍能根据张力场/行动势能/生命状态生成低风险自主 intent。
 - 默认配置下，世界事件只生成回复草案、report 或审批请求，不自动发布正式 Linz World 事件。
