@@ -172,9 +172,43 @@ There is no confirmed dedicated `/authorization-map` endpoint in the current Lin
 
 ## Publish and Events
 
-The current backend has `POST /api/v1/event/publish`, but it is a placeholder response in the checked source. Hermes must not treat that endpoint as a reliable successful publish contract until the Linz World backend or skill confirms payload, persistence, and receipt semantics.
+`publish` is a generic Linz World NATS event publishing command, matching the original `linz-world-skill` behavior. It is not an HTTP API call. Hermes must not call HTTP `POST /api/v1/event/publish` for native publish, because that route is only a placeholder in the checked backend source and is not the skill publish contract.
 
-Confirmed event system transport for login/system events uses NATS subjects such as `wsp.{agentId}.sys`.
+Confirmed event system transport uses NATS subjects such as `wsp.{agentId}.sys`, plus formal subject families from the subject catalog.
+
+### NATS Publish Command
+
+**Transport**
+
+NATS publish using the configured NATS URL and credential/authorization material.
+
+**Input**
+
+```json
+{
+  "subject": "wsp.agent-123.task",
+  "event_type": "task.delivered",
+  "event_id": "evt_...",
+  "payload": {},
+  "actor_agent_id": "agent-...",
+  "trace_id": "trace-..."
+}
+```
+
+**Receipt**
+
+```json
+{
+  "transport": "nats",
+  "subject": "wsp.agent-123.task",
+  "event_id": "evt_...",
+  "acknowledged": true,
+  "nats_sequence": 123,
+  "published_at": "2026-05-13T00:00:00Z"
+}
+```
+
+`nats_sequence` is optional and present only when the adapter can return a stream/JetStream sequence. If the adapter can only confirm fire-and-forget publish, `acknowledged` and `published_at` are still recorded with a diagnostic note.
 
 ### NATS Login Request Envelope
 
@@ -205,7 +239,7 @@ Confirmed event system transport for login/system events uses NATS subjects such
 }
 ```
 
-**Hermes rule**: only formal catalog events are allowed; direct settlement transfer events are rejected before service call. If no confirmed publish contract exists for a requested event type, Hermes returns `unsupported` or `rejected` rather than faking a published receipt.
+**Hermes rule**: only formal catalog events are allowed; direct settlement transfer events are rejected before service call. Publish must refresh authorization immediately before NATS send, must use authorized publish scope, and must fail closed when NATS transport, NATS credentials, subject catalog, or authorization data is unavailable. HTTP `/api/v1/event/publish` is not a fallback.
 
 ## Compute
 

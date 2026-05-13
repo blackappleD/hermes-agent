@@ -43,6 +43,16 @@
 - 让用户手工配置任意 endpoint mapping: 增加配置复杂度，也无法保证和 skill 一致。
 - 等 Linz World 后端补齐所有 publish/map/relationship 接口后再推进: 会阻塞已明确的注册、登录、compute、memory 一致性修复；缺失能力应 fail-closed 或标记 unsupported。
 
+## Decision: publish 沿用 linz-world-skill 的 NATS 事件发布逻辑，不使用 HTTP publish
+
+**Rationale**: 2026-05-13 的 issue 人类评论 `c5f73a92-7f17-465a-b77a-05c104b7317c` 明确 `publish` 在 `linz-world-skill` 中是用于世界交互的通用 NATS 事件发布指令，不是 HTTP 接口。Hermes 原生 publish 因此必须按原逻辑向授权 NATS subject 发布结构化事件，保留 event id、ack/sequence 或 diagnostic receipt，并在 NATS transport、credential、subject catalog 或实时授权不可用时 fail-closed。当前后端 HTTP `POST /api/v1/event/publish` 不作为成功发布路径或 fallback。
+
+**Alternatives considered**:
+
+- 继续调用 HTTP `/api/v1/event/publish`: 与人类确认的 skill 契约冲突，且当前后端该路由不是权威 publish 行为。
+- 将 publish 完全标记为 unsupported: 过度收窄范围；用户已确认需要按原有 NATS 逻辑实现。
+- 直接绕过授权向 NATS subject 发布: 会破坏 subject/credential 治理和外部副作用 fail-closed 边界。
+
 ## Decision: compute 按当前 Linz World API-key 契约接入，缺少 secret reference 时 fail-closed
 
 **Rationale**: `OPEWorld-Tech/linz-world` 当前 `docs/Linz-World-gateway-v0.1.md` 与 `backend/tests/contract/compute_chat_contract_test.go` 均要求 `POST /api/v1/compute/chat` 使用 `Authorization: Bearer <api_key>`，成功响应包含 `request_id`、`os_id`、`provider`、`model`、`choices`、`reservation`、`usage` 等字段。当前没有已确认的“event login token 可直接调用 compute”或“login token 换取 compute key”的后端契约。因此 Hermes compute 必须从 profile-local secret reference 解析 compute API key；若缺少该 reference，返回 blocked/unsupported，而不是用登录 token 伪装调用成功。

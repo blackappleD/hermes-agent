@@ -83,6 +83,11 @@ Shows recent world events and dispatch states for the current profile.
 
 Publishes a formal Linz World event from a structured request.
 
+**Transport**
+
+- Uses the configured NATS transport and authorized subject scope.
+- Must not call HTTP `/api/v1/event/publish`.
+
 **Preconditions**
 
 - Registered identity.

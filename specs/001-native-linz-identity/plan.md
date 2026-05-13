@@ -7,11 +7,11 @@
 
 ## 摘要
 
-将 Linz World 从可选 skill 能力提升为 Hermes 原生世界身份层：每个 Hermes profile 拥有一个 original spirit 身份，agent persona 创建/加载时必须成功注册或复用身份，注册失败时 fail-closed 并阻止 persona 进入普通对话状态。本功能提供原生命令、agent 工具、事件接入、授权治理、发布 receipt、世界算力、Soul Memory 和关系能力；不做旧 linz-world-skill 身份导入、同步或迁移入口。外部副作用每次执行前实时刷新授权 map，刷新失败即阻断。世界事件可靠保存后确认接收，Hermes 内部处理最多自动重试 3 次；原始 payload 仅限受限审计路径，prompt 和普通输出只使用脱敏摘要。
+将 Linz World 从可选 skill 能力提升为 Hermes 原生世界身份层：每个 Hermes profile 拥有一个 original spirit 身份，agent persona 创建/加载时必须成功注册或复用身份，注册失败时 fail-closed 并阻止 persona 进入普通对话状态。本功能提供原生命令、agent 工具、事件接入、授权治理、NATS 发布 receipt、世界算力、Soul Memory 和关系能力；不做旧 linz-world-skill 身份导入、同步或迁移入口。外部副作用每次执行前实时刷新授权 map，刷新失败即阻断。世界事件可靠保存后确认接收，Hermes 内部处理最多自动重试 3 次；原始 payload 仅限受限审计路径，prompt 和普通输出只使用脱敏摘要。
 
 技术方法采用 `agent/linz_world/` 作为内建领域模块，复用现有 `get_hermes_home()` profile-aware 路径、`hermes_cli/config.py` 配置体系、`gateway.platform_registry` 动态平台、`gateway.platforms.base.MessageEvent`、`tools.registry` 自注册工具、`toolsets.py` 工具暴露和 `hermes_state.SessionDB` 持久化能力。NATS 监听作为可选传输适配，不在本计划中引入新的必需依赖。
 
-OPE-108 增量要求：Hermes 原生接入必须与 `OPEWorld-Tech/linz-world` 仓库中 `linz-world-skill`/后端实际接口一致。当前核对的权威契约包括统一响应 envelope、`POST /api/v1/auth/register` 注册、`POST /api/v1/event/agents/login` 登录、`POST /api/v1/event/agents/credentials` 凭证、`GET /api/v1/event/subjects` 主题定义、`POST /api/v1/compute/chat` API-key 算力、`/api/v1/memory/...` 记忆路由，以及 NATS `wsp.{agentId}.sys` 系统主题。Builder 必须替换 Hermes 侧占位路径 `/identity/original-spirit` 和占位字段，配置主键使用 `linz_world.service_url` 并支持 origin 或 `/api/v1` 根地址归一化；compute 必须使用 profile secret 中的 compute API key reference，不能把登录 token 当作 compute bearer。
+OPE-108 增量要求：Hermes 原生接入必须与 `OPEWorld-Tech/linz-world` 仓库中 `linz-world-skill`/后端实际接口一致。当前核对的权威契约包括统一响应 envelope、`POST /api/v1/auth/register` 注册、`POST /api/v1/event/agents/login` 登录、`POST /api/v1/event/agents/credentials` 凭证、`GET /api/v1/event/subjects` 主题定义、`linz-world-skill` 的 NATS publish 指令、`POST /api/v1/compute/chat` API-key 算力、`/api/v1/memory/...` 记忆路由，以及 NATS `wsp.{agentId}.sys` 系统主题。Builder 必须替换 Hermes 侧占位路径 `/identity/original-spirit` 和占位字段，配置主键使用 `linz_world.service_url` 并支持 origin 或 `/api/v1` 根地址归一化；compute 必须使用 profile secret 中的 compute API key reference，不能把登录 token 当作 compute bearer；publish 必须使用授权 NATS subject 发布结构化事件，不能调用 HTTP `/api/v1/event/publish`。
 
 ## 技术背景
 
@@ -153,14 +153,15 @@ specs/001-native-linz-identity/
 | 实时授权 map 校验 | 用户要求每次外部副作用前刷新授权，刷新失败阻断 | 使用缓存授权会降低网络成本，但会扩大越权窗口 |
 | 受限审计 payload + 脱敏摘要双轨 | 需要诊断和证据，同时防止 prompt/普通输出泄露 | 只保存摘要会削弱排错；默认暴露原文违反安全边界 |
 | 对齐 Linz World 后端/skill 实际接口而非 Hermes 占位接口 | OPE-108 明确要求本次身份接入接口和 linz-world-skill 调用后端接口保持一致 | 继续保留占位路径会让已实现功能无法接入真实 Linz World 服务 |
+| publish 使用 NATS 而非 HTTP | 人类确认 publish 是 `linz-world-skill` 的通用 NATS 事件发布指令 | HTTP `/api/v1/event/publish` 不是权威 publish 行为，会偏离原世界交互逻辑 |
 | compute 使用后端当前 API-key 契约 | `linz-world` 当前 docs 和 contract tests 要求 `Authorization: Bearer <api_key>`，且返回 request_id/choices/reservation/usage | 使用登录 token 会与当前后端不兼容；若无 secret reference 则 fail-closed，避免伪造成功路径 |
 
 ## 后续交接说明
 
 - **目标**: 让每个 Hermes profile 原生拥有一个 Linz World original spirit 身份，并在未安装 `linz-world-skill` 时提供身份、登录、授权、事件、发布、世界算力、Soul Memory 和关系能力。
 - **修改范围**: 预计新增 `agent/linz_world/` 领域模块，扩展 `hermes_cli/linz.py`、`hermes_cli/commands.py`、`tools/linz_world_tools.py`、`tools/registry.py`、`toolsets.py`、gateway platform registry 和 `run_agent.py` persona bootstrap 路径。
-- **关键设计**: 身份注册按 Hermes profile 幂等执行；注册失败 fail-closed；远端 HTTP/NATS 契约以 `linz-world` 后端/skill 为准；compute 使用 profile-local compute API key secret reference，不使用登录 token；外部副作用每次实时刷新授权 map；世界事件可靠保存后 ack，内部处理最多自动重试 3 次；prompt、普通工具结果和默认视图只使用脱敏摘要。
-- **风险与取舍**: fail-closed 会让 Linz World 服务不可用或 compute API key reference 缺失时阻止相关能力；真实后端某些能力仍是占位或缺少专用 map/publish 接口时，Hermes 必须返回 unsupported/unknown 并阻断副作用，而不是自造成功路径；实时授权刷新增加延迟但收窄越权窗口；受限审计 payload 增加隐私治理要求但保留诊断证据。
-- **验收标准**: 以 `spec.md` 的 SC-001 到 SC-018 为准，重点验证身份唯一性、注册失败阻断、无旧身份导入/同步/迁移入口、授权阻断、事件去重、payload 脱敏、默认不开启自动上线/自动响应/自动发布，以及 `/api/v1/auth/register`、`/api/v1/event/agents/login`、`/api/v1/compute/chat` API-key 鉴权/响应字段、统一 envelope 和 `service_url` 归一化的接口一致性。
-- **测试计划**: 按 `tasks.md` 先写 `tests/linz_world/` 覆盖身份、授权、事件、工具、CLI、发布、compute API-key contract fixtures、隐私和 Linz World contract fixtures，再执行 `quickstart.md` 中的 targeted regressions。
-- **交接建议**: Reviewer Agent 审查通过后，Builder Agent 应按 `tasks.md` 的 US1 MVP -> US2/US3 -> US4 顺序实现，不要把 NATS SDK 作为必需依赖引入。
+- **关键设计**: 身份注册按 Hermes profile 幂等执行；注册失败 fail-closed；远端 HTTP/NATS 契约以 `linz-world` 后端/skill 为准；publish 使用授权 NATS subject，不使用 HTTP `/api/v1/event/publish`；compute 使用 profile-local compute API key secret reference，不使用登录 token；外部副作用每次实时刷新授权 map；世界事件可靠保存后 ack，内部处理最多自动重试 3 次；prompt、普通工具结果和默认视图只使用脱敏摘要。
+- **风险与取舍**: fail-closed 会让 Linz World 服务、NATS transport/credential 或 compute API key reference 缺失时阻止相关能力；真实后端某些能力仍是占位或缺少专用 map/relationship 接口时，Hermes 必须返回 unsupported/unknown 并阻断副作用，而不是自造成功路径；HTTP publish 不作为 fallback，避免偏离 `linz-world-skill` 原世界交互逻辑；实时授权刷新增加延迟但收窄越权窗口；受限审计 payload 增加隐私治理要求但保留诊断证据。
+- **验收标准**: 以 `spec.md` 的 SC-001 到 SC-019 为准，重点验证身份唯一性、注册失败阻断、无旧身份导入/同步/迁移入口、授权阻断、NATS publish/no-HTTP-fallback、事件去重、payload 脱敏、默认不开启自动上线/自动响应/自动发布，以及 `/api/v1/auth/register`、`/api/v1/event/agents/login`、`/api/v1/compute/chat` API-key 鉴权/响应字段、统一 envelope 和 `service_url` 归一化的接口一致性。
+- **测试计划**: 按 `tasks.md` 先写 `tests/linz_world/` 覆盖身份、授权、事件、工具、CLI、NATS publish contract fixtures、compute API-key contract fixtures、隐私和 Linz World contract fixtures，再执行 `quickstart.md` 中的 targeted regressions。
+- **交接建议**: Reviewer Agent 审查通过后，Builder Agent 应按 `tasks.md` 的 US1 MVP -> US2/US3 -> US4 顺序实现；publish 可以使用可选 NATS transport adapter 和 fake transport 测试，若需要 concrete NATS client 依赖，必须 scoped、documented 且不变成 Hermes 启动必需依赖。

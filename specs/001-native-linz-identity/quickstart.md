@@ -66,11 +66,15 @@ Place tokens or credentials only in the profile's secret/runtime store. Do not p
 1. Login with `hermes linz login`.
 2. Run `hermes linz map`.
 3. Attempt a valid publish.
-4. Expected: publish refreshes authorization map immediately before external call.
-5. Force map refresh failure.
-6. Expected: publish, compute, memory sink, and relationship mutation are blocked.
-7. Attempt forbidden settlement transfer publish.
-8. Expected: request is rejected before external call.
+4. Expected: publish refreshes authorization map immediately before NATS send.
+5. Expected: publish sends through the fake or configured NATS transport and does not call HTTP `/api/v1/event/publish`.
+6. Expected: successful NATS publish records subject, event id, acknowledged status, optional NATS sequence, timestamp, and redacted payload summary.
+7. Force map refresh failure.
+8. Expected: publish, compute, memory sink, and relationship mutation are blocked.
+9. Force NATS transport or credential absence.
+10. Expected: publish is blocked with a diagnostic and no HTTP publish fallback is attempted.
+11. Attempt forbidden settlement transfer publish.
+12. Expected: request is rejected before external call.
 
 ## 6. World Event Ingest Scenario
 

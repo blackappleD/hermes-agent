@@ -17,6 +17,7 @@
 - Q: Linz World 原始事件 payload 应该如何保留？ → A: 保存受限审计用原始 payload；prompt 和普通输出只使用脱敏摘要。
 - Q: Hermes 原生身份接入应以哪个后端接口契约为准？ → A: 必须以 `OPEWorld-Tech/linz-world` 中 `linz-world-skill`/后端实际使用的接口为准，不得继续使用 Hermes 侧占位接口。已核对当前 `linz-world` 主分支：统一响应 envelope 为 `{"code":0,"message":"success","data":...}`；注册接口是 `POST /api/v1/auth/register`，请求字段为 `publicKey`、`publicKeyType`、`fingerprint`、`metadata`，成功数据字段为 `agentId`、`soulId`、`soulHash`、`accessToken`、`expiresIn`、`registeredAt`；事件登录接口是 `POST /api/v1/event/agents/login`，请求字段为 `agentId`、`signedNonce`，成功数据字段为 `token`、`expiresAt`、`subjectClaims`、`credentialId`。依据: OPE-108 issue 描述和 OPE-88 评论 `f9f266fc-2cd3-4360-ae16-0ebc677891c7`、`e835f8ea-1408-4d55-8072-257f7c23e202`。
 - Q: 用户提供的 Linz World 服务地址如何落地？ → A: 当前配置应支持 `http://8.156.84.202:17878` 和 `http://8.156.84.202:17878/api/v1` 两种输入并归一化，避免重复拼接 `/api/v1` 或遗漏版本前缀；用户可见配置文档使用 `service_url`，不再混用 `server_url`。
+- Q: `publish` 应该走 HTTP `/api/v1/event/publish` 还是沿用 `linz-world-skill` 的 NATS 发布逻辑？ → A: `publish` 是 `linz-world-skill` 中用于世界交互的通用 NATS 事件发布指令，不是 HTTP 接口；Hermes 原生实现必须按原逻辑向授权 NATS subject 发布事件，并保留 receipt/ack 诊断。依据: OPE-108 人类评论 `c5f73a92-7f17-465a-b77a-05c104b7317c`。
 
 ## 非目标
 
@@ -125,7 +126,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **FR-016**: 系统必须在世界事件已被可靠保存后确认接收；agent 处理失败必须转化为 Hermes 内部失败状态，最多自动重试 3 次，仍失败后等待人工处理。
 - **FR-017**: 系统必须把可处理的世界消息、需求、任务、订单、交付、结算和治理事件映射为 Hermes 内部事件类别，供后续张力场和用户界面消费。
 - **FR-018**: 系统必须在对话上下文、普通工具结果和用户默认视图中只暴露脱敏摘要和必要引用，不得暴露原始凭据、私密字段或完整未筛选 payload。
-- **FR-019**: 世界事件发布成功后，系统必须记录 publish receipt；发布失败时必须记录失败原因、被拒绝的 subject/event_type 摘要和治理结果。
+- **FR-019**: 世界事件发布必须沿用 `linz-world-skill` 的 NATS 事件发布逻辑：通过当前 NATS transport/credential 向授权 subject 发布结构化事件，而不是调用 HTTP `/api/v1/event/publish`；发布成功后必须记录 publish receipt，发布失败时必须记录失败原因、被拒绝的 subject/event_type 摘要和治理结果。
 - **FR-020**: 世界算力调用必须使用当前 Hermes profile 的 Linz World compute API key secret reference 调用当前后端，不得通过工具参数、prompt、普通 CLI 输出或日志接受/回显裸凭据；缺少 compute API key reference 时必须返回 blocked/unsupported 诊断，而不是尝试使用登录 token 代替。
 - **FR-021**: Soul Memory 写入必须包含 artifact_ref 或等价交付物引用、sink_reason 和证据摘要；系统不得只写入无来源的自由文本。
 - **FR-022**: 系统必须兼容旧 Soul Memory sink 命名输入并归一为新的记忆写入语义，确保旧命名调用不会因名称差异失败。
@@ -138,7 +139,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **FR-029**: 授权 map 不得调用未在 `linz-world` 后端或 skill 中存在的占位接口；当前版本必须从登录/凭证响应的 `subjectClaims`、`publishScopeSnapshot`、`subscribeScopeSnapshot` 以及 `GET /api/v1/event/subjects` 的主题定义组合授权摘要，若后端缺少必要数据则返回可诊断的 unsupported/unknown 状态并阻断外部副作用。
 - **FR-030**: 世界算力调用必须匹配当前 Linz World Compute Gateway 契约 `POST /api/v1/compute/chat`，使用 `Authorization: Bearer <compute_api_key>`，请求至少包含 `model`、`messages`、`stream`、`temperature`、`metadata`；成功响应必须从统一 envelope 的 `data.request_id`、`data.os_id`、`data.provider`、`data.model`、`data.choices`、`data.reservation`、`data.usage` 建模，并把 `request_id` 作为主要 receipt。缺失 Authorization、无效或吊销 compute key 的 401 响应必须保留为用户可诊断失败。
 - **FR-031**: Soul Memory 相关能力必须匹配 Linz World Memory 模块路由：人格种子使用 `/api/v1/memory/seeds`，Soul Memory 使用 `/api/v1/memory/soul`，记忆事件归档使用 `/api/v1/memory/events`，投影/快照/lineage 使用对应 `/api/v1/memory/...` 路由；不得调用未确认的 Hermes 占位 memory sink 路径。
-- **FR-032**: 发布与事件接收必须匹配 Linz World 事件系统实际契约：NATS subject 使用 `wsp.{agentId}.sys` 等正式主题；HTTP `POST /api/v1/event/publish` 当前在后端仅为占位返回，除非后端/skill 契约确认其真实 payload 和持久化语义，否则 Hermes 不得把它当作可靠发布成功依据。
+- **FR-032**: 发布与事件接收必须匹配 Linz World 事件系统实际契约：NATS subject 使用 `sys.*`、`mrk.*`、`wsp.{agentId}.*`、`apl.*`、`rent.*`、`poca.*` 等正式主题族；`publish` 必须走 NATS publish transport，并使用 event id 去重、subject 授权和 receipt 记录。HTTP `POST /api/v1/event/publish` 不是本功能的 publish 实现路径，不得作为成功发布依据或 fallback。
 - **FR-033**: 配置必须使用 `linz_world.service_url` 作为用户可见服务地址键，并支持将 origin 根地址和 `/api/v1` 根地址归一化为同一 HTTP 调用行为；旧文档中的 `server_url` 只能作为兼容输入读取，不得作为新文档主键。
 
 ### 关键实体 *(如果功能涉及数据则包含)*
@@ -164,7 +165,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **SC-002**: 同一 Hermes profile 连续加载 10 次后，只保留一个 Linz World original spirit 身份，且用户可见审计记录中没有重复注册成功事件。
 - **SC-003**: 100% 的注册失败、登录失败和授权 map 刷新失败都会向用户显示可操作诊断，而不是静默跳过。
 - **SC-004**: 100% 的实现和任务中不包含旧 linz-world-skill 身份导入、同步或迁移入口，且不会读取、写入或修改旧身份来源。
-- **SC-005**: 100% 的未登录、未授权、未知 subject/event_type 或禁止结算转账发布请求会在外部投递前被阻断，并返回用户可理解原因。
+- **SC-005**: 100% 的未登录、未授权、未知 subject/event_type、缺少 NATS transport/credential 或禁止结算转账发布请求会在外部投递前被阻断，并返回用户可理解原因；有效 publish 请求必须通过 fake 或真实 NATS transport 发出，不得调用 HTTP `/api/v1/event/publish`。
 - **SC-006**: 同一个世界事件重复投递 5 次时，Hermes 只生成 1 条用户可见事件记录和最多 1 次 agent turn 触发。
 - **SC-007**: 在 Linz World 服务可达时，95% 的状态、授权 map 和近期事件查询会在 5 秒内向用户返回结果或明确错误。
 - **SC-008**: 对登录、发布、世界算力和事件接收流程的安全检查中，用户可见输出、prompt 注入内容和普通工具结果中不出现 raw token、私钥或等价凭据。
@@ -178,6 +179,7 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **SC-016**: 登录/授权测试中 100% 的登录请求使用 `POST /api/v1/event/agents/login` + `agentId`/`signedNonce`，并从 `subjectClaims` 或 credential scope snapshot 生成授权摘要；若授权数据缺失，发布、compute、memory、relationship 外部副作用全部阻断。
 - **SC-017**: Contract fixture 或 fake service 测试必须覆盖 Linz World 统一响应 envelope 成功、非 0 code、缺失 data、字段缺失和 HTTP 错误，且所有错误都会保存 failed/pending 状态和用户可诊断 next_action。
 - **SC-018**: `POST /api/v1/compute/chat` contract fixture 必须覆盖缺失 Authorization、无效或吊销 compute API key 的 401 envelope，以及成功 envelope 中 `request_id`、`os_id`、`provider`、`model`、`choices`、`reservation`、`usage` 字段解析；缺少 compute API key reference 时 Hermes compute 外部副作用必须 fail-closed。
+- **SC-019**: publish contract fixture 必须覆盖 NATS subject/event payload、授权通过后的 publish ack/sequence 或 diagnostic receipt、NATS 不可用 fail-closed、未授权 subject 拒绝，以及确认不会调用 HTTP `/api/v1/event/publish`。
 
 ## 假设
 

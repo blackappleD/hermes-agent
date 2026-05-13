@@ -98,7 +98,7 @@ All handlers return JSON strings, following Hermes tool conventions. Tool output
 
 ## Tool: `linz_publish`
 
-**Purpose**: Publish a formal Linz World event after governance checks.
+**Purpose**: Publish a formal Linz World event to NATS after governance checks.
 
 **Parameters**
 
@@ -117,6 +117,8 @@ All handlers return JSON strings, following Hermes tool conventions. Tool output
 - Must reject if refresh fails.
 - Must reject unknown subject/event_type.
 - Must reject forbidden direct settlement transfer events.
+- Must publish through the configured NATS transport; must not call HTTP `/api/v1/event/publish`.
+- Must fail closed if NATS transport or NATS credential material is missing.
 
 **Result**
 
@@ -126,7 +128,10 @@ All handlers return JSON strings, following Hermes tool conventions. Tool output
   "status": "published",
   "world_event_id": "evt_...",
   "receipt": {
-    "recorded": true
+    "transport": "nats",
+    "recorded": true,
+    "acknowledged": true,
+    "nats_sequence": 123
   }
 }
 ```

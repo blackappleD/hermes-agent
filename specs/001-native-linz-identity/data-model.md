@@ -177,12 +177,15 @@ A structured request to publish a Linz World event.
 
 - `request_id`: local unique id.
 - `actor_agent_id`: canonical Linz World `agentId` attempting publish.
+- `transport`: `nats`.
 - `subject`: formal subject.
 - `event_type`: formal event type.
+- `event_id`: required world event id; generated if caller omits one.
 - `payload`: structured object.
 - `payload_summary`: redacted summary.
 - `authorization_map_version`: version used for decision.
 - `governance_result_id`: linked decision.
+- `trace_id`: optional cross-system trace id.
 - `requested_at`: timestamp.
 
 **Relationships**
@@ -196,6 +199,7 @@ A structured request to publish a Linz World event.
 - Authorization map must refresh successfully immediately before publish.
 - Subject/event_type must be in the formal catalog.
 - Payload must be a structured object.
+- NATS transport and NATS credential/authorization material must be available; HTTP `/api/v1/event/publish` is not a fallback.
 - Direct settlement transfer events are forbidden for agent direct publish.
 
 ## Entity: Publish Receipt
@@ -207,13 +211,17 @@ Auditable outcome of a publish request.
 - `request_id`: linked publish request.
 - `status`: `published | rejected | failed | uncertain`.
 - `world_event_id`: remote event id, optional.
+- `transport`: `nats`.
+- `subject`: published subject, optional.
+- `nats_sequence`: NATS stream/JetStream sequence if available, optional.
+- `acknowledged`: whether the transport confirmed publish.
 - `failure_reason`: redacted diagnostic, optional.
 - `receipt_received_at`: timestamp, optional.
 - `governance_result_id`: linked decision.
 
 **Validation Rules**
 
-- Successful remote publish without local receipt persistence must be surfaced as `uncertain`.
+- Successful NATS publish without local receipt persistence must be surfaced as `uncertain`.
 - Failures must preserve subject/event_type summary and reason.
 
 ## Entity: World Compute Request
