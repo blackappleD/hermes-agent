@@ -1652,7 +1652,146 @@ def setup_terminal_backend(config: dict):
 
 
 # =============================================================================
-# Section 3: Agent Settings
+# Section 3: Linz World Identity
+# =============================================================================
+
+
+_LINZ_PERSONA_START = "<!-- LINZ_WORLD:PERSONA_SEED:START -->"
+_LINZ_PERSONA_END = "<!-- LINZ_WORLD:PERSONA_SEED:END -->"
+_LINZ_PERSONA_PATTERN = re.compile(
+    rf"{re.escape(_LINZ_PERSONA_START)}\s*\n(?P<body>.*?)\n{re.escape(_LINZ_PERSONA_END)}",
+    re.DOTALL,
+)
+
+
+def _read_soul_md_content(hermes_home) -> str:
+    soul_path = Path(hermes_home) / "SOUL.md"
+    try:
+        return soul_path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
+def _extract_linz_persona_seed_from_soul(content: str) -> str:
+    match = _LINZ_PERSONA_PATTERN.search(content or "")
+    if not match:
+        return ""
+    body = match.group("body").strip()
+    heading = "## Linz World Persona Seed"
+    if body.startswith(heading):
+        body = body[len(heading):].strip()
+    return body
+
+
+def _linz_persona_block(persona_seed: str) -> str:
+    seed = persona_seed.strip()
+    return (
+        f"{_LINZ_PERSONA_START}\n"
+        "## Linz World Persona Seed\n\n"
+        f"{seed}\n"
+        f"{_LINZ_PERSONA_END}"
+    )
+
+
+def _inject_linz_persona_seed(content: str, persona_seed: str) -> str:
+    block = _linz_persona_block(persona_seed)
+    existing = content or ""
+    if _LINZ_PERSONA_PATTERN.search(existing):
+        updated = _LINZ_PERSONA_PATTERN.sub(block, existing, count=1)
+    elif existing.strip():
+        updated = existing.rstrip() + "\n\n" + block + "\n"
+    else:
+        updated = block + "\n"
+    return updated if updated.endswith("\n") else updated + "\n"
+
+
+def _write_linz_persona_seed_to_soul(hermes_home, persona_seed: str) -> None:
+    soul_path = Path(hermes_home) / "SOUL.md"
+    soul_path.parent.mkdir(parents=True, exist_ok=True)
+    content = _read_soul_md_content(hermes_home)
+    soul_path.write_text(_inject_linz_persona_seed(content, persona_seed), encoding="utf-8")
+
+
+def _persona_seed_preview(seed: str) -> str:
+    normalized = " ".join(str(seed or "").split())
+    if len(normalized) <= 120:
+        return normalized
+    return normalized[:117] + "..."
+
+
+def setup_linz_world(config: dict):
+    """Configure native Linz World identity registration and persona seed."""
+
+    print_header("Linz World Identity")
+    print_info("Configures the native original-spirit registration used before persona load.")
+    print_info("The persona seed is injected into a Linz World block in SOUL.md.")
+    print()
+
+    linz = config.setdefault("linz_world", {})
+    current_enabled = bool(linz.get("enabled", True))
+    enabled = prompt_yes_no("Enable native Linz World identity registration?", current_enabled)
+    linz["enabled"] = enabled
+    linz["identity_required_on_agent_load"] = enabled
+    if not enabled:
+        save_config(config)
+        print_warning("Linz World identity registration disabled.")
+        return
+
+    current_url = str(linz.get("service_url") or linz.get("server_url") or "").strip()
+    while True:
+        service_url = prompt("Linz World service URL", current_url).strip()
+        if service_url:
+            break
+        print_warning("Linz World service URL is required for registration.")
+        if prompt_yes_no("Disable Linz World identity registration for now?", False):
+            linz["enabled"] = False
+            linz["identity_required_on_agent_load"] = False
+            save_config(config)
+            return
+    linz["service_url"] = service_url
+    linz.pop("server_url", None)
+
+    current_name = str(linz.get("os_name") or "Hermes").strip() or "Hermes"
+    os_name = prompt("Linz World agent name", current_name).strip() or current_name
+    linz["os_name"] = os_name
+
+    type_choices = ["USER", "SEV", "GOV"]
+    current_type = str(linz.get("os_type") or linz.get("type") or "USER").strip().upper()
+    default_type = type_choices.index(current_type) if current_type in type_choices else 0
+    type_idx = prompt_choice("Original-spirit type:", type_choices, default_type)
+    linz["os_type"] = type_choices[type_idx]
+    linz.pop("type", None)
+
+    runtime_type = str(linz.get("runtime_type") or "Hermes").strip() or "Hermes"
+    linz["runtime_type"] = runtime_type
+
+    hermes_home = get_hermes_home()
+    soul_content = _read_soul_md_content(hermes_home)
+    current_seed = str(linz.get("persona_seed") or "").strip()
+    if not current_seed:
+        current_seed = _extract_linz_persona_seed_from_soul(soul_content)
+    if current_seed:
+        print_info(f"Current persona seed: {_persona_seed_preview(current_seed)}")
+        print_info("Press Enter to keep it, or type a replacement.")
+
+    while True:
+        entered_seed = prompt(
+            "Persona seed" if not current_seed else "Persona seed (blank keeps current)"
+        ).strip()
+        persona_seed = entered_seed or current_seed
+        if persona_seed:
+            break
+        print_warning("Persona seed is required for Linz World registration.")
+
+    linz["persona_seed"] = persona_seed
+    _write_linz_persona_seed_to_soul(hermes_home, persona_seed)
+    save_config(config)
+    print_success("Linz World identity settings saved.")
+    print_info(f"SOUL.md updated: {Path(hermes_home) / 'SOUL.md'}")
+
+
+# =============================================================================
+# Section 4: Agent Settings
 # =============================================================================
 
 
@@ -3021,6 +3160,7 @@ SETUP_SECTIONS = [
     ("model", "Model & Provider", setup_model_provider),
     ("tts", "Text-to-Speech", setup_tts),
     ("terminal", "Terminal Backend", setup_terminal_backend),
+    ("linz", "Linz World Identity", setup_linz_world),
     ("gateway", "Messaging Platforms (Gateway)", setup_gateway),
     ("tools", "Tools", setup_tools),
     ("agent", "Agent Settings", setup_agent_settings),
@@ -3035,6 +3175,7 @@ def run_setup_wizard(args):
       hermes setup model     — just model/provider
       hermes setup tts       — just text-to-speech
       hermes setup terminal  — just terminal backend
+      hermes setup linz      — just Linz World identity
       hermes setup gateway   — just messaging platforms
       hermes setup tools     — just tool configuration
       hermes setup agent     — just agent settings
@@ -3175,7 +3316,7 @@ def run_setup_wizard(args):
         print_info("Press Enter to keep it, or type a new value to change it.")
         print_info("")
         print_info("Tip: jump straight to a section with 'hermes setup model|terminal|")
-        print_info("     gateway|tools|agent', or fill only missing items with --quick.")
+        print_info("     linz|gateway|tools|agent', or fill only missing items with --quick.")
         # Fall through to the "Full Setup — run all sections" block below.
         # --reconfigure is now the default on existing installs; the flag
         # is preserved for backwards compatibility but is a no-op here.
@@ -3226,15 +3367,19 @@ def run_setup_wizard(args):
     if not (migration_ran and _skip_configured_section(config, "terminal", "Terminal Backend")):
         setup_terminal_backend(config)
 
-    # Section 3: Agent Settings
+    # Section 3: Linz World Identity
+    if not (migration_ran and _skip_configured_section(config, "linz_world", "Linz World Identity")):
+        setup_linz_world(config)
+
+    # Section 4: Agent Settings
     if not (migration_ran and _skip_configured_section(config, "agent", "Agent Settings")):
         setup_agent_settings(config)
 
-    # Section 4: Messaging Platforms
+    # Section 5: Messaging Platforms
     if not (migration_ran and _skip_configured_section(config, "gateway", "Messaging Platforms")):
         setup_gateway(config)
 
-    # Section 5: Tools
+    # Section 6: Tools
     if not (migration_ran and _skip_configured_section(config, "tools", "Tools")):
         setup_tools(config, first_install=not is_existing)
 
@@ -3271,12 +3416,15 @@ def _run_first_time_quick_setup(config: dict, hermes_home, is_existing: bool):
     # Step 2: Terminal Backend — where commands run is a core decision
     setup_terminal_backend(config)
 
-    # Step 3: Apply defaults for everything else
+    # Step 3: Linz World identity — required before persona load
+    setup_linz_world(config)
+
+    # Step 4: Apply defaults for everything else
     _apply_default_agent_settings(config)
 
     save_config(config)
 
-    # Step 4: Offer messaging gateway setup
+    # Step 5: Offer messaging gateway setup
     print()
     gateway_choice = prompt_choice(
         "Connect a messaging platform? (Telegram, Discord, etc.)",
