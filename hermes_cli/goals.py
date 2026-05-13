@@ -32,8 +32,10 @@ from __future__ import annotations
 import json
 import logging
 import re
+import sqlite3
 import time
 from dataclasses import dataclass, asdict
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -141,6 +143,27 @@ def _meta_key(session_id: str) -> str:
 _DB_CACHE: Dict[str, Any] = {}
 
 
+class _MetaStore:
+    def __init__(self, root: Path):
+        self.db_path = root / "state.db"
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._conn = sqlite3.connect(str(self.db_path))
+        self._conn.execute("CREATE TABLE IF NOT EXISTS state_meta (key TEXT PRIMARY KEY, value TEXT)")
+        self._conn.commit()
+
+    def get_meta(self, key: str) -> Optional[str]:
+        row = self._conn.execute("SELECT value FROM state_meta WHERE key = ?", (key,)).fetchone()
+        return row[0] if row else None
+
+    def set_meta(self, key: str, value: str) -> None:
+        self._conn.execute(
+            "INSERT INTO state_meta (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
+        self._conn.commit()
+
+
 def _get_session_db() -> Optional[Any]:
     """Return a SessionDB instance for the current HERMES_HOME.
 
@@ -165,8 +188,12 @@ def _get_session_db() -> Optional[Any]:
     try:
         db = SessionDB()
     except Exception as exc:  # pragma: no cover
-        logger.debug("GoalManager: SessionDB() raised (%s)", exc)
-        return None
+        logger.debug("GoalManager: SessionDB() raised (%s); using meta fallback", exc)
+        try:
+            db = _MetaStore(Path(home))
+        except Exception as fallback_exc:
+            logger.debug("GoalManager: meta fallback raised (%s)", fallback_exc)
+            return None
     _DB_CACHE[home] = db
     return db
 

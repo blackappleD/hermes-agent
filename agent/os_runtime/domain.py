@@ -43,6 +43,7 @@ class TensionOperationType(str, Enum):
 class OpenActionFamily(str, Enum):
     COMMUNICATE = "communicate"
     LEARN = "learn"
+    USE_TOOL = "use_tool"
     TRADE = "trade"
     COLLABORATE = "collaborate"
     REST = "rest"

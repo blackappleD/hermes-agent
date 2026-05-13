@@ -7529,6 +7529,8 @@ class HermesCLI:
                 _cprint(f"  No agent running; queued as next turn: {payload[:80]}{'...' if len(payload) > 80 else ''}")
         elif canonical == "goal":
             self._handle_goal_command(cmd_original)
+        elif canonical == "os_runtime":
+            self._handle_os_runtime_command(cmd_original)
         elif canonical == "skin":
             self._handle_skin_command(cmd_original)
         elif canonical == "voice":
@@ -8214,6 +8216,94 @@ class HermesCLI:
                     self._pending_input.put(prompt)
                 except Exception as exc:
                     logging.debug("goal continuation enqueue failed: %s", exc)
+
+    # ────────────────────────────────────────────────────────────────
+    # /os_runtime — tension-field assisted continuation
+    # ────────────────────────────────────────────────────────────────
+    def _handle_os_runtime_command(self, cmd: str) -> None:
+        parts = (cmd or "").strip().split(None, 1)
+        arg = parts[1].strip() if len(parts) > 1 else "status"
+        try:
+            from hermes_cli.os_runtime import handle_os_runtime_command
+
+            result = handle_os_runtime_command(arg, session_id=self.session_id)
+        except Exception as exc:
+            _cprint(f"  OS Runtime unavailable: {exc}")
+            return
+        if result.output:
+            _cprint(f"  {result.output}")
+        if result.send_message:
+            try:
+                self._pending_input.put(result.send_message)
+            except Exception as exc:
+                logging.debug("os_runtime kickoff enqueue failed: %s", exc)
+
+    def _maybe_continue_os_runtime_after_turn(self) -> None:
+        try:
+            from hermes_cli.os_runtime import load_runtime_config
+
+            cfg = load_runtime_config()
+            if not cfg.enabled:
+                return
+            from agent.os_runtime.adapters.session_store import OSRuntimeEvent
+            from agent.os_runtime.domain import EventSource
+            from agent.os_runtime.driver import OSRuntimeDriver
+        except Exception as exc:
+            logging.debug("os_runtime hook unavailable: %s", exc)
+            return
+
+        try:
+            if getattr(self, "_pending_input", None) is not None and not self._pending_input.empty():
+                return
+        except Exception:
+            pass
+
+        driver = OSRuntimeDriver(session_id=self.session_id, config=cfg)
+        if driver.state is None or driver.state.status not in {"passive", "assisted", "paused"}:
+            return
+
+        last_response = ""
+        try:
+            hist = self.conversation_history or []
+            for msg in reversed(hist):
+                if msg.get("role") == "assistant":
+                    content = msg.get("content", "")
+                    if isinstance(content, list):
+                        parts = [
+                            p.get("text", "")
+                            for p in content
+                            if isinstance(p, dict) and p.get("type") in {"text", "output_text"}
+                        ]
+                        last_response = "\n".join(t for t in parts if t)
+                    else:
+                        last_response = str(content or "")
+                    break
+        except Exception:
+            last_response = ""
+        if not last_response.strip():
+            return
+
+        event = OSRuntimeEvent(
+            event_id=f"osr-cli-turn:{uuid.uuid4().hex}",
+            event_type="assistant_turn",
+            source=EventSource.HERMES_CONVERSATION,
+            session_id=self.session_id,
+            summary=last_response[:240],
+            metadata={"surface": "cli"},
+        )
+        decision = driver.evaluate_after_turn(
+            last_response,
+            source="cli",
+            recent_event=event,
+            user_interrupted=bool(getattr(self, "_last_turn_interrupted", False)),
+        )
+        if decision.message:
+            _cprint(f"  {decision.message}")
+        if decision.should_continue and decision.continuation_prompt:
+            try:
+                self._pending_input.put(decision.continuation_prompt)
+            except Exception as exc:
+                logging.debug("os_runtime continuation enqueue failed: %s", exc)
 
     def _handle_skin_command(self, cmd: str):
         """Handle /skin [name] — show or change the display skin."""
@@ -12942,6 +13032,10 @@ class HermesCLI:
                             self._maybe_continue_goal_after_turn()
                         except Exception as _goal_exc:
                             logging.debug("goal continuation hook failed: %s", _goal_exc)
+                        try:
+                            self._maybe_continue_os_runtime_after_turn()
+                        except Exception as _os_runtime_exc:
+                            logging.debug("os_runtime continuation hook failed: %s", _os_runtime_exc)
 
                         # Continuous voice: auto-restart recording after agent responds.
                         # Dispatch to a daemon thread so play_beep (sd.wait) and

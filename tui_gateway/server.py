@@ -3040,6 +3040,7 @@ def _run_prompt_submit(rid, sid: str, session: dict, text: Any) -> None:
         approval_token = None
         session_tokens = []
         goal_followup = None  # set by the post-turn goal hook below
+        os_runtime_followup = None
         try:
             from tools.approval import (
                 reset_current_session_key,
@@ -3270,6 +3271,45 @@ def _run_prompt_submit(rid, sid: str, session: dict, text: Any) -> None:
                         file=sys.stderr,
                     )
 
+                try:
+                    from agent.os_runtime.adapters.session_store import OSRuntimeEvent
+                    from agent.os_runtime.domain import EventSource
+                    from agent.os_runtime.driver import OSRuntimeDriver
+                    from hermes_cli.os_runtime import load_runtime_config
+
+                    cfg = load_runtime_config()
+                    sid_key = session.get("session_key") or ""
+                    if cfg.enabled and sid_key:
+                        driver = OSRuntimeDriver(session_id=sid_key, config=cfg)
+                        if driver.state is not None and driver.state.status in {"passive", "assisted", "paused"}:
+                            event = OSRuntimeEvent(
+                                event_id=f"osr-tui-turn:{uuid.uuid4().hex}",
+                                event_type="assistant_turn",
+                                source=EventSource.HERMES_CONVERSATION,
+                                session_id=sid_key,
+                                summary=raw[:240],
+                                metadata={"surface": "tui"},
+                            )
+                            decision = driver.evaluate_after_turn(
+                                raw,
+                                source="tui",
+                                recent_event=event,
+                            )
+                            if decision.message:
+                                _emit(
+                                    "status.update",
+                                    sid,
+                                    {"kind": "os_runtime", "text": decision.message},
+                                )
+                            if decision.should_continue and decision.continuation_prompt:
+                                os_runtime_followup = decision.continuation_prompt
+                except Exception as _os_runtime_exc:
+                    print(
+                        f"[tui_gateway] os_runtime continuation hook failed: "
+                        f"{type(_os_runtime_exc).__name__}: {_os_runtime_exc}",
+                        file=sys.stderr,
+                    )
+
             # Apply pending_title now that the DB row exists.
             _pending = session.get("pending_title")
             if _pending and status == "complete":
@@ -3379,6 +3419,23 @@ def _run_prompt_submit(rid, sid: str, session: dict, text: Any) -> None:
             except Exception as _cont_exc:
                 print(
                     f"[tui_gateway] goal continuation dispatch failed: "
+                    f"{type(_cont_exc).__name__}: {_cont_exc}",
+                    file=sys.stderr,
+                )
+                with session["history_lock"]:
+                    session["running"] = False
+
+        if os_runtime_followup:
+            with session["history_lock"]:
+                if session.get("running") or session.pop("os_runtime_cancel_pending", False):
+                    return
+                session["running"] = True
+            try:
+                _emit("message.start", sid)
+                _run_prompt_submit(rid, sid, session, os_runtime_followup)
+            except Exception as _cont_exc:
+                print(
+                    f"[tui_gateway] os_runtime continuation dispatch failed: "
                     f"{type(_cont_exc).__name__}: {_cont_exc}",
                     file=sys.stderr,
                 )
@@ -4263,6 +4320,8 @@ _PENDING_INPUT_COMMANDS: frozenset[str] = frozenset(
         "steer",
         "plan",
         "goal",
+        "os_runtime",
+        "os-runtime",
     }
 )
 
@@ -4647,6 +4706,32 @@ def _(rid, params: dict) -> dict:
             rid,
             {"type": "send", "notice": notice, "message": state.goal},
         )
+
+    if name == "os_runtime":
+        if not session:
+            return _err(rid, 4001, "no active session")
+        sid_key = session.get("session_key") or ""
+        if not sid_key:
+            return _err(rid, 4001, "no session key")
+        try:
+            from hermes_cli.os_runtime import handle_os_runtime_command
+
+            result = handle_os_runtime_command(arg or "status", session_id=sid_key)
+        except Exception as exc:
+            return _err(rid, 5030, f"os_runtime unavailable: {exc}")
+        if result.clear_pending:
+            session["os_runtime_cancel_pending"] = True
+        if result.send_message:
+            return _ok(
+                rid,
+                {
+                    "type": "send",
+                    "notice": result.output,
+                    "message": result.send_message,
+                    "os_runtime": True,
+                },
+            )
+        return _ok(rid, {"type": "exec", "output": result.output})
 
     if name in {"snapshot", "snap"}:
         subcommand = arg.split(maxsplit=1)[0].lower() if arg else ""

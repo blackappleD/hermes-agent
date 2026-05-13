@@ -37,6 +37,7 @@ import signal
 import tempfile
 import threading
 import time
+import uuid
 from collections import OrderedDict
 from contextvars import copy_context
 from pathlib import Path
@@ -2105,6 +2106,41 @@ class GatewayRunner:
                     queued_events.pop(session_key, None)
         return removed
 
+    @staticmethod
+    def _is_os_runtime_continuation_event(event_or_text: Any) -> bool:
+        try:
+            from agent.os_runtime.driver import is_os_runtime_continuation_event
+
+            return is_os_runtime_continuation_event(event_or_text)
+        except Exception:
+            text = getattr(event_or_text, "text", event_or_text) or ""
+            return str(text).startswith("[OS Runtime assisted continuation]")
+
+    def _clear_os_runtime_pending_continuations(self, session_key: str, adapter: Any) -> int:
+        removed = 0
+        pending_slot = getattr(adapter, "_pending_messages", None) if adapter is not None else None
+        if isinstance(pending_slot, dict):
+            pending_event = pending_slot.get(session_key)
+            if self._is_os_runtime_continuation_event(pending_event):
+                pending_slot.pop(session_key, None)
+                removed += 1
+
+        queued_events = getattr(self, "_queued_events", None)
+        if isinstance(queued_events, dict):
+            overflow = queued_events.get(session_key) or []
+            if overflow:
+                kept = []
+                for queued_event in overflow:
+                    if self._is_os_runtime_continuation_event(queued_event):
+                        removed += 1
+                    else:
+                        kept.append(queued_event)
+                if kept:
+                    queued_events[session_key] = kept
+                else:
+                    queued_events.pop(session_key, None)
+        return removed
+
     def _goal_still_active_for_session(self, session_id: str) -> bool:
         """Best-effort fresh DB check before running a queued continuation."""
         if not session_id:
@@ -2114,6 +2150,22 @@ class GatewayRunner:
             return GoalManager(session_id=session_id).is_active()
         except Exception as exc:
             logger.debug("goal continuation: active-state recheck failed: %s", exc)
+            return False
+
+    def _os_runtime_still_active_for_session(self, session_id: str) -> bool:
+        if not session_id:
+            return False
+        try:
+            from agent.os_runtime.driver import OSRuntimeDriver
+            from hermes_cli.os_runtime import load_runtime_config
+
+            cfg = load_runtime_config()
+            if not cfg.enabled:
+                return False
+            state = OSRuntimeDriver(session_id=session_id, config=cfg).state
+            return state is not None and state.status == "assisted"
+        except Exception as exc:
+            logger.debug("os_runtime continuation: active-state recheck failed: %s", exc)
             return False
 
     def _update_runtime_status(self, gateway_state: Optional[str] = None, exit_reason: Optional[str] = None) -> None:
@@ -6080,6 +6132,13 @@ class GatewayRunner:
                     return await self._handle_goal_command(event)
                 return "Agent is running — use /goal status / pause / clear mid-run, or /stop before setting a new goal."
 
+            if _cmd_def_inner and _cmd_def_inner.name == "os_runtime":
+                _os_arg = (event.get_command_args() or "").strip().lower()
+                _os_sub = _os_arg.split(maxsplit=1)[0] if _os_arg else "status"
+                if _os_sub in {"status", "pause", "resume", "clear"}:
+                    return await self._handle_os_runtime_command(event)
+                return "Agent is running — use /os_runtime status / pause / clear mid-run, or /stop before changing OS Runtime mode."
+
             # Session-level toggles that are safe to run mid-agent —
             # /yolo can unblock a pending approval prompt, /verbose cycles
             # the tool-progress display mode for the ongoing stream.
@@ -6458,6 +6517,9 @@ class GatewayRunner:
         if canonical == "goal":
             return await self._handle_goal_command(event)
 
+        if canonical == "os_runtime":
+            return await self._handle_os_runtime_command(event)
+
         if canonical == "voice":
             return await self._handle_voice_command(event)
 
@@ -6643,6 +6705,11 @@ class GatewayRunner:
                         session_entry = None
                     if session_entry is not None:
                         await self._post_turn_goal_continuation(
+                            session_entry=session_entry,
+                            source=source,
+                            final_response=_final_text,
+                        )
+                        await self._post_turn_os_runtime_continuation(
                             session_entry=session_entry,
                             source=source,
                             final_response=_final_text,
@@ -9512,6 +9579,109 @@ class GatewayRunner:
                 self._enqueue_fifo(_quick_key, cont_event, adapter)
         except Exception as exc:
             logger.debug("goal continuation: enqueue failed: %s", exc)
+
+    async def _handle_os_runtime_command(self, event: "MessageEvent") -> str:
+        args = (event.get_command_args() or "").strip()
+        try:
+            session_entry = self.session_store.get_or_create_session(event.source)
+            sid = getattr(session_entry, "session_id", "") or ""
+            from hermes_cli.os_runtime import handle_os_runtime_command
+
+            result = handle_os_runtime_command(args or "status", session_id=sid)
+        except Exception as exc:
+            logger.debug("os_runtime command unavailable: %s", exc)
+            return f"OS Runtime unavailable: {exc}"
+
+        adapter = self.adapters.get(event.source.platform) if event.source else None
+        _quick_key = self._session_key_for_source(event.source) if event.source else None
+        if result.clear_pending and adapter and _quick_key:
+            try:
+                self._clear_os_runtime_pending_continuations(_quick_key, adapter)
+            except Exception as exc:
+                logger.debug("os_runtime pending cleanup failed: %s", exc)
+        if result.send_message and adapter and _quick_key:
+            try:
+                kickoff_event = MessageEvent(
+                    text=result.send_message,
+                    message_type=MessageType.TEXT,
+                    source=event.source,
+                    message_id=event.message_id,
+                    channel_prompt=event.channel_prompt,
+                )
+                self._enqueue_fifo(_quick_key, kickoff_event, adapter)
+            except Exception as exc:
+                logger.debug("os_runtime kickoff enqueue failed: %s", exc)
+        return result.output
+
+    async def _post_turn_os_runtime_continuation(
+        self,
+        *,
+        session_entry: Any,
+        source: Any,
+        final_response: str,
+    ) -> None:
+        try:
+            from agent.os_runtime.adapters.session_store import OSRuntimeEvent
+            from agent.os_runtime.domain import EventSource
+            from agent.os_runtime.driver import OSRuntimeDriver
+            from hermes_cli.os_runtime import load_runtime_config
+        except Exception as exc:
+            logger.debug("os_runtime continuation: module unavailable: %s", exc)
+            return
+
+        cfg = load_runtime_config()
+        if not cfg.enabled:
+            return
+        sid = getattr(session_entry, "session_id", None) or ""
+        if not sid:
+            return
+        driver = OSRuntimeDriver(session_id=sid, config=cfg)
+        if driver.state is None or driver.state.status not in {"passive", "assisted", "paused"}:
+            return
+
+        adapter = self.adapters.get(source.platform) if source is not None else None
+        _quick_key = self._session_key_for_source(source) if source is not None else None
+        if driver.state.status == "assisted" and adapter and _quick_key:
+            try:
+                if self._queue_depth(_quick_key, adapter=adapter) > 0:
+                    logger.debug(
+                        "os_runtime continuation: skipping because pending queue already has work for %s",
+                        _quick_key,
+                    )
+                    return
+            except Exception as exc:
+                logger.debug("os_runtime continuation: queue-depth check failed: %s", exc)
+
+        recent_event = OSRuntimeEvent(
+            event_id=f"osr-gateway-turn-{uuid.uuid4().hex}",
+            event_type="assistant_turn",
+            source=EventSource.HERMES_CONVERSATION,
+            session_id=sid,
+            summary=(final_response or "")[:240],
+            metadata={"surface": "gateway"},
+        )
+        decision = driver.evaluate_after_turn(
+            final_response or "",
+            source="gateway",
+            recent_event=recent_event,
+        )
+        if decision.message and source is not None:
+            await self._defer_goal_status_notice_after_delivery(source, decision.message)
+        if not decision.should_continue or not decision.continuation_prompt or source is None:
+            return
+
+        try:
+            if adapter and _quick_key:
+                cont_event = MessageEvent(
+                    text=decision.continuation_prompt,
+                    message_type=MessageType.TEXT,
+                    source=source,
+                    message_id=None,
+                    channel_prompt=None,
+                )
+                self._enqueue_fifo(_quick_key, cont_event, adapter)
+        except Exception as exc:
+            logger.debug("os_runtime continuation: enqueue failed: %s", exc)
 
     async def _handle_undo_command(self, event: MessageEvent) -> str:
         """Handle /undo command - remove the last user/assistant exchange."""
@@ -15882,6 +16052,12 @@ class GatewayRunner:
                     if self._is_goal_continuation_event(pending_event) and not self._goal_still_active_for_session(session_id):
                         logger.info(
                             "Discarding stale goal continuation for session %s — goal is no longer active",
+                            session_key or "?",
+                        )
+                        return result
+                    if self._is_os_runtime_continuation_event(pending_event) and not self._os_runtime_still_active_for_session(session_id):
+                        logger.info(
+                            "Discarding stale os_runtime continuation for session %s — runtime is no longer active",
                             session_key or "?",
                         )
                         return result
