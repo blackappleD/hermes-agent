@@ -275,9 +275,9 @@ NATS publish using the configured NATS URL and credential/authorization material
 
 **Headers**
 
-`Authorization: Bearer <compute_api_key>`
+`Authorization: Bearer <jwt_token>`
 
-Current Linz World compute gateway validates a compute API key. Hermes stores and passes this through a profile-local secret reference; tools, prompts, user-visible CLI output, and logs must never expose the raw key. If no compute API key reference exists, Hermes returns `unsupported` or `blocked` and does not call compute with the event login token.
+Current Linz World compute uses the JWT token returned by successful Linz World login. Hermes stores only a profile-local token reference; tools, prompts, user-visible CLI output, and logs must never expose the raw token. If no current login token exists, Hermes returns `unsupported` or `blocked` and does not call compute.
 
 **Request**
 

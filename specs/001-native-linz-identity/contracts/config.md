@@ -24,8 +24,6 @@ linz_world:
     auto_login: false
     token_ref: ""
     last_login_at: ""
-  compute:
-    api_key_ref: ""
   auto_listen: false
   auto_respond: false
   auto_publish: false
@@ -51,10 +49,10 @@ linz_world:
 ## Rules
 
 - Non-secret identity/config fields live in `config.yaml`.
-- Raw tokens, raw compute API keys, private keys, restricted payload blobs, cursors, dispatch states, and receipts are runtime state and must not be written into prompt-visible config.
-- `compute.api_key_ref` stores only a profile-local secret reference. If it is empty, `linz_compute` must return blocked/unsupported instead of using a login token as the compute bearer credential.
+- Raw tokens, private keys, restricted payload blobs, cursors, dispatch states, and receipts are runtime state and must not be written into prompt-visible config.
+- `linz_compute` uses the current successful Linz World login token reference as its bearer credential.
 - `identity_required_on_agent_load` must default to true for this feature.
-- `service_url` is the canonical user-visible service address key. Implementations may read legacy `server_url` as compatibility input, but new docs and writes use `service_url`.
+- `service_url` is the canonical and only user-visible service address key.
 - `service_url` accepts either origin root, for example `http://8.156.84.202:17878`, or API root, for example `http://8.156.84.202:17878/api/v1`; HTTP calls must normalize `/api/v1` exactly once.
 - `auto_listen`, `auto_respond`, `auto_publish`, and `self_drive` remain false unless explicitly enabled in a later feature.
 - Adding this section does not require a `_config_version` bump because no existing Hermes config key is renamed or migrated.
