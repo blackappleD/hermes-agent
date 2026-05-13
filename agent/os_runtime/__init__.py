@@ -46,6 +46,12 @@ from agent.os_runtime.domain import (
     WorldComputeEligibility,
     WorldIdentityRef,
 )
+from agent.os_runtime.driver import (
+    OS_RUNTIME_CONTINUATION_MARKER,
+    OSRuntimeDecision,
+    OSRuntimeDriver,
+    OSRuntimeState,
+)
 
 __all__ = [
     "ActionPotential",
@@ -67,8 +73,12 @@ __all__ = [
     "OpenIntent",
     "OpenSpace",
     "OSRuntimeConfig",
+    "OSRuntimeDecision",
+    "OSRuntimeDriver",
     "OSRuntimeEventRef",
     "OSRuntimeRiskConfig",
+    "OSRuntimeState",
+    "OS_RUNTIME_CONTINUATION_MARKER",
     "PermissionTicket",
     "RecommendedDepth",
     "RiskLevel",
