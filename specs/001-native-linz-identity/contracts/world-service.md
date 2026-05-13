@@ -16,7 +16,9 @@ All confirmed Linz World HTTP endpoints use the unified response envelope:
 
 Rules:
 
-- Only `code == 0` with object `data` is a success.
+- Only `code == 0` with endpoint-specific valid `data` is a success.
+- Endpoint-specific `data` may be an object, array, or explicit null only where that endpoint contract says so.
+- For this feature, `GET /api/v1/event/subjects` success `data` is an array; registration, login, credential, compute, memory, and projection success `data` are objects.
 - Non-zero `code`, HTTP errors, missing `data`, or missing required fields are service errors.
 - `linz_world.service_url` may be configured as `http://8.156.84.202:17878` or `http://8.156.84.202:17878/api/v1`; the client must normalize so `/api/v1` is present exactly once.
 
@@ -156,6 +158,28 @@ There is no confirmed dedicated `/authorization-map` endpoint in the current Lin
 ### Subject Definitions
 
 `GET /api/v1/event/subjects`
+
+**Success `data`**
+
+```json
+[
+  {
+    "id": "sub-001",
+    "subjectPattern": "wsp.{agent_id}.*",
+    "category": "wsp",
+    "displayName": "Workspace events",
+    "description": "Workspace-scoped interaction events",
+    "directionPolicy": "pub_sub",
+    "persistenceEnabled": true,
+    "status": "active",
+    "createdAt": "2026-05-12T00:00:00Z",
+    "updatedAt": "2026-05-12T00:00:00Z",
+    "updatedBy": "system"
+  }
+]
+```
+
+This array is the current Linz World `PredefinedSubject[]` contract. Hermes must treat `{ "code": 0, "data": [] }` as a successful empty catalog response, not as an invalid envelope.
 
 **Derived Hermes authorization summary**
 
@@ -351,19 +375,20 @@ Current Linz World compute gateway validates a compute API key. Hermes stores an
 
 Current confirmed relationship read surface is `GET /api/v1/memory/projections/{agentId}/relationships`. A direct ACTIVE relationship mutation endpoint was not found in the checked Linz World backend source.
 
-**Read Success**
+**Read Success `data`**
 
 ```json
 {
-  "relationships": [
-    {
-      "relationship_id": "rel_...",
-      "counterparty_id": "actor_...",
-      "state": "ACTIVE",
-      "summary": "redacted summary"
-    }
-  ]
+  "projection_id": "proj_...",
+  "agent_id": "agent-...",
+  "projection_type": "RELATIONSHIP_SUMMARY_MD",
+  "source_version": 1,
+  "content": "# 关系摘要\n\n- actor_...: ACTIVE ...",
+  "generated_at": "2026-05-12T00:00:00Z",
+  "generated_by": "operator-or-system"
 }
 ```
+
+**Hermes read rule**: relationship read is a MemoryProjection response. Hermes must preserve `projection_id`, `agent_id`, `projection_type`, `source_version`, `content`, `generated_at`, and `generated_by` in tool/CLI model output after redaction. If `content` is structured JSON with `relationships` or `items`, Hermes may parse a `relationships` list from it; if `content` is markdown or plain text, Hermes returns the preserved projection and may expose an empty parsed list only with the projection still present. Hermes must not convert a valid MemoryProjection into only an empty `relationships` array.
 
 **Mutation rule**: adding ACTIVE relationship is an external side effect and requires real-time authorization refresh. If no confirmed Linz World mutation route exists, Hermes returns `unsupported` and does not fabricate a local-only remote success.

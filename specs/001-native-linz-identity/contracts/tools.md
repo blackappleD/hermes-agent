@@ -192,8 +192,27 @@ All handlers return JSON strings, following Hermes tool conventions. Tool output
 
 **Rules**
 
-- `action=read` returns redacted summaries.
+- `action=read` returns redacted summaries plus the preserved Linz World MemoryProjection metadata and content.
+- `action=read` must not drop a valid projection when no structured relationship list can be parsed from `content`.
 - Relationship mutation is an external side effect and requires real-time authorization map refresh.
+
+**Read Result**
+
+```json
+{
+  "success": true,
+  "relationships": [],
+  "projection": {
+    "projection_id": "proj_...",
+    "agent_id": "agent-...",
+    "projection_type": "RELATIONSHIP_SUMMARY_MD",
+    "source_version": 1,
+    "content": "# redacted relationship summary",
+    "generated_at": "2026-05-12T00:00:00Z",
+    "generated_by": "operator-or-system"
+  }
+}
+```
 
 ## Common Error Result
 

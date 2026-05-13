@@ -53,6 +53,26 @@
 - 将 publish 完全标记为 unsupported: 过度收窄范围；用户已确认需要按原有 NATS 逻辑实现。
 - 直接绕过授权向 NATS subject 发布: 会破坏 subject/credential 治理和外部副作用 fail-closed 边界。
 
+## Decision: HTTP envelope 成功条件按 endpoint-specific data shape 校验
+
+**Rationale**: `linz-world` 当前 `backend/tests/contract/event_subjects_contract_test.go` 明确 `GET /api/v1/event/subjects` 返回统一 `{code,message,data}` envelope，但成功 `data` 是 `PredefinedSubject[]` 数组。授权 map 依赖该接口，因此 Hermes 不能把“data 必须是 object”当作全局成功规则；必须按 endpoint-specific schema 校验。
+
+**Alternatives considered**:
+
+- 继续要求所有成功 `data` 都是 object: 会把真实 subjects 目录数组误判为 `invalid_response`，阻断授权刷新。
+- 把 `data` 完全视为 untyped: 会削弱字段缺失、错误 envelope 和 contract fixture 的早期发现能力。
+- 为 subjects 单独绕过 envelope 校验: 会产生特殊路径并降低统一错误处理一致性。
+
+## Decision: relationship read 以 MemoryProjection 为权威响应，不以直接 relationships array 为准
+
+**Rationale**: `linz-world` 当前 `GET /api/v1/memory/projections/{agentId}/relationships` handler 返回 `MemoryProjection`，字段为 `projection_id`、`agent_id`、`projection_type`、`source_version`、`content`、`generated_at`、`generated_by`。`content` 当前可能是 markdown/text 投影正文。Hermes 必须保留 projection 元数据和正文，并仅在 `content` 可结构化解析时派生 `relationships` 列表。
+
+**Alternatives considered**:
+
+- 继续期望顶层 `relationships` array: 会在真实后端下丢弃 projection 内容并错误显示空关系。
+- 强制要求 `content` 必须 JSON: 与当前后端 markdown/text projection 不兼容。
+- 只显示 projection content 不尝试解析 relationships: 可行但降低工具结果的结构化价值；当前决策允许可解析时派生，解析失败仍保留 projection。
+
 ## Decision: compute 按当前 Linz World API-key 契约接入，缺少 secret reference 时 fail-closed
 
 **Rationale**: `OPEWorld-Tech/linz-world` 当前 `docs/Linz-World-gateway-v0.1.md` 与 `backend/tests/contract/compute_chat_contract_test.go` 均要求 `POST /api/v1/compute/chat` 使用 `Authorization: Bearer <api_key>`，成功响应包含 `request_id`、`os_id`、`provider`、`model`、`choices`、`reservation`、`usage` 等字段。当前没有已确认的“event login token 可直接调用 compute”或“login token 换取 compute key”的后端契约。因此 Hermes compute 必须从 profile-local secret reference 解析 compute API key；若缺少该 reference，返回 blocked/unsupported，而不是用登录 token 伪装调用成功。

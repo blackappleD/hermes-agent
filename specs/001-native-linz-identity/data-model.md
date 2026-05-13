@@ -98,6 +98,7 @@ Read-only governance input refreshed before every external side effect.
 - `publish_scope_snapshot`: scope returned by `POST /api/v1/event/agents/credentials`.
 - `subscribe_scope_snapshot`: scope returned by `POST /api/v1/event/agents/credentials`.
 - `credential_id`: Linz World credential id, if issued.
+- `subject_catalog`: latest confirmed `PredefinedSubject[]` returned by `GET /api/v1/event/subjects`, redacted to catalog metadata.
 - `refresh_error`: redacted diagnostic, optional.
 
 **Relationships**
@@ -111,6 +112,7 @@ Read-only governance input refreshed before every external side effect.
 - Refresh failure or `unknown` state blocks the side effect.
 - Cached map may be displayed for read-only status but must not authorize side effects.
 - The map must be derived from confirmed Linz World login/credential/subject routes; unconfirmed map endpoints must not be called.
+- `GET /api/v1/event/subjects` with envelope `{code: 0, data: []}` is a valid successful empty subject catalog; empty catalog may block side effects with a catalog diagnostic, but it is not an envelope parse failure.
 
 ## Entity: World Event
 
@@ -278,21 +280,30 @@ Structured memory write to Linz World side memory.
 
 ## Entity: Relationship Record
 
-Relationship read or ACTIVE relationship mutation.
+Relationship read projection or ACTIVE relationship mutation.
 
 **Fields**
 
-- `relationship_id`: world relationship id.
+- `relationship_id`: parsed world relationship id, optional.
 - `actor_agent_id`: current canonical Linz World `agentId`.
-- `counterparty_id`: related actor.
-- `state`: e.g. `ACTIVE`.
-- `summary`: redacted relationship summary.
+- `counterparty_id`: parsed related actor, optional.
+- `state`: parsed state such as `ACTIVE`, optional.
+- `summary`: redacted relationship summary derived from projection content.
+- `projection_id`: MemoryProjection id returned by Linz World relationship projection.
+- `projection_type`: expected `RELATIONSHIP_SUMMARY_MD`.
+- `source_version`: projection source version.
+- `content`: redacted projection content.
+- `generated_at`: projection generation timestamp.
+- `generated_by`: projection generator/operator.
+- `parsed_relationships`: optional relationship list parsed from structured projection `content`.
 - `authorization_map_version`: version used for mutation, optional for read.
 - `updated_at`: timestamp.
 
 **Validation Rules**
 
 - Reads can display redacted summaries.
+- Relationship reads must preserve MemoryProjection metadata and `content` even when no structured relationships can be parsed.
+- If `content` is markdown or plain text, `parsed_relationships` may be empty, but the projection must remain visible to callers.
 - ACTIVE relationship mutation is an external side effect and requires real-time authorization refresh.
 
 ## Entity: Governance Result

@@ -35,4 +35,5 @@
 - OPE-108 更新验证通过；已补充 Linz World 后端/skill 接口一致性要求，覆盖统一响应 envelope、`service_url` 归一化、注册/登录/凭证/主题/compute/memory 路由，以及 publish 不走 HTTP placeholder、改走授权 NATS subject 的 fail-closed 处理。
 - Spec Reviewer NEEDS_REVISION 已处理；compute 契约改为当前 Linz World API-key 鉴权与 `request_id/os_id/provider/model/choices/reservation/usage` 响应字段，并补充缺失/无效/吊销 key 的 401 fixture 与缺少 secret reference 的 fail-closed 验收。
 - 2026-05-13 publish 澄清已处理；publish 契约改为 `linz-world-skill` 原有 NATS 事件发布指令，不使用 HTTP `/api/v1/event/publish`，并补充 NATS transport/credential、授权 subject、ack/sequence receipt 和 no-HTTP-fallback 验收。
+- Spec Reviewer 二次 NEEDS_REVISION 已处理；HTTP envelope 改为 endpoint-specific `data` shape，subjects 支持 `PredefinedSubject[]` 数组响应；relationship read 改为 MemoryProjection 响应并要求保留 projection 元数据和 `content`。
 - 当前没有 `[NEEDS CLARIFICATION]` 标记；可直接进入 `/speckit.plan`。

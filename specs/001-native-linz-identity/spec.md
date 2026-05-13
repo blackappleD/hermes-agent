@@ -18,6 +18,8 @@
 - Q: Hermes 原生身份接入应以哪个后端接口契约为准？ → A: 必须以 `OPEWorld-Tech/linz-world` 中 `linz-world-skill`/后端实际使用的接口为准，不得继续使用 Hermes 侧占位接口。已核对当前 `linz-world` 主分支：统一响应 envelope 为 `{"code":0,"message":"success","data":...}`；注册接口是 `POST /api/v1/auth/register`，请求字段为 `publicKey`、`publicKeyType`、`fingerprint`、`metadata`，成功数据字段为 `agentId`、`soulId`、`soulHash`、`accessToken`、`expiresIn`、`registeredAt`；事件登录接口是 `POST /api/v1/event/agents/login`，请求字段为 `agentId`、`signedNonce`，成功数据字段为 `token`、`expiresAt`、`subjectClaims`、`credentialId`。依据: OPE-108 issue 描述和 OPE-88 评论 `f9f266fc-2cd3-4360-ae16-0ebc677891c7`、`e835f8ea-1408-4d55-8072-257f7c23e202`。
 - Q: 用户提供的 Linz World 服务地址如何落地？ → A: 当前配置应支持 `http://8.156.84.202:17878` 和 `http://8.156.84.202:17878/api/v1` 两种输入并归一化，避免重复拼接 `/api/v1` 或遗漏版本前缀；用户可见配置文档使用 `service_url`，不再混用 `server_url`。
 - Q: `publish` 应该走 HTTP `/api/v1/event/publish` 还是沿用 `linz-world-skill` 的 NATS 发布逻辑？ → A: `publish` 是 `linz-world-skill` 中用于世界交互的通用 NATS 事件发布指令，不是 HTTP 接口；Hermes 原生实现必须按原逻辑向授权 NATS subject 发布事件，并保留 receipt/ack 诊断。依据: OPE-108 人类评论 `c5f73a92-7f17-465a-b77a-05c104b7317c`。
+- Q: Linz World HTTP envelope 的 `data` 是否总是 object？ → A: 否。统一 envelope 仍是 `{code,message,data}`，但 `data` 形状以 endpoint 为准；当前 `GET /api/v1/event/subjects` 成功 `data` 是 `PredefinedSubject[]` 数组，必须作为成功授权目录处理。依据: OPE-108 Spec Reviewer 评论 `163234b0-3d57-4508-81fd-1bc7222aa054` 与 `linz-world` contract test。
+- Q: Relationship read 应如何消费 `/memory/projections/{agentId}/relationships`？ → A: 真实响应是 `MemoryProjection` 对象，必须保留 `projection_id`、`agent_id`、`projection_type`、`source_version`、`content`、`generated_at`、`generated_by`；只有当 `content` 可解析出结构化 `relationships/items` 时才派生关系列表，否则保留 projection content，不得静默退化为空关系列表。依据: OPE-108 Spec Reviewer 评论 `163234b0-3d57-4508-81fd-1bc7222aa054` 与 `linz-world` memory projection handler。
 
 ## 非目标
 
@@ -130,13 +132,13 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **FR-020**: 世界算力调用必须使用当前 Hermes profile 的 Linz World compute API key secret reference 调用当前后端，不得通过工具参数、prompt、普通 CLI 输出或日志接受/回显裸凭据；缺少 compute API key reference 时必须返回 blocked/unsupported 诊断，而不是尝试使用登录 token 代替。
 - **FR-021**: Soul Memory 写入必须包含 artifact_ref 或等价交付物引用、sink_reason 和证据摘要；系统不得只写入无来源的自由文本。
 - **FR-022**: 系统必须兼容旧 Soul Memory sink 命名输入并归一为新的记忆写入语义，确保旧命名调用不会因名称差异失败。
-- **FR-023**: 系统必须支持读取 Linz World 关系状态和添加 ACTIVE 关系，并把关系摘要作为后续自治层可消费的关系信号。
+- **FR-023**: 系统必须支持读取 Linz World 关系状态和添加 ACTIVE 关系；关系读取必须按 Linz World `MemoryProjection` 响应建模，保留 projection 元数据和 `content`，并在可解析时从 `content.relationships`、`content.items` 或等价结构派生关系列表，作为后续自治层可消费的关系信号。
 - **FR-024**: 系统必须默认不启用自驱动、自动上线监听、自动响应或自动外部发布；这些行为只能由用户配置或显式命令开启。
 - **FR-025**: 所有注册、登录、事件接收、发布、算力、记忆和关系操作必须产生用户可追踪的状态或审计结果。
-- **FR-026**: Linz World HTTP client 必须解析 Linz World 统一响应 envelope：只有 `code == 0` 且 `data` 为对象时才视为成功；非 0 code、HTTP 错误、缺失 data 或字段不匹配必须转为用户可诊断错误。
+- **FR-026**: Linz World HTTP client 必须解析 Linz World 统一响应 envelope `{code,message,data}`：只有 `code == 0` 且 `data` 符合 endpoint-specific 形状时才视为成功；`data` 可以按 endpoint 契约为对象或数组，当前 `GET /api/v1/event/subjects` 成功 `data` 必须支持 `PredefinedSubject[]` 数组；非 0 code、HTTP 错误、缺失 data 或字段不匹配必须转为用户可诊断错误。
 - **FR-027**: 身份注册必须调用 Linz World 当前后端/skill 契约 `POST /api/v1/auth/register`，请求字段为 `publicKey`、`publicKeyType`、`fingerprint`、`metadata`；不得调用 Hermes 占位路径 `/identity/original-spirit`。成功后必须从 `data.agentId`、`data.soulId`、`data.soulHash`、`data.accessToken`、`data.expiresIn`、`data.registeredAt` 建立当前 profile 身份和登录状态；内部可保留 `os_id` 别名，但对外接口不得发送 `os_id` 替代 `agentId`。
 - **FR-028**: 登录与刷新必须匹配 Linz World 事件模块接口：登录调用 `POST /api/v1/event/agents/login`，请求字段为 `agentId`、`signedNonce`；刷新调用 `POST /api/v1/event/agents/refresh`，请求字段为 `token`；成功结果必须读取 `data.token`、`data.expiresAt`、`data.subjectClaims`、`data.credentialId`，并禁止在用户可见输出中泄露 token。
-- **FR-029**: 授权 map 不得调用未在 `linz-world` 后端或 skill 中存在的占位接口；当前版本必须从登录/凭证响应的 `subjectClaims`、`publishScopeSnapshot`、`subscribeScopeSnapshot` 以及 `GET /api/v1/event/subjects` 的主题定义组合授权摘要，若后端缺少必要数据则返回可诊断的 unsupported/unknown 状态并阻断外部副作用。
+- **FR-029**: 授权 map 不得调用未在 `linz-world` 后端或 skill 中存在的占位接口；当前版本必须从登录/凭证响应的 `subjectClaims`、`publishScopeSnapshot`、`subscribeScopeSnapshot` 以及 `GET /api/v1/event/subjects` 的 `PredefinedSubject[]` 主题定义组合授权摘要，若后端缺少必要数据则返回可诊断的 unsupported/unknown 状态并阻断外部副作用。
 - **FR-030**: 世界算力调用必须匹配当前 Linz World Compute Gateway 契约 `POST /api/v1/compute/chat`，使用 `Authorization: Bearer <compute_api_key>`，请求至少包含 `model`、`messages`、`stream`、`temperature`、`metadata`；成功响应必须从统一 envelope 的 `data.request_id`、`data.os_id`、`data.provider`、`data.model`、`data.choices`、`data.reservation`、`data.usage` 建模，并把 `request_id` 作为主要 receipt。缺失 Authorization、无效或吊销 compute key 的 401 响应必须保留为用户可诊断失败。
 - **FR-031**: Soul Memory 相关能力必须匹配 Linz World Memory 模块路由：人格种子使用 `/api/v1/memory/seeds`，Soul Memory 使用 `/api/v1/memory/soul`，记忆事件归档使用 `/api/v1/memory/events`，投影/快照/lineage 使用对应 `/api/v1/memory/...` 路由；不得调用未确认的 Hermes 占位 memory sink 路径。
 - **FR-032**: 发布与事件接收必须匹配 Linz World 事件系统实际契约：NATS subject 使用 `sys.*`、`mrk.*`、`wsp.{agentId}.*`、`apl.*`、`rent.*`、`poca.*` 等正式主题族；`publish` 必须走 NATS publish transport，并使用 event id 去重、subject 授权和 receipt 记录。HTTP `POST /api/v1/event/publish` 不是本功能的 publish 实现路径，不得作为成功发布依据或 fallback。
@@ -180,6 +182,8 @@ Linz World 事件可以作为 Hermes 原生外部输入进入 agent 会话和运
 - **SC-017**: Contract fixture 或 fake service 测试必须覆盖 Linz World 统一响应 envelope 成功、非 0 code、缺失 data、字段缺失和 HTTP 错误，且所有错误都会保存 failed/pending 状态和用户可诊断 next_action。
 - **SC-018**: `POST /api/v1/compute/chat` contract fixture 必须覆盖缺失 Authorization、无效或吊销 compute API key 的 401 envelope，以及成功 envelope 中 `request_id`、`os_id`、`provider`、`model`、`choices`、`reservation`、`usage` 字段解析；缺少 compute API key reference 时 Hermes compute 外部副作用必须 fail-closed。
 - **SC-019**: publish contract fixture 必须覆盖 NATS subject/event payload、授权通过后的 publish ack/sequence 或 diagnostic receipt、NATS 不可用 fail-closed、未授权 subject 拒绝，以及确认不会调用 HTTP `/api/v1/event/publish`。
+- **SC-020**: subjects contract fixture 必须覆盖 `GET /api/v1/event/subjects` 返回 `{code:0,message:"success",data:[...]}` 和 `{code:0,data:[]}`；两者都必须被视为成功 envelope，并用于授权摘要生成或空目录诊断，不得因 `data` 是数组而错误阻断授权刷新。
+- **SC-021**: relationship projection contract fixture 必须覆盖 `GET /api/v1/memory/projections/{agentId}/relationships` 返回 MemoryProjection envelope，且工具/CLI 结果必须保留 `projection_id`、`agent_id`、`projection_type`、`source_version`、`content`、`generated_at`、`generated_by`；如果无法从 `content` 派生关系列表，也不得丢弃 projection 或退化为只有空 `relationships` list。
 
 ## 假设
 

@@ -48,10 +48,14 @@ Place tokens or credentials only in the profile's secret/runtime store. Do not p
 6. Expected: no call is made to `/identity/original-spirit`, and no remote request uses `os_id` as the Linz World agent identifier.
 7. Trigger login with a fake HTTP service or request recorder.
 8. Expected: login calls `POST /api/v1/event/agents/login` with `agentId` and `signedNonce`; token output is stored as a secret/runtime reference and is not printed.
-9. Trigger compute without a configured `linz_world.compute.api_key_ref`.
-10. Expected: compute returns blocked/unsupported and no remote compute call is made with the login token.
-11. Trigger compute with a fake compute API key secret reference.
-12. Expected: compute calls `POST /api/v1/compute/chat` with `Authorization: Bearer <compute_api_key>`, maps 401 envelopes to diagnostics, and parses success `data.request_id`, `data.os_id`, `data.provider`, `data.model`, `data.choices`, `data.reservation`, and `data.usage`.
+9. Trigger authorization map refresh with `GET /api/v1/event/subjects` returning `{code:0,data:[...]}` and `{code:0,data:[]}` in separate runs.
+10. Expected: both responses parse as successful envelopes; non-empty arrays populate the subject catalog and empty arrays produce a catalog diagnostic rather than an envelope parse failure.
+11. Trigger compute without a configured `linz_world.compute.api_key_ref`.
+12. Expected: compute returns blocked/unsupported and no remote compute call is made with the login token.
+13. Trigger compute with a fake compute API key secret reference.
+14. Expected: compute calls `POST /api/v1/compute/chat` with `Authorization: Bearer <compute_api_key>`, maps 401 envelopes to diagnostics, and parses success `data.request_id`, `data.os_id`, `data.provider`, `data.model`, `data.choices`, `data.reservation`, and `data.usage`.
+15. Trigger relationship read with `GET /api/v1/memory/projections/{agentId}/relationships` returning a MemoryProjection.
+16. Expected: response preserves `projection_id`, `agent_id`, `projection_type`, `source_version`, `content`, `generated_at`, and `generated_by`; parsed `relationships` may be empty only if projection content cannot be structurally parsed.
 
 ## 4. Scope Exclusion Scenario
 

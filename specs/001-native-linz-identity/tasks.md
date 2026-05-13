@@ -37,7 +37,8 @@
 - [ ] T012 [P] Add foundation tests for config validation and profile scoping in `tests/linz_world/test_config.py`
 - [ ] T013 [P] Add foundation tests for event catalog and redaction behavior in `tests/linz_world/test_event_catalog.py`
 - [ ] T014 [P] Add foundation tests for event state idempotency and receipt state transitions in `tests/linz_world/test_event_state.py`
-- [ ] T014A [P] Add Linz World HTTP envelope, service_url normalization, registration, login, credential, compute, and memory contract fixture tests in `tests/linz_world/test_api_contract.py`
+- [ ] T014A [P] Add Linz World HTTP envelope, service_url normalization, registration, login, credential, subjects array, compute, and memory contract fixture tests in `tests/linz_world/test_api_contract.py`
+- [ ] T014B [P] Add contract fixtures proving `GET /api/v1/event/subjects` accepts `{code:0,data:[...]}` and `{code:0,data:[]}` as successful `PredefinedSubject[]` envelopes for authorization map generation in `tests/linz_world/test_api_contract.py`
 
 **Checkpoint**: Shared foundation is ready; user stories can be implemented incrementally.
 
@@ -133,6 +134,7 @@
 - [ ] T044 [P] [US4] Add NATS publish success, reject, failure, missing transport, and uncertain receipt tests in `tests/linz_world/test_publisher.py`; verify HTTP `/api/v1/event/publish` is never called for native publish
 - [ ] T045 [P] [US4] Add compute, memory, and relationship side-effect tests in `tests/linz_world/test_compute_memory_relationship.py`, including missing compute API key reference fail-closed behavior
 - [ ] T045A [P] [US4] Add Linz World compute contract fixtures in `tests/linz_world/test_api_contract.py` covering `Authorization: Bearer <compute_api_key>`, missing/invalid/revoked key 401 envelopes, and successful `data.request_id/os_id/provider/model/choices/reservation/usage` parsing
+- [ ] T045B [P] [US4] Add Linz World relationship projection contract fixtures in `tests/linz_world/test_api_contract.py` covering `GET /api/v1/memory/projections/{agentId}/relationships` MemoryProjection fields `projection_id/agent_id/projection_type/source_version/content/generated_at/generated_by` and ensuring projection content is not discarded when parsed relationships are empty
 - [ ] T046 [P] [US4] Add no-credential-leak regression tests for tools and CLI in `tests/linz_world/test_tools.py`
 
 ### Implementation for US4
@@ -141,10 +143,10 @@
 - [ ] T048 [US4] Implement publish request validation, governance, NATS transport publish, ack/sequence diagnostic receipt, and receipt persistence in `agent/linz_world/publisher.py`
 - [ ] T049 [US4] Implement world compute invocation in `agent/linz_world/compute.py` using a profile-local compute API key secret reference, with request_id receipt, provider/model summary, usage/reservation diagnostics, and no raw key exposure
 - [ ] T050 [US4] Implement Soul Memory write validation with `artifact_ref` and `sink_reason` in `agent/linz_world/memory.py`
-- [ ] T051 [US4] Implement relationship read and ACTIVE mutation governance in `agent/linz_world/relationship.py`
+- [ ] T051 [US4] Implement relationship read as MemoryProjection preservation plus optional parsed relationships, and ACTIVE mutation governance in `agent/linz_world/relationship.py`
 - [ ] T052 [US4] Update `tools/linz_world_tools.py` to route publish, compute, memory, and relationship calls through governance helpers
 - [ ] T053 [US4] Update `hermes_cli/linz.py` publish path to surface `published`, `rejected`, `failed`, and `uncertain` outcomes
-- [ ] T053A [US4] Align publish with `linz-world-skill` NATS event publishing semantics, compute with current Linz World `POST /api/v1/compute/chat` API-key contract and response fields, and memory with `/api/v1/memory/seeds`, `/api/v1/memory/soul`, `/api/v1/memory/events`, `/api/v1/memory/projections`, `/api/v1/memory/snapshots`, and `/api/v1/memory/lineage`; do not use HTTP `/api/v1/event/publish` for native publish
+- [ ] T053A [US4] Align publish with `linz-world-skill` NATS event publishing semantics, compute with current Linz World `POST /api/v1/compute/chat` API-key contract and response fields, subjects with `GET /api/v1/event/subjects` array `data`, and memory with `/api/v1/memory/seeds`, `/api/v1/memory/soul`, `/api/v1/memory/events`, `/api/v1/memory/projections`, `/api/v1/memory/snapshots`, and `/api/v1/memory/lineage`; do not use HTTP `/api/v1/event/publish` for native publish
 
 **Checkpoint**: US4 external side effects are governed and auditable.
 
@@ -177,7 +179,7 @@
 
 - T002-T004 can run in parallel after T001.
 - T006-T008 and T012-T014 can run in parallel once T005 establishes config shape.
-- T014A can run in parallel with other foundation tests after T010 defines the HTTP client boundary.
+- T014A/T014B can run in parallel with other foundation tests after T010 defines the HTTP client boundary.
 - US2 CLI tests (T025, T027) and tool tests (T026) can run in parallel.
 - US3 adapter, duplicate, and retry tests (T034-T036) can run in parallel.
 - US4 governance, publish, compute/memory/relationship, and privacy tests (T043-T046) can run in parallel.
