@@ -11974,6 +11974,34 @@ class AIAgent:
         except Exception as exc:
             logger.warning("pre_llm_call hook failed: %s", exc)
 
+        _os_runtime_user_context = ""
+        try:
+            from hermes_cli.os_runtime import load_runtime_config as _load_os_runtime_config
+
+            _os_runtime_cfg = _load_os_runtime_config()
+            _auto_cfg = getattr(_os_runtime_cfg, "autonomous", None)
+            if (
+                _os_runtime_cfg.enabled
+                and _auto_cfg is not None
+                and _auto_cfg.enabled
+                and _auto_cfg.apply_to_all_turns
+            ):
+                from agent.os_runtime.self_prompt_injector import render_self_prompt_user_context
+                from agent.os_runtime.turn_hooks import TurnTensionHook
+
+                _turn_request = {"messages": [{"role": "user", "content": original_user_message}]}
+                _turn_eval = TurnTensionHook(
+                    self.session_id or "",
+                    config=_os_runtime_cfg,
+                ).before_turn(
+                    _turn_request,
+                    message=original_user_message,
+                )
+                if _turn_eval.injected and _turn_eval.self_prompt:
+                    _os_runtime_user_context = render_self_prompt_user_context(_turn_eval.self_prompt)
+        except Exception as exc:
+            logger.debug("os_runtime pre-llm turn hook failed open: %s", exc, exc_info=True)
+
         # Main conversation loop
         api_call_count = 0
         final_response = None
@@ -12185,6 +12213,8 @@ class AIAgent:
                             _injections.append(_fenced)
                     if _plugin_user_context:
                         _injections.append(_plugin_user_context)
+                    if _os_runtime_user_context:
+                        _injections.append(_os_runtime_user_context)
                     if _injections:
                         _base = api_msg.get("content", "")
                         if isinstance(_base, str):
@@ -15350,6 +15380,27 @@ class AIAgent:
                 )
             except Exception as exc:
                 logger.debug("os_runtime post_llm projection failed: %s", exc)
+            try:
+                from hermes_cli.os_runtime import load_runtime_config as _load_os_runtime_config
+
+                _os_runtime_cfg = _load_os_runtime_config()
+                _auto_cfg = getattr(_os_runtime_cfg, "autonomous", None)
+                if (
+                    _os_runtime_cfg.enabled
+                    and _auto_cfg is not None
+                    and _auto_cfg.enabled
+                    and _auto_cfg.apply_to_all_turns
+                ):
+                    from agent.os_runtime.turn_hooks import TurnTensionHook
+
+                    TurnTensionHook(
+                        self.session_id or "",
+                        config=_os_runtime_cfg,
+                    ).after_turn(
+                        assistant_response=final_response or "",
+                    )
+            except Exception as exc:
+                logger.debug("os_runtime post-llm turn hook failed open: %s", exc, exc_info=True)
 
         # Extract reasoning from the CURRENT turn only.  Walk backwards
         # but stop at the user message that started this turn — anything

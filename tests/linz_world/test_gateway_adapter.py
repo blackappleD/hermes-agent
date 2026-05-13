@@ -1,5 +1,7 @@
 import pytest
 
+from agent.os_runtime.adapters.runtime_queue import RuntimeQueueRepository
+from agent.os_runtime.config import OSRuntimeConfig
 from agent.linz_world.event_bus import project_to_message_event
 from agent.linz_world.event_state import LinzStateRepository
 from agent.linz_world.gateway_adapter import dispatch_world_event, persist_world_event_for_gateway
@@ -85,6 +87,59 @@ async def test_dispatch_world_event_marks_handled_after_success(linz_home):
     assert result.handled is True
     assert result.record.dispatch_status.value == "handled"
     assert seen == ["evt_success"]
+
+
+@pytest.mark.asyncio
+async def test_dispatch_world_event_wakes_autonomous_runtime_after_persist(monkeypatch, linz_home):
+    repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
+    cfg = OSRuntimeConfig.from_dict(
+        {
+            "enabled": True,
+            "mode": "autonomous_low_risk",
+            "autonomous": {
+                "enabled": True,
+                "respond_to_world_events": True,
+                "idle_cooldown_seconds": 0,
+            },
+        }
+    )
+    monkeypatch.setattr("hermes_cli.os_runtime.load_runtime_config", lambda: cfg)
+
+    class _SessionStore:
+        profile_id = "test-profile"
+
+        def get_or_create_session(self, source):
+            return type("Entry", (), {"session_id": "linz-session-1"})()
+
+    async def _handler(message):
+        return None
+
+    result = await dispatch_world_event(
+        {
+            "event_id": "evt_autonomous",
+            "subject": "wsp.chat.message.sent",
+            "event_type": "message.sent",
+            "payload": {"text": "hello"},
+            "source": {"room_id": "room_1", "actor_id": "actor_1"},
+            "sequence": {"stream": "world-events", "consumer": "hermes-profile", "nats_sequence": 42},
+        },
+        _handler,
+        repo,
+        session_store=_SessionStore(),
+    )
+
+    queue_repo = RuntimeQueueRepository(root=linz_home)
+    try:
+        assert result.handled is True
+        inbox = queue_repo.list_inbox("linz-session-1")
+        wakes = queue_repo.list_wakes("linz-session-1")
+        assert len(inbox) == 1
+        assert inbox[0].event_id == "evt_autonomous"
+        assert inbox[0].status == "handled"
+        assert wakes
+        assert wakes[0].wake_reason == "world_event"
+    finally:
+        queue_repo.close()
 
 
 @pytest.mark.asyncio

@@ -110,7 +110,7 @@ def test_invalid_json_falls_back_to_rule_path_without_execution_permission():
 def test_unknown_action_family_and_missing_fields_fall_back():
     prompt = _self_prompt()
     unknown = {
-        "action_family": "use_tool",
+        "action_family": "unsafe_side_effect",
         "action_type": "unsafe",
         "why_now": "because",
         "open_space": prompt.open_space.to_dict(),
@@ -134,7 +134,7 @@ def test_unknown_action_family_and_missing_fields_fall_back():
         prefer_llm=True,
     )
 
-    assert unknown_intent.metadata["fallback_reason"] == "unknown_action_family:use_tool"
+    assert unknown_intent.metadata["fallback_reason"] == "unknown_action_family:unsafe_side_effect"
     assert missing_intent.metadata["fallback_reason"].startswith("missing_required_fields:")
 
 

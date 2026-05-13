@@ -79,6 +79,41 @@ class SelfPromptInjector:
         return _redact(payload)
 
 
+def render_self_prompt_user_context(payload: dict[str, Any]) -> str:
+    """Render a redacted injection payload as API-time user context."""
+
+    if not payload:
+        return ""
+    open_space = _dict(payload.get("open_space"))
+    target = _dict(payload.get("target_direction"))
+    lines = [
+        "<os-runtime-self-prompt>",
+        "The following ephemeral OS Runtime context applies only to this turn.",
+    ]
+    if payload.get("state_summary"):
+        lines.append(f"State: {_safe_text(payload.get('state_summary'))}")
+    if payload.get("tension_summary"):
+        lines.append(f"Tension: {_safe_text(payload.get('tension_summary'))}")
+    if payload.get("potential_summary"):
+        lines.append(f"Action potential: {_safe_text(payload.get('potential_summary'))}")
+    if open_space.get("description"):
+        lines.append(f"Open space: {_safe_text(open_space.get('description'))}")
+    if target.get("description"):
+        lines.append(f"Target direction: {_safe_text(target.get('description'))}")
+    if target.get("success_condition"):
+        lines.append(f"Success condition: {_safe_text(target.get('success_condition'))}")
+    if target.get("stop_condition"):
+        lines.append(f"Stop condition: {_safe_text(target.get('stop_condition'))}")
+    constraints = _safe_list(payload.get("constraints") or open_space.get("constraints"))
+    if constraints:
+        lines.append("Constraints: " + "; ".join(constraints))
+    refs = _safe_list(payload.get("evidence_refs"))
+    if refs:
+        lines.append("Evidence refs: " + ", ".join(refs))
+    lines.append("</os-runtime-self-prompt>")
+    return "\n".join(str(_redact(line)) for line in lines)
+
+
 def _safe_open_space(value: Any) -> dict[str, Any]:
     data = _dict(value)
     return {
@@ -140,4 +175,8 @@ def _redact(value: Any, *, key: str = "") -> Any:
     return value
 
 
-__all__ = ["EphemeralSelfPromptInjection", "SelfPromptInjector"]
+__all__ = [
+    "EphemeralSelfPromptInjection",
+    "SelfPromptInjector",
+    "render_self_prompt_user_context",
+]

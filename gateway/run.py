@@ -9704,7 +9704,6 @@ class GatewayRunner:
     ) -> None:
         try:
             from agent.os_runtime.autonomous_scheduler import AutonomousScheduler
-            from agent.os_runtime.turn_hooks import TurnTensionHook
             from hermes_cli.os_runtime import load_runtime_config
         except Exception as exc:
             logger.debug("os_runtime autonomous pre-turn: module unavailable: %s", exc)
@@ -9722,15 +9721,8 @@ class GatewayRunner:
                 AutonomousScheduler(sid, config=cfg).start()
             except Exception as exc:
                 logger.debug("os_runtime autonomous scheduler start failed: %s", exc)
-        if not auto.apply_to_all_turns:
-            return
-        request = {"messages": [{"role": "user", "content": getattr(event, "text", "") or ""}]}
-        result = TurnTensionHook(sid, config=cfg).before_turn(request, message=event)
-        if result.injected:
-            try:
-                setattr(event, "os_runtime_ephemeral_context", result.self_prompt)
-            except Exception:
-                pass
+        # All-turn observation and optional SelfPrompt injection are handled in
+        # AIAgent.run_conversation(), the shared CLI/TUI/gateway pre-LLM path.
 
     async def _post_turn_os_runtime_autonomous_hook(
         self,
@@ -9739,23 +9731,10 @@ class GatewayRunner:
         source: Any,
         final_response: str,
     ) -> None:
-        try:
-            from agent.os_runtime.turn_hooks import TurnTensionHook
-            from hermes_cli.os_runtime import load_runtime_config
-        except Exception as exc:
-            logger.debug("os_runtime autonomous post-turn: module unavailable: %s", exc)
-            return
-
-        cfg = load_runtime_config()
-        auto = getattr(cfg, "autonomous", None)
-        if not cfg.enabled or auto is None or not auto.enabled or not auto.apply_to_all_turns:
-            return
-        sid = getattr(session_entry, "session_id", "") or ""
-        if not sid:
-            return
-        TurnTensionHook(sid, config=cfg).after_turn(
-            assistant_response=final_response or "",
-        )
+        # The shared AIAgent post-LLM path records autonomous after_turn
+        # evidence for CLI, TUI, and gateway. This gateway hook remains as a
+        # compatibility no-op so existing call sites do not need branching.
+        return
 
     async def _handle_undo_command(self, event: MessageEvent) -> str:
         """Handle /undo command - remove the last user/assistant exchange."""

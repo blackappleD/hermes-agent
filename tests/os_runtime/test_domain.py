@@ -52,6 +52,7 @@ def test_core_enum_values_are_stable():
     assert [item.value for item in OpenActionFamily] == [
         "communicate",
         "learn",
+        "use_tool",
         "trade",
         "collaborate",
         "rest",
@@ -61,7 +62,6 @@ def test_core_enum_values_are_stable():
     ]
     assert "reply" not in {item.value for item in OpenActionFamily}
     assert "draft" not in {item.value for item in OpenActionFamily}
-    assert "use_tool" not in {item.value for item in OpenActionFamily}
     assert RiskLevel.MEDIUM.value == "medium"
     assert BubbleLifecycle.PROPOSED.value == "proposed"
     assert [item.value for item in RuleMaturity] == ["R0", "R1", "R2", "R3", "R4"]
@@ -78,6 +78,24 @@ def test_arbitration_decision_uses_new_protocol_values_only():
     assert "allow_reply" not in {item.value for item in ArbitrationDecision}
     assert "allow_draft" not in {item.value for item in ArbitrationDecision}
     assert "allow_sandbox" not in {item.value for item in ArbitrationDecision}
+
+
+def test_use_tool_action_family_remains_deserializable_for_compatibility():
+    assert OpenActionFamily("use_tool") is OpenActionFamily.USE_TOOL
+    intent = OpenIntent.from_dict(
+        {
+            "intent_id": "intent-use-tool",
+            "action_family": "use_tool",
+        }
+    )
+    space = OpenSpace.from_dict(
+        {
+            "available_action_families": ["communicate", "use_tool"],
+        }
+    )
+
+    assert intent.action_family is OpenActionFamily.USE_TOOL
+    assert OpenActionFamily.USE_TOOL in space.available_action_families
 
 
 def test_module4_protocol_objects_are_exported_from_stable_entrypoint():

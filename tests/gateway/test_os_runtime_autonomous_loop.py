@@ -40,7 +40,7 @@ def hermes_home(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_gateway_autonomous_pre_turn_starts_idle_and_projects(monkeypatch, hermes_home):
+async def test_gateway_autonomous_pre_turn_starts_idle(monkeypatch, hermes_home):
     cfg = OSRuntimeConfig.from_dict(
         {
             "enabled": True,
@@ -68,7 +68,7 @@ async def test_gateway_autonomous_pre_turn_starts_idle_and_projects(monkeypatch,
     try:
         state = repo.load_state("session-1")
         assert state is not None
-        assert state.last_turn_event_id
+        assert state.status == "idle"
     finally:
         repo.close()
 

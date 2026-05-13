@@ -265,8 +265,7 @@ class ActionPotentialEvaluator:
     ) -> RecommendedDepth:
         has_goal = bool(signals.task_context and (signals.task_context.active_goal or signals.task_context.user_goal))
         action_family = str(candidate.get("action_family") or candidate.get("family") or "").lower()
-        use_tool_value = getattr(OpenActionFamily.USE_TOOL, "value", OpenActionFamily.USE_TOOL)
-        is_tool = action_family == str(use_tool_value).lower() or bool(candidate.get("tools_needed") or candidate.get("tool_names"))
+        is_tool = action_family == OpenActionFamily.USE_TOOL.value or bool(candidate.get("tools_needed") or candidate.get("tool_names"))
         inhibited = life.fatigue >= 0.75 or life.restraint >= 0.82 or life.life_cycle == "cooldown"
         simple_chat = _is_simple_chat(signal_items, has_goal=has_goal)
 
