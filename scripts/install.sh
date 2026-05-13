@@ -10,6 +10,7 @@
 #
 # Or with options:
 #   curl -fsSL ... | bash -s -- --no-venv --skip-setup
+#   bash scripts/install.sh --local --dir /path/to/hermes-agent
 #
 # ============================================================================
 
@@ -69,6 +70,7 @@ ROOT_FHS_LAYOUT=false
 USE_VENV=true
 RUN_SETUP=true
 BRANCH="main"
+LOCAL_INSTALL=false
 
 # Detect non-interactive mode (e.g. curl | bash)
 # When stdin is not a terminal, read -p will fail with EOF,
@@ -94,6 +96,10 @@ while [[ $# -gt 0 ]]; do
             BRANCH="$2"
             shift 2
             ;;
+        --local)
+            LOCAL_INSTALL=true
+            shift
+            ;;
         --dir)
             INSTALL_DIR="$2"
             INSTALL_DIR_EXPLICIT=true
@@ -112,6 +118,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --no-venv      Don't create virtual environment"
             echo "  --skip-setup   Skip interactive setup wizard"
             echo "  --branch NAME  Git branch to install (default: main)"
+            echo "  --local        Use existing --dir source tree; skip git clone/fetch/checkout/pull"
             echo "  --dir PATH     Installation directory"
             echo "                   default (non-root):  ~/.hermes/hermes-agent"
             echo "                   default (root, Linux): /usr/local/lib/hermes-agent"
@@ -845,12 +852,42 @@ show_manual_install_hint() {
     esac
 }
 
+validate_local_source_mode() {
+    if [ "$LOCAL_INSTALL" != true ]; then
+        return 0
+    fi
+
+    if [ "$INSTALL_DIR_EXPLICIT" != true ]; then
+        log_error "--local requires --dir PATH or HERMES_INSTALL_DIR"
+        exit 1
+    fi
+    if [ ! -d "$INSTALL_DIR" ]; then
+        log_error "Local source directory does not exist: $INSTALL_DIR"
+        exit 1
+    fi
+    if [ ! -f "$INSTALL_DIR/pyproject.toml" ]; then
+        log_error "Local source directory does not look like hermes-agent: $INSTALL_DIR"
+        log_info "Expected to find pyproject.toml in the directory passed to --dir"
+        exit 1
+    fi
+    if [ "$BRANCH" != "main" ]; then
+        log_warn "--branch is ignored in --local mode; using the current contents of --dir"
+    fi
+}
+
 # ============================================================================
 # Installation
 # ============================================================================
 
 clone_repo() {
     log_info "Installing to $INSTALL_DIR..."
+
+    if [ "$LOCAL_INSTALL" = true ]; then
+        log_info "Local source mode enabled; skipping git clone/fetch/checkout/pull"
+        cd "$INSTALL_DIR"
+        log_success "Local source tree ready"
+        return 0
+    fi
 
     if [ -d "$INSTALL_DIR" ]; then
         if [ -d "$INSTALL_DIR/.git" ]; then
@@ -1115,20 +1152,29 @@ setup_path() {
 
     local command_link_dir
     local command_link_display_dir
+    local command_link_path
     command_link_dir="$(get_command_link_dir)"
     command_link_display_dir="$(get_command_link_display_dir)"
+    command_link_path="$command_link_dir/hermes"
 
     # Create a user-facing shim for the hermes command.
     # We intentionally clear PYTHONPATH/PYTHONHOME here so inherited env vars
     # can't make this launcher import modules from another checkout.
     mkdir -p "$command_link_dir"
-    cat > "$command_link_dir/hermes" <<EOF
+    if [ -e "$command_link_path" ] || [ -L "$command_link_path" ]; then
+        rm -f "$command_link_path" || {
+            log_warn "Unable to replace existing hermes launcher at $command_link_path"
+            log_info "Remove it manually and re-run the installer."
+            return 0
+        }
+    fi
+    cat > "$command_link_path" <<EOF
 #!/usr/bin/env bash
 unset PYTHONPATH
 unset PYTHONHOME
 exec "$HERMES_BIN" "\$@"
 EOF
-    chmod +x "$command_link_dir/hermes"
+    chmod +x "$command_link_path"
     log_success "Installed hermes launcher → $command_link_display_dir/hermes"
 
     if [ "$DISTRO" = "termux" ]; then
@@ -1324,13 +1370,47 @@ install_node_deps() {
         return 0
     fi
 
-    if [ -f "$INSTALL_DIR/package.json" ]; then
-        log_info "Installing Node.js dependencies (browser tools)..."
-        cd "$INSTALL_DIR"
+    npm_deps_current() {
+        local package_dir="$1"
+        local marker="$package_dir/node_modules/.hermes-install-complete"
+
+        if [ ! -d "$package_dir/node_modules" ] || [ ! -f "$marker" ]; then
+            return 1
+        fi
+        if [ "$package_dir/package.json" -nt "$marker" ]; then
+            return 1
+        fi
+        if [ -f "$package_dir/package-lock.json" ] && [ "$package_dir/package-lock.json" -nt "$marker" ]; then
+            return 1
+        fi
+        return 0
+    }
+
+    npm_install_if_needed() {
+        local package_dir="$1"
+        local label="$2"
+        local warning="$3"
+        local marker="$package_dir/node_modules/.hermes-install-complete"
+
+        if npm_deps_current "$package_dir"; then
+            log_info "$label already installed; skipping npm install"
+            return 0
+        fi
+
+        log_info "Installing $label..."
+        cd "$package_dir"
         npm install --silent 2>/dev/null || {
-            log_warn "npm install failed (browser tools may not work)"
+            log_warn "$warning"
+            return 1
         }
-        log_success "Node.js dependencies installed"
+        mkdir -p "$package_dir/node_modules"
+        touch "$marker"
+        log_success "$label installed"
+        return 0
+    }
+
+    if [ -f "$INSTALL_DIR/package.json" ]; then
+        npm_install_if_needed "$INSTALL_DIR" "Node.js dependencies (browser tools)" "npm install failed (browser tools may not work)" || true
 
         # Install Playwright browser + system dependencies.
         # Playwright's --with-deps only supports apt-based systems natively.
@@ -1393,12 +1473,7 @@ install_node_deps() {
 
     # Install TUI dependencies
     if [ -f "$INSTALL_DIR/ui-tui/package.json" ]; then
-        log_info "Installing TUI dependencies..."
-        cd "$INSTALL_DIR/ui-tui"
-        npm install --silent 2>/dev/null || {
-            log_warn "TUI npm install failed (hermes --tui may not work)"
-        }
-        log_success "TUI dependencies installed"
+        npm_install_if_needed "$INSTALL_DIR/ui-tui" "TUI dependencies" "TUI npm install failed (hermes --tui may not work)" || true
     fi
 
 
@@ -1625,9 +1700,14 @@ main() {
 
     detect_os
     resolve_install_layout
+    validate_local_source_mode
     install_uv
     check_python
-    check_git
+    if [ "$LOCAL_INSTALL" = true ]; then
+        log_info "Local source mode enabled; skipping Git clone/update checks"
+    else
+        check_git
+    fi
     check_node
     check_network_prerequisites
     install_system_packages
