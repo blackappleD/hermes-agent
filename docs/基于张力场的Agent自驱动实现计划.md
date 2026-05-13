@@ -185,7 +185,7 @@ linz_world:
   auto_register_on_agent_create: true
   registration_failure_mode: explicit_pending # explicit_pending | fail_agent_create
   registration_state: pending                 # pending | registered | failed
-  server_url: ""
+  service_url: ""
   nats_url: ""
   original_spirit:
     os_id: ""
