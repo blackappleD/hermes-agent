@@ -6682,6 +6682,14 @@ class GatewayRunner:
         _run_generation = self._begin_session_run_generation(_quick_key)
 
         try:
+            try:
+                session_entry = self.session_store.get_or_create_session(source)
+                await self._pre_turn_os_runtime_autonomous_hook(
+                    session_entry=session_entry,
+                    event=event,
+                )
+            except Exception as _osr_pre_exc:
+                logger.debug("os_runtime autonomous pre-turn hook failed: %s", _osr_pre_exc)
             _agent_result = await self._handle_message_with_agent(event, source, _quick_key, _run_generation)
             # Goal continuation: after the agent returns a final response
             # for this turn, check any standing /goal — the judge will
@@ -6710,6 +6718,11 @@ class GatewayRunner:
                             final_response=_final_text,
                         )
                         await self._post_turn_os_runtime_continuation(
+                            session_entry=session_entry,
+                            source=source,
+                            final_response=_final_text,
+                        )
+                        await self._post_turn_os_runtime_autonomous_hook(
                             session_entry=session_entry,
                             source=source,
                             final_response=_final_text,
@@ -9682,6 +9695,67 @@ class GatewayRunner:
                 self._enqueue_fifo(_quick_key, cont_event, adapter)
         except Exception as exc:
             logger.debug("os_runtime continuation: enqueue failed: %s", exc)
+
+    async def _pre_turn_os_runtime_autonomous_hook(
+        self,
+        *,
+        session_entry: Any,
+        event: "MessageEvent",
+    ) -> None:
+        try:
+            from agent.os_runtime.autonomous_scheduler import AutonomousScheduler
+            from agent.os_runtime.turn_hooks import TurnTensionHook
+            from hermes_cli.os_runtime import load_runtime_config
+        except Exception as exc:
+            logger.debug("os_runtime autonomous pre-turn: module unavailable: %s", exc)
+            return
+
+        cfg = load_runtime_config()
+        auto = getattr(cfg, "autonomous", None)
+        if not cfg.enabled or auto is None or not auto.enabled:
+            return
+        sid = getattr(session_entry, "session_id", "") or ""
+        if not sid:
+            return
+        if auto.start_with_gateway or auto.start_on_agent_load:
+            try:
+                AutonomousScheduler(sid, config=cfg).start()
+            except Exception as exc:
+                logger.debug("os_runtime autonomous scheduler start failed: %s", exc)
+        if not auto.apply_to_all_turns:
+            return
+        request = {"messages": [{"role": "user", "content": getattr(event, "text", "") or ""}]}
+        result = TurnTensionHook(sid, config=cfg).before_turn(request, message=event)
+        if result.injected:
+            try:
+                setattr(event, "os_runtime_ephemeral_context", result.self_prompt)
+            except Exception:
+                pass
+
+    async def _post_turn_os_runtime_autonomous_hook(
+        self,
+        *,
+        session_entry: Any,
+        source: Any,
+        final_response: str,
+    ) -> None:
+        try:
+            from agent.os_runtime.turn_hooks import TurnTensionHook
+            from hermes_cli.os_runtime import load_runtime_config
+        except Exception as exc:
+            logger.debug("os_runtime autonomous post-turn: module unavailable: %s", exc)
+            return
+
+        cfg = load_runtime_config()
+        auto = getattr(cfg, "autonomous", None)
+        if not cfg.enabled or auto is None or not auto.enabled or not auto.apply_to_all_turns:
+            return
+        sid = getattr(session_entry, "session_id", "") or ""
+        if not sid:
+            return
+        TurnTensionHook(sid, config=cfg).after_turn(
+            assistant_response=final_response or "",
+        )
 
     async def _handle_undo_command(self, event: MessageEvent) -> str:
         """Handle /undo command - remove the last user/assistant exchange."""

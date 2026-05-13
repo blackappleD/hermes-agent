@@ -43,13 +43,17 @@ class TensionOperationType(str, Enum):
 class OpenActionFamily(str, Enum):
     COMMUNICATE = "communicate"
     LEARN = "learn"
-    USE_TOOL = "use_tool"
     TRADE = "trade"
     COLLABORATE = "collaborate"
     REST = "rest"
     CREATE = "create"
     NEW_TOOL = "new_tool"
     NEW_SKILL = "new_skill"
+
+
+# Backward-compatible constant for candidate dictionaries. It is deliberately
+# not an enum member; direct tool use is represented by candidate metadata.
+OpenActionFamily.USE_TOOL = "use_tool"  # type: ignore[attr-defined]
 
 
 class ArbitrationDecision(str, Enum):

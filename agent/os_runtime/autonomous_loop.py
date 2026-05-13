@@ -1,0 +1,356 @@
+"""One-shot resident autonomous runtime loop."""
+
+from __future__ import annotations
+
+import logging
+import uuid
+from dataclasses import dataclass, field
+from typing import Any
+
+from agent.linz_world.models import utc_now_iso
+from agent.os_runtime.adapters.context import ContextAdapter
+from agent.os_runtime.adapters.events import EventProjectionAdapter
+from agent.os_runtime.adapters.runtime_queue import RuntimeQueueRepository
+from agent.os_runtime.adapters.session_store import OSRuntimeEvent, OSRuntimeEventRepository
+from agent.os_runtime.autonomous_scheduler import AutonomousScheduler
+from agent.os_runtime.autonomous_state import (
+    AutonomousRuntimeState,
+    AutonomousRuntimeStatus,
+    AutonomousWakeRecord,
+)
+from agent.os_runtime.config import OSRuntimeConfig, default_os_runtime_config
+from agent.os_runtime.domain import (
+    ArbitrationDecision,
+    EventSource,
+    LifeState,
+    RecommendedDepth,
+    TensionSet,
+)
+from agent.os_runtime.engine import BoYueArbiter, OpenIntentGenerator, SelfPromptCompiler, TensionFieldEngine, TensionInterpreter
+from agent.os_runtime.engine.action_potential import ActionPotentialEvaluator
+from agent.os_runtime.engine.life_state import LifeStateSystem
+from agent.os_runtime.engine.signals import SignalInterpreter
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class AutonomousRunResult:
+    ran: bool
+    status: str
+    reason: str = ""
+    wake_record: AutonomousWakeRecord | None = None
+    state: AutonomousRuntimeState | None = None
+    evidence: dict[str, Any] = field(default_factory=dict)
+
+
+class AutonomousRuntimeLoop:
+    def __init__(
+        self,
+        session_id: str,
+        *,
+        profile_id: str = "",
+        config: OSRuntimeConfig | dict[str, Any] | None = None,
+        event_repository: OSRuntimeEventRepository | None = None,
+        queue_repository: RuntimeQueueRepository | None = None,
+        scheduler: AutonomousScheduler | None = None,
+        context_adapter: Any = None,
+        signal_interpreter: Any = None,
+        life_system: Any = None,
+        tension_interpreter: Any = None,
+        tension_engine: Any = None,
+        action_evaluator: Any = None,
+        self_prompt_compiler: Any = None,
+        intent_generator: Any = None,
+        arbiter: Any = None,
+    ) -> None:
+        self.session_id = session_id
+        self.profile_id = profile_id
+        if isinstance(config, OSRuntimeConfig):
+            self.config = config
+        elif isinstance(config, dict):
+            self.config = OSRuntimeConfig.from_dict(config)
+        else:
+            self.config = default_os_runtime_config()
+        self.event_repository = event_repository or OSRuntimeEventRepository(enabled=self.config.enabled)
+        self.queue_repository = queue_repository or RuntimeQueueRepository(enabled=self.config.enabled)
+        self.scheduler = scheduler or AutonomousScheduler(
+            session_id,
+            profile_id=profile_id,
+            config=self.config,
+            repository=self.queue_repository,
+        )
+        self.context_adapter = context_adapter
+        self.signal_interpreter = signal_interpreter or SignalInterpreter(config=self.config)
+        self.life_system = life_system or LifeStateSystem()
+        self.tension_interpreter = tension_interpreter or TensionInterpreter()
+        self.tension_engine = tension_engine or TensionFieldEngine()
+        self.action_evaluator = action_evaluator or ActionPotentialEvaluator()
+        self.self_prompt_compiler = self_prompt_compiler or SelfPromptCompiler()
+        self.intent_generator = intent_generator or OpenIntentGenerator()
+        self.arbiter = arbiter or BoYueArbiter()
+
+    def run_once(
+        self,
+        *,
+        wake_reason: str,
+        event_ref: Any = None,
+    ) -> AutonomousRunResult:
+        event_id = _event_id(event_ref)
+        decision = self.scheduler.wake(reason=wake_reason, event_id=event_id)
+        if not decision.allowed:
+            return AutonomousRunResult(False, "skipped", decision.reason, state=decision.state)
+
+        wake = AutonomousWakeRecord(
+            wake_id=f"wake-{uuid.uuid4().hex}",
+            session_id=self.session_id,
+            profile_id=self.profile_id,
+            wake_reason=wake_reason,
+            event_id=event_id,
+        )
+        try:
+            events = self._events(wake_reason=wake_reason, event_ref=event_ref)
+            state = self.queue_repository.load_state(self.session_id) or decision.state or AutonomousRuntimeState(
+                session_id=self.session_id,
+                profile_id=self.profile_id,
+            )
+            snapshot = self._context(events, wake_reason=wake_reason)
+            signals = self.signal_interpreter.interpret(
+                task_context=snapshot.task_context,
+                agent_context=snapshot.agent_context,
+                events=snapshot.recent_events,
+                authorization_map=getattr(snapshot, "authorization_map", None),
+                relationships=getattr(snapshot, "relationships", None),
+            )
+            life_state, life_delta = self.life_system.update(
+                signals,
+                previous_state=_life_state(state),
+                execution_feedback={"status": "autonomous_wake", "wake_reason": wake_reason},
+            )
+            signal_ref = signals.event_refs[0] if signals.event_refs else events[0].to_ref()
+            tension_interpretation = self.tension_interpreter.interpret(
+                signal_ref,
+                signals,
+                snapshot.task_context,
+                life_state,
+                _tension_set(state),
+            )
+            tension_set, tension_delta = self.tension_engine.update(
+                _tension_set(state),
+                tension_interpretation.operations,
+                signals,
+                life_state,
+            )
+            action_potential = self.action_evaluator.evaluate(
+                signal_set=signals,
+                life_state=life_state,
+                tension_set=tension_set,
+                intent_id=f"autonomous-ap:{self.session_id}:{wake.wake_id}",
+            )
+            self_prompt = self.self_prompt_compiler.compile(
+                task_context=snapshot.task_context,
+                agent_context=snapshot.agent_context,
+                life_state=life_state,
+                tension_set=tension_set,
+                tension_explanation=tension_interpretation,
+                action_potential=action_potential,
+                constraints=[
+                    "autonomous low-risk mode",
+                    "no external side effects by default",
+                    "no world publish without policy, catalog, authorization, STVB, evidence, and approval",
+                ],
+            )
+            intent = self.intent_generator.generate(
+                self_prompt=self_prompt,
+                action_potential=action_potential,
+            )
+            arbitration = self.arbiter.arbitrate(
+                intent=intent,
+                self_prompt=self_prompt,
+                action_potential=action_potential,
+                available_tools=[],
+                allow_auto_execute=self.config.autonomous.allow_tool_execution,
+                approval_granted=False,
+                policy_preflight=_policy_preflight(),
+                event_catalog_preflight=_catalog_preflight(),
+                authorization_summary=_authorization_summary(snapshot),
+            )
+            action_summary = _action_summary(arbitration.decision, action_potential.recommended_depth)
+            evidence = {
+                "wake_reason": wake_reason,
+                "event_ids": [event.event_id for event in events],
+                "life_state": life_state.to_dict(),
+                "life_delta": _safe_to_dict(life_delta),
+                "tension_set": tension_set.to_dict(),
+                "tension_delta": _safe_to_dict(tension_delta),
+                "action_potential": action_potential.to_dict(),
+                "self_prompt": self_prompt.to_dict(),
+                "open_intent": intent.to_dict(),
+                "arbitration": arbitration.to_dict(),
+                "action_summary": action_summary,
+                "stop_reason": "bounded single wake completed",
+            }
+            state.status = AutonomousRuntimeStatus.SLEEPING.value
+            state.last_wake_reason = wake_reason
+            state.last_wake_event_id = event_id
+            state.last_intent_id = intent.intent_id
+            state.last_arbitration = arbitration.to_dict()
+            state.last_action_summary = action_summary
+            state.life_state = life_state.to_dict()
+            state.tension_set = tension_set.to_dict()
+            state.action_potential = action_potential.to_dict()
+            state.self_prompt = self_prompt.to_dict()
+            state.evidence = evidence
+            self.queue_repository.save_state(state)
+
+            wake.status = "completed"
+            wake.finished_at = utc_now_iso()
+            wake.turns_used = min(1, decision.max_turns or 1)
+            wake.stop_reason = evidence["stop_reason"]
+            wake.intent_id = intent.intent_id
+            wake.arbitration = arbitration.to_dict()
+            wake.action_summary = action_summary
+            wake.evidence = evidence
+            self.queue_repository.append_wake(wake)
+            state = self.scheduler.finish_wake(action_summary=action_summary)
+            return AutonomousRunResult(True, "completed", action_summary, wake, state, evidence)
+        except Exception as exc:
+            logger.debug("autonomous runtime loop failed closed: %s", exc, exc_info=True)
+            wake.status = "failed"
+            wake.finished_at = utc_now_iso()
+            wake.stop_reason = f"loop error: {type(exc).__name__}"
+            self.queue_repository.append_wake(wake)
+            state = self.scheduler.finish_wake(
+                status=AutonomousRuntimeStatus.PAUSED.value,
+                action_summary=wake.stop_reason,
+            )
+            return AutonomousRunResult(False, "failed", wake.stop_reason, wake, state)
+
+    def _events(self, *, wake_reason: str, event_ref: Any) -> list[OSRuntimeEvent]:
+        if isinstance(event_ref, OSRuntimeEvent):
+            stored = self.event_repository.append(event_ref)
+            return [stored or event_ref]
+        if hasattr(event_ref, "to_ref") or isinstance(event_ref, dict):
+            event = OSRuntimeEvent.from_dict(_event_payload(event_ref, wake_reason=wake_reason, session_id=self.session_id))
+            stored = self.event_repository.append(event)
+            return [stored or event]
+        adapter = EventProjectionAdapter(self.event_repository, self.config)
+        result = adapter.project(
+            event_type="runtime_tick" if wake_reason in {"tick", "manual_tick"} else "runtime_feedback",
+            source=EventSource.RUNTIME_FEEDBACK,
+            summary=f"autonomous wake: {wake_reason}",
+            session_id=self.session_id,
+            trace_id=self.session_id,
+            event_id=f"osr-autonomous-{uuid.uuid4().hex}",
+            metadata={"wake_reason": wake_reason, "no_user_goal": True},
+        )
+        if result.written and result.event:
+            return [result.event]
+        return [
+            OSRuntimeEvent(
+                event_id=f"osr-autonomous-{uuid.uuid4().hex}",
+                event_type="runtime_feedback",
+                source=EventSource.RUNTIME_FEEDBACK,
+                session_id=self.session_id,
+                summary=f"autonomous wake: {wake_reason}",
+                metadata={"wake_reason": wake_reason},
+            )
+        ]
+
+    def _context(self, events: list[OSRuntimeEvent], *, wake_reason: str) -> Any:
+        adapter = self.context_adapter or ContextAdapter(
+            event_repository=self.event_repository,
+            config=self.config,
+        )
+        return adapter.build_context(
+            session_id=self.session_id,
+            user_goal="",
+            active_goal="",
+            task_id=f"autonomous:{self.session_id}:{wake_reason}",
+            profile_name=self.profile_id,
+            recent_events=events,
+            resource_state={"source": "autonomous_loop", "wake_reason": wake_reason},
+        )
+
+
+def _event_payload(event_ref: Any, *, wake_reason: str, session_id: str) -> dict[str, Any]:
+    if hasattr(event_ref, "to_dict"):
+        data = event_ref.to_dict()
+    elif isinstance(event_ref, dict):
+        data = dict(event_ref)
+    else:
+        data = {}
+    metadata = dict(data.get("metadata") or {})
+    metadata.setdefault("wake_reason", wake_reason)
+    return {
+        "event_id": str(data.get("event_id") or f"osr-autonomous-{uuid.uuid4().hex}"),
+        "event_type": str(data.get("event_type") or ("world_event" if wake_reason == "world_event" else "runtime_feedback")),
+        "source": str(data.get("source") or (EventSource.LINZ_WORLD.value if wake_reason == "world_event" else EventSource.RUNTIME_FEEDBACK.value)),
+        "trace_id": str(data.get("trace_id") or data.get("event_id") or ""),
+        "session_id": str(data.get("session_id") or session_id),
+        "timestamp": str(data.get("timestamp") or utc_now_iso()),
+        "summary": str(data.get("summary") or "autonomous wake event"),
+        "metadata": metadata,
+        "content_ref": str(data.get("content_ref") or ""),
+        "payload_hash": str(data.get("payload_hash") or ""),
+        "status": str(data.get("status") or "recorded"),
+    }
+
+
+def _event_id(event_ref: Any) -> str:
+    if event_ref is None:
+        return ""
+    if isinstance(event_ref, dict):
+        return str(event_ref.get("event_id") or "")
+    return str(getattr(event_ref, "event_id", "") or "")
+
+
+def _life_state(state: AutonomousRuntimeState) -> LifeState | None:
+    try:
+        return LifeState.from_dict(state.life_state) if state.life_state else None
+    except Exception:
+        return None
+
+
+def _tension_set(state: AutonomousRuntimeState) -> TensionSet | None:
+    try:
+        return TensionSet.from_dict(state.tension_set) if state.tension_set else None
+    except Exception:
+        return None
+
+
+def _policy_preflight() -> dict[str, Any]:
+    return {}
+
+
+def _catalog_preflight() -> dict[str, Any]:
+    return {"status": "missing", "reason": "catalog publish path not requested"}
+
+
+def _authorization_summary(snapshot: Any) -> dict[str, Any]:
+    auth = getattr(getattr(snapshot, "task_context", None), "metadata", {}).get("authorization", {})
+    return auth if isinstance(auth, dict) else {}
+
+
+def _action_summary(decision: ArbitrationDecision, depth: RecommendedDepth) -> str:
+    if decision == ArbitrationDecision.REQUIRE_APPROVAL:
+        return "require_approval"
+    if decision == ArbitrationDecision.REPORT_ONLY:
+        return "report_only"
+    if depth == RecommendedDepth.DRAFT:
+        return "draft_only"
+    return f"{decision.value}:{depth.value}"
+
+
+def _safe_to_dict(value: Any) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if hasattr(value, "to_dict"):
+        data = value.to_dict()
+        return data if isinstance(data, dict) else {"value": data}
+    if isinstance(value, dict):
+        return dict(value)
+    return {"value": str(value)}
+
+
+__all__ = ["AutonomousRunResult", "AutonomousRuntimeLoop"]
