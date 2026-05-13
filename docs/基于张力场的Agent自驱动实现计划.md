@@ -34,6 +34,8 @@ Hermes profile 创建/加载
 
 Linz World 创建期注册是基础身份能力，不属于 `os_runtime` opt-in。需要 opt-in 的是自驱动、自动响应、自动上线监听和外部副作用执行。第一版自驱动能力先限制在低风险、可审计、可停止的范围：继续推进明确目标、生成草案、建议下一步；不允许默认执行高风险外部副作用。
 
+需要特别区分两种自驱动形态：模块 6 的 `/os_runtime goal` 是 turn-boundary assisted continuation，需要用户显式设置目标；完整元神自驱动应由后续常驻自治循环承担。常驻自治循环在 Agent profile 或 gateway/runtime 启动后自动在线，通过 Linz World 世界事件、时间 tick、内部反馈和生命状态变化唤醒张力场评估，不依赖用户每次输入 `/os_runtime`。该能力仍必须是配置 opt-in，并且第一版只开放低风险自主响应、草案、反思、证据和可观测状态；外部发布、工具副作用和世界市场交易仍由裁判、policy、授权 map 和审批边界控制。
+
 ## 2. 现有项目能力对照
 
 | 白皮书模块 | Hermes 当前落点 | 实现策略 |
@@ -232,6 +234,7 @@ os_runtime:
 | 阶段 1：外部事件观测闭环 | NATS 世界事件、Hermes 对话、工具/运行时反馈进入事件流，计算生命状态、张力解释和张力网络 | 无，只展示 | 低 |
 | 阶段 2：低风险意图建议 | 生成 ActionPotential、SelfPrompt、OpenIntent、ArbitrationResult | 建议下一步，不自动执行 | 低 |
 | 阶段 3：辅助自驱动 | 类似 `/goal`，在明确目标下自动继续下一轮 | 仅自然语言/草案 | 中低 |
+| 阶段 3.5：常驻自治运行循环 | Agent/gateway 启动后按世界事件、时间 tick 和内部反馈自动唤醒张力场 | 无需 `/os_runtime goal` 的低风险自主响应、草案、反思和 evidence | 中 |
 | 阶段 4：工具执行网关 | 对低风险工具调用生成票据、receipt、evidence | 受限工具执行 | 中 |
 | 阶段 5：记忆进化与规则结晶 | R0/R1 规则、张力演化、经验回流 | 调整后续裁判 | 中 |
 | 阶段 6：治理与平台化 | 审批、STVB、dashboard、API | 多会话可观测自治 | 中高 |
@@ -697,7 +700,7 @@ os_runtime:
    - 返回是否需要 continuation prompt。
 3. `mode=passive`：只记录状态和 intent，不继续。
 4. `mode=assisted`：只允许 `report_only`，或无外部副作用的低风险 `auto_execute` continuation；实现层可把旧 `allow_reply` / `allow_draft` 映射为这两类。
-5. `mode=autonomous_low_risk`：允许低风险 `auto_execute`、`sandbox_execute`、受限 tool/world reply，但必须有 permission ticket 与 receipt。
+5. `mode=autonomous_low_risk` 在本模块只保留为配置/状态枚举和 fail-closed 路径；真正的常驻自治循环、事件唤醒和无 `/os_runtime goal` 的自主响应由模块 6.5 实现。
 6. 添加 CLI/slash 命令：
    - `/os_runtime status`
    - `/os_runtime passive`
@@ -713,6 +716,106 @@ os_runtime:
 - `assisted` 模式能在低风险文档任务中自动继续，但会在预算耗尽、完成、用户打断、裁判拒绝时停止。
 - Linz World 消息可以触发 assisted continuation，但默认不自动发布正式事件。
 - continuation prompt 必须是普通 user-role 消息，不改 system prompt。
+
+### 模块 6.5：常驻 Autonomous Runtime Loop 与世界事件自响应
+
+目标：在不依赖用户输入 `/os_runtime goal` 的情况下，让 Agent 以当前 Hermes profile 的 Linz World original spirit 身份常驻在线。运行时根据世界事件、时间 tick、内部反馈、生命状态、张力场和行动势能自动唤醒，生成 OpenIntent，经 BoYueArbiter/Policy 裁判后执行低风险自主响应、草案、反思、证据记录或审批请求。该模块是“完全元神自驱动”的入口，但第一版仍不允许默认高风险工具执行、world publish 或经济结算。
+
+新增：
+
+- `agent/os_runtime/autonomous_loop.py`
+- `agent/os_runtime/autonomous_state.py`
+- `agent/os_runtime/autonomous_scheduler.py`
+- `agent/os_runtime/world_event_waker.py`
+- `agent/os_runtime/autonomous_inbox.py`
+- `agent/os_runtime/adapters/runtime_queue.py`
+- `hermes_cli/os_runtime_autonomous.py`
+- `tests/os_runtime/test_autonomous_loop.py`
+- `tests/os_runtime/test_world_event_waker.py`
+- `tests/gateway/test_os_runtime_autonomous_loop.py`
+
+配置建议：
+
+```yaml
+os_runtime:
+  enabled: true
+  mode: autonomous_low_risk
+  autonomous:
+    enabled: true
+    start_on_agent_load: true
+    start_with_gateway: true
+    respond_to_world_events: true
+    tick_interval_seconds: 30
+    idle_cooldown_seconds: 60
+    max_turns_per_wake: 3
+    max_wakes_per_hour: 20
+    allow_tool_execution: false
+    allow_world_publish: false
+    require_approval_for_world_publish: true
+```
+
+实现步骤：
+
+1. 定义 `AutonomousRuntimeState`：
+   - `status`: `stopped | idle | sleeping | evaluating | acting | paused | failed`
+   - `loop_id`
+   - `profile_id`
+   - `session_id`
+   - `last_wake_reason`
+   - `last_wake_event_id`
+   - `last_tick_at`
+   - `wakes_used`
+   - `max_wakes_per_hour`
+   - `cooldown_until`
+   - `last_intent_id`
+   - `last_arbitration`
+   - `last_action_summary`
+   - `paused_reason`
+2. 新建 `AutonomousRuntimeLoop.run_once(wake_reason, event_ref=None)`：
+   - 从 `autonomous_inbox` 或 `OSRuntimeEventRepository` 读取未处理世界事件/内部反馈。
+   - 调用模块 1-5 的 context/signals/life/tension/action/self_prompt/intent/arbiter 链。
+   - 在没有用户 goal 时，允许由张力场、生命状态和 action potential 共同决定是否生成自主 intent。
+   - 把每次 wake 的输入、输出、裁判和停止原因写入 evidence。
+3. 新建 `AutonomousScheduler`：
+   - 在 gateway/runtime 启动时按配置启动。
+   - 支持固定 tick、idle cooldown、hourly wake budget、pause/resume/stop。
+   - 不创建无限无预算循环；每次 wake 最多 `max_turns_per_wake`。
+4. 新建 `WorldEventWaker`：
+   - 订阅 Linz World gateway adapter 已持久化的 world event。
+   - `wsp.chat.message.sent`、需求/任务/订单/交付/治理等事件进入 autonomous inbox。
+   - 重复事件只唤醒一次。
+5. 自主行动第一版只允许：
+   - `report_only`：记录观察、张力变化、建议和审批需求。
+   - 低风险 `auto_execute`：生成自然语言回复草案、文档草案、内部反思、evidence package。
+   - `require_approval`：生成用户可见审批请求。
+   - 不允许默认工具执行、真实 world publish、外部消息发送、删除、支付或权限操作。
+6. 如配置显式允许 `allow_world_publish=true`，world publish 仍必须同时通过：
+   - BoYueArbiter
+   - PolicyEngine
+   - Linz event catalog
+   - authorization map
+   - STVBGuard
+   - evidence receipt
+7. 提供观测命令：
+   - `hermes os-runtime autonomous status`
+   - `hermes os-runtime autonomous pause`
+   - `hermes os-runtime autonomous resume`
+   - `hermes os-runtime autonomous stop`
+   - `hermes os-runtime autonomous tick`
+   - `hermes os-runtime autonomous inbox`
+   - `hermes os-runtime autonomous events`
+   - `hermes os-runtime autonomous intents`
+
+验收标准：
+
+- 启用 `autonomous.enabled=true` 后，Agent/gateway 启动即可进入 idle/sleeping 常驻状态，不需要用户输入 `/os_runtime goal`。
+- 注入一条合法 Linz World 消息事件后，runtime 自动 wake，完成 context -> signals -> life -> tension -> action potential -> self prompt -> intent -> arbitration 链路。
+- 没有用户 goal 时，Agent 仍可基于张力场和生命状态生成低风险自主 intent。
+- 默认配置下，世界事件只会产生回复草案、report 或审批请求，不会自动 `linz_publish`。
+- tick wake 可以在无世界事件时触发内部反思、未完成张力检查或休眠决策。
+- cooldown、wake budget、fatigue/restraint 和用户 pause/stop 能阻止无限自驱动。
+- 每次 wake 都有可查询 evidence：wake reason、event id、LifeState、top tensions、ActionPotential、OpenIntent、ArbitrationResult、action summary、stop reason。
+- `os_runtime.enabled=false` 或 `autonomous.enabled=false` 时，gateway/TUI/CLI 行为不变。
 
 ### 模块 7：工具执行适配与证据包
 
@@ -1050,6 +1153,21 @@ os_runtime:
 
 允许低风险自然语言/草案 continuation。
 
+### PR 5.5：Autonomous Runtime Loop 与世界事件自响应
+
+范围：
+
+- `autonomous_loop.py`
+- `autonomous_state.py`
+- `autonomous_scheduler.py`
+- `world_event_waker.py`
+- `autonomous_inbox.py`
+- gateway/runtime 启动 hook
+- Linz World event wake hook
+- autonomous status/pause/resume/stop/tick/inbox/events/intents 命令
+
+让 Agent 在 `os_runtime.mode=autonomous_low_risk` 且 `autonomous.enabled=true` 时常驻 idle/sleeping，按世界事件、时间 tick 和内部反馈自动唤醒张力场评估。第一版只允许 report、草案、内部反思、evidence 和审批请求；真实工具执行、world publish 和经济结算仍默认关闭。
+
 ### PR 6：Tool receipts 与 evidence
 
 范围：
@@ -1119,6 +1237,8 @@ os_runtime:
 - SelfPrompt 的 `open_space` 与 `target_direction` 编译。
 - OpenIntent action_family 与新工具/新技能提议字段。
 - Arbiter 的 `auto_execute/sandbox_execute/require_approval/report_only/reject` 裁判矩阵。
+- AutonomousRuntimeLoop 的 wake budget、cooldown、tick wake、world event wake、pause/stop 和 fail-closed。
+- WorldEventWaker 的 dedupe、inbox 入队、低风险 world event 自响应决策。
 - RuleCrystallizer R0/R1 阈值。
 
 ### 集成测试
@@ -1131,6 +1251,8 @@ os_runtime:
 - `os_runtime.enabled=false` 下普通对话行为不变。
 - `passive` 模式写事件但不继续。
 - `assisted` 模式在明确低风险目标下触发 continuation。
+- `autonomous_low_risk` 模式不需要 `/os_runtime goal`，可由 world event 或 tick 自动 wake。
+- 默认 autonomous world event 只生成草案/report/审批请求，不自动发布正式事件。
 - 用户打断、pause、clear 能移除 queued continuation。
 - 工具调用 receipt 可被 evidence package 聚合。
 - 高风险工具被 `pre_tool_call` 阻断。
@@ -1165,15 +1287,16 @@ MVP 完成条件：
 3. 已有 `linz-world-skill` 本地 profile 可被一次性导入，但运行期不再创建或写入额外 Linz profile。
 4. 用户可开启 `os_runtime.mode=passive`，看到 NATS 世界事件、Hermes 对话事件、生命状态、张力、意图建议。
 5. 用户可开启 `os_runtime.mode=assisted`，Agent 对明确低风险目标或低风险世界消息自动继续推进。
-6. 每次自动推进都有 tension interpretation、intent、arbitration、evidence。
-7. 高风险工具和世界事件发布不会被自动执行。
-8. 自驱动能被 pause/clear/interrupt 停止。
-9. 不破坏现有 `/goal`、普通 CLI、gateway、TUI、工具调用、memory provider 行为。
-10. LifeState、TensionSet、ActionPotential、SelfPrompt、OpenIntent、ArbitrationResult 覆盖白皮书 A-G 模块的必备字段，不再停留在旧的简化字段集。
+6. 用户可开启 `os_runtime.mode=autonomous_low_risk` 与 `autonomous.enabled=true`，Agent 在不输入 `/os_runtime goal` 的情况下按 world event、tick 和内部反馈自主 wake。
+7. 每次自动推进或 autonomous wake 都有 tension interpretation、intent、arbitration、evidence。
+8. 高风险工具和世界事件发布不会被默认自动执行。
+9. 自驱动能被 pause/clear/interrupt/stop 停止，并受 cooldown、wake budget、fatigue/restraint 限制。
+10. 不破坏现有 `/goal`、普通 CLI、gateway、TUI、工具调用、memory provider 行为。
+11. LifeState、TensionSet、ActionPotential、SelfPrompt、OpenIntent、ArbitrationResult 覆盖白皮书 A-G 模块的必备字段，不再停留在旧的简化字段集。
 
 MVP 不做：
 
-- 不做完全自治外部执行。
+- 不做无治理、无预算、无审批的完全自治外部执行。
 - 不做完全自治世界市场交易。
 - 不做经济结算。
 - 不做多租户 RBAC/ABAC 完整体系。
@@ -1190,21 +1313,23 @@ MVP 不做：
 3. 不创建额外 Linz profile；所有必要 Linz 字段写入当前 Hermes profile 的 `linz_world` 段或其 per-profile 状态目录。
 4. 世界事件发布必须经过 authorization map、event catalog、arbiter、policy。
 5. 默认只读、被动观测先行。
-6. 自驱动 continuation 必须有预算上限。
-7. 所有自动行动必须有 stop condition。
-8. 工具副作用必须经过 arbiter/policy，并且 evidence 只能记录 `auto_execute`、`sandbox_execute`、`require_approval`、`report_only`、`reject` 五类主裁判结果。
-9. 事件、意图、裁判、执行、证据必须可关联 trace。
-10. 记忆回写必须分层，不能把所有事件塞入长期记忆。
-11. 规则结晶必须有成熟度，不允许偶发事件直接升级硬规则。
-12. 复用现有 plugin hook、kanban、delegate、memory、gateway/TUI，不复制基础设施。
-13. `os_runtime` 中凡是叫 `context`、`store`、`memory`、`tools` 的文件都必须是 adapter，不得替代同名现有基础设施。
-14. 所有路径必须 profile-aware，使用 `get_hermes_home()`；旧 `~/.linz-world` 只作为迁移来源，不把它扩散到 Hermes 运行期状态。
+6. 自驱动 continuation 和 autonomous wake 都必须有预算上限。
+7. 常驻自治循环必须有 cooldown、wake budget、fatigue/restraint 抑制和用户 pause/stop 优先级。
+8. 所有自动行动必须有 stop condition。
+9. 工具副作用必须经过 arbiter/policy，并且 evidence 只能记录 `auto_execute`、`sandbox_execute`、`require_approval`、`report_only`、`reject` 五类主裁判结果。
+10. 事件、意图、裁判、执行、证据必须可关联 trace。
+11. 记忆回写必须分层，不能把所有事件塞入长期记忆。
+12. 规则结晶必须有成熟度，不允许偶发事件直接升级硬规则。
+13. 复用现有 plugin hook、kanban、delegate、memory、gateway/TUI，不复制基础设施。
+14. `os_runtime` 中凡是叫 `context`、`store`、`memory`、`tools` 的文件都必须是 adapter，不得替代同名现有基础设施。
+15. 所有路径必须 profile-aware，使用 `get_hermes_home()`；旧 `~/.linz-world` 只作为迁移来源，不把它扩散到 Hermes 运行期状态。
 
 ## 10. 风险与缓解
 
 | 风险 | 具体表现 | 缓解 |
 | --- | --- | --- |
 | 无限自驱动 | judge 误判或 intent 持续继续 | max turns、fatigue、stop condition、用户打断优先 |
+| 常驻循环失控 | tick 或 world event 持续唤醒导致后台自激 | wake budget、idle cooldown、dedupe、fatigue/restraint、pause/stop、per-wake max turns |
 | 行动越权 | LLM 直接调用工具绕过意图 | `pre_tool_call` 强制 arbiter/policy 票据 |
 | 世界事件越权 | LLM 伪造 subject/event_type 或无授权发布 | Linz event catalog + map + policy 三层阻断 |
 | 世界身份泄露 | token、私钥、Soul Memory 原文进入 prompt 或工具结果 | redaction、只注入摘要、token 不出 auth/client 层 |
@@ -1232,6 +1357,7 @@ Linz World native identity/status/map/message projection
   -> OpenIntentGenerator(rule path)
   -> BoYueArbiter
   -> OSRuntimeDriver assisted continuation
+  -> AutonomousRuntimeLoop world-event/tick wake
   -> EvidencePackage via existing tool/LLM hooks
 ```
 
@@ -1261,6 +1387,25 @@ BoYueArbiter 只允许 report_only 或无外部发布副作用的 auto_execute �
 Agent 生成回复草案
 未得到用户或 policy 允许时，不自动 linz_publish
 EvidencePackage 记录 world event、intent、裁判、草案
+```
+
+再用一个常驻自治场景验收：
+
+```text
+Hermes gateway/runtime 以 os_runtime.mode=autonomous_low_risk + autonomous.enabled=true 启动
+AutonomousScheduler 进入 idle/sleeping，不需要用户输入 /os_runtime goal
+Linz World NATS 订阅收到 wsp.chat.message.sent
+WorldEventWaker 持久化并去重后把 event_ref 放入 autonomous inbox
+AutonomousRuntimeLoop wake(reason=world_event)
+ContextAdapter/SignalInterpreter 识别关系维护与低风险回复机会
+LifeState 更新 social_hunger/silence_pressure/restraint
+TensionInterpreter/TensionField 生成或增强 relationship/unsatisfied_response 张力
+ActionPotentialEvaluator 判断值得生成回复草案但不值得直接发布
+OpenIntentGenerator 生成 communicate/draft_reply intent
+BoYueArbiter: report_only 或低风险 auto_execute(draft only)
+EvidencePackage 记录 wake reason、event、生命状态、张力、势能、intent、裁判和草案
+默认配置下不自动 linz_publish；若需要发布则进入 require_approval
+AutonomousScheduler 根据 cooldown/fatigue/wake budget 休眠
 ```
 
 这个闭环一旦稳定，先进入规则结晶与治理增强；泡泡协议/kanban 协作作为低优先级扩展最后接入，风险会小很多。
