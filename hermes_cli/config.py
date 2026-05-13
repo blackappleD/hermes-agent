@@ -26,6 +26,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 
+from agent.os_runtime.config import DEFAULT_OS_RUNTIME_CONFIG
+
 logger = logging.getLogger(__name__)
 
 # Track which (config_path, mtime_ns, size) tuples we've already warned about
@@ -527,6 +529,8 @@ DEFAULT_CONFIG = {
         "image_input_mode": "auto",
         "disabled_toolsets": [],
     },
+
+    "os_runtime": copy.deepcopy(DEFAULT_OS_RUNTIME_CONFIG),
     
     "terminal": {
         "backend": "local",
