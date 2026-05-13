@@ -7,8 +7,10 @@ from agent.linz_world.api_client import (
     LinzWorldServiceError,
     derive_authorization_summary,
     normalize_api_base_url,
+    resolve_secret_ref,
     store_runtime_secret,
 )
+from agent.linz_world.key_material import ensure_key_material
 
 
 class _Response:
@@ -19,6 +21,15 @@ class _Response:
 
     def json(self):
         return self._payload
+
+
+class _TextResponse:
+    status_code = 404
+    reason_phrase = "Not Found"
+    text = "404 Not Found"
+
+    def json(self):
+        raise ValueError("Extra data: line 1 column 5 (char 4)")
 
 
 def test_service_url_normalization_supports_origin_and_api_root():
@@ -52,6 +63,8 @@ def test_register_uses_linz_world_auth_register_contract(monkeypatch):
         "profile-1",
         "Hermes",
         "reliable, direct, and careful",
+        public_key="-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----\n",
+        fingerprint="fingerprint-1",
     )
 
     assert result["agentId"] == "agent-1"
@@ -67,6 +80,8 @@ def test_register_uses_linz_world_auth_register_contract(monkeypatch):
         "runtime_type",
         "metadata",
     }
+    assert calls[0][2]["publicKey"].startswith("-----BEGIN PUBLIC KEY-----")
+    assert calls[0][2]["fingerprint"] == "fingerprint-1"
     assert calls[0][2]["persona_seed"] == "reliable, direct, and careful"
     assert calls[0][2]["metadata"]["persona_seed"] == "reliable, direct, and careful"
     assert "hermes_profile" not in {k for k in calls[0][2] if k != "metadata"}
@@ -82,6 +97,8 @@ def test_envelope_nonzero_and_missing_data_are_errors(monkeypatch):
             "profile-1",
             "Hermes",
             "seed",
+            public_key="public-key",
+            fingerprint="fingerprint",
         )
 
     monkeypatch.setattr(
@@ -93,11 +110,72 @@ def test_envelope_nonzero_and_missing_data_are_errors(monkeypatch):
             "profile-1",
             "Hermes",
             "seed",
+            public_key="public-key",
+            fingerprint="fingerprint",
         )
 
 
-def test_compute_uses_api_key_bearer_and_parses_current_response(monkeypatch):
+def test_non_json_response_reports_endpoint_and_status(tmp_path, monkeypatch):
+    monkeypatch.setattr("httpx.request", lambda *args, **kwargs: _TextResponse())
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    key_material = ensure_key_material("test-profile")
+
+    with pytest.raises(LinzWorldServiceError, match=r"POST /auth/login .*HTTP 404"):
+        HttpLinzWorldService("http://linz.test").login({
+            "agent_id": "agent-1",
+            "private_key_path": key_material.private_key_path,
+        })
+
+
+def test_login_uses_confirmed_auth_login_contract(tmp_path, monkeypatch):
     calls = []
+
+    def fake_request(method, url, json=None, headers=None, timeout=None):
+        calls.append((method, url, json, headers))
+        return _Response(
+            {
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "token": "event-token",
+                    "expires_in": 3600,
+                    "memorySummary": {"available": True},
+                },
+            }
+        )
+
+    monkeypatch.setattr("httpx.request", fake_request)
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    key_material = ensure_key_material("test-profile")
+
+    result = HttpLinzWorldService("http://linz.test").login({
+        "agent_id": "agent-1",
+        "private_key_path": key_material.private_key_path,
+    })
+
+    assert calls[0][0] == "POST"
+    assert calls[0][1] == "http://linz.test/api/v1/auth/login"
+    assert calls[0][2]["osId"] == "agent-1"
+    assert "agentId" not in calls[0][2]
+    assert isinstance(calls[0][2]["timestamp"], int)
+    assert result["token"] == "event-token"
+
+
+def test_runtime_secret_persists_under_profile(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+
+    token_ref = store_runtime_secret("event_token", "event-token")
+
+    from agent.linz_world import api_client as api_client_mod
+
+    api_client_mod._RUNTIME_SECRETS.clear()
+    assert resolve_secret_ref(token_ref) == "event-token"
+    assert (tmp_path / "linz_world" / "secrets.json").is_file()
+
+
+def test_compute_uses_login_token_bearer_and_parses_current_response(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
 
     def fake_request(method, url, json=None, headers=None, timeout=None):
         calls.append((method, url, json, headers))
@@ -118,16 +196,16 @@ def test_compute_uses_api_key_bearer_and_parses_current_response(monkeypatch):
         )
 
     monkeypatch.setattr("httpx.request", fake_request)
-    key_ref = store_runtime_secret("compute_api_key", "test-compute-key")
+    token_ref = store_runtime_secret("event_token", "login-jwt-token")
 
     result = HttpLinzWorldService("http://linz.test/api/v1").invoke_compute(
-        key_ref,
+        token_ref,
         "do work",
         {"model": "gpt-4o-mini", "temperature": 0.2},
     )
 
     assert calls[0][1] == "http://linz.test/api/v1/compute/chat"
-    assert calls[0][3]["Authorization"] == "Bearer test-compute-key"
+    assert calls[0][3]["Authorization"] == "Bearer login-jwt-token"
     assert result["request_id"] == "req_1"
     assert result["provider"] == "openai-main"
     assert result["usage"]["total_tokens"] == 10
@@ -136,52 +214,28 @@ def test_compute_uses_api_key_bearer_and_parses_current_response(monkeypatch):
 def test_compute_401_envelope_is_diagnostic_failure(monkeypatch):
     monkeypatch.setattr(
         "httpx.request",
-        lambda *args, **kwargs: _Response({"code": 401, "message": "invalid compute key", "data": None}, status_code=401),
+        lambda *args, **kwargs: _Response({"code": 401, "message": "invalid login token", "data": None}, status_code=401),
     )
 
-    with pytest.raises(LinzWorldServiceError, match="invalid compute key"):
+    with pytest.raises(LinzWorldServiceError, match="invalid login token"):
         HttpLinzWorldService("http://linz.test").invoke_compute("revoked-key", "task", {})
 
 
-def test_subjects_array_envelope_derives_authorization_summary(monkeypatch):
+def test_listener_bootstrap_derives_authorization_summary(tmp_path, monkeypatch):
     calls = []
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
 
     def fake_request(method, url, json=None, headers=None, timeout=None):
         calls.append((method, url, json, headers))
-        if url.endswith("/event/agents/refresh"):
-            return _Response(
-                {
-                    "code": 0,
-                    "message": "success",
-                    "data": {
-                        "token": "event-token",
-                        "expiresAt": "2099-01-01T00:00:00Z",
-                        "subjectClaims": ["wsp.chat.message.sent"],
-                        "credentialId": "cred_1",
-                    },
-                }
-            )
-        if url.endswith("/event/agents/credentials"):
-            return _Response(
-                {
-                    "code": 0,
-                    "message": "success",
-                    "data": {
-                        "id": "cred_1",
-                        "agentId": "agent-1",
-                        "publishScopeSnapshot": ["wsp.chat.message.sent"],
-                        "subscribeScopeSnapshot": ["wsp.agent-1.sys"],
-                    },
-                }
-            )
         return _Response(
             {
                 "code": 0,
                 "message": "success",
-                "data": [
-                    {"subject": "wsp.chat.message.sent", "eventTypes": ["message.sent"]},
-                    {"subject": "wsp.agent-1.sys", "event_type": "subject_change"},
-                ],
+                "data": {
+                    "viewVersion": "bootstrap-v1",
+                    "allowedSubjects": ["wsp.chat.message.sent"],
+                    "allowedEventTypes": ["message.sent"],
+                },
             }
         )
 
@@ -190,10 +244,11 @@ def test_subjects_array_envelope_derives_authorization_summary(monkeypatch):
 
     result = HttpLinzWorldService("http://linz.test").refresh_authorization_map({"agent_id": "agent-1"}, token_ref)
 
-    assert any(call[1] == "http://linz.test/api/v1/event/subjects" for call in calls)
-    assert result["allowed_subjects"] == ["wsp.agent-1.sys", "wsp.chat.message.sent"]
-    assert "message.sent" in result["allowed_event_types"]
-    assert "subject_change" in result["allowed_event_types"]
+    assert calls[0][1] == "http://linz.test/api/v1/event/agents/listener/bootstrap"
+    assert calls[0][3]["Authorization"] == "Bearer event-token"
+    assert result["map_version"] == "bootstrap-v1"
+    assert result["allowed_subjects"] == ["wsp.agent-1", "wsp.chat.message.sent"]
+    assert result["allowed_event_types"] == ["message.sent"]
 
 
 def test_derive_authorization_summary_accepts_subjects_array():
@@ -208,8 +263,9 @@ def test_derive_authorization_summary_accepts_subjects_array():
     assert result["allowed_event_types"] == ["message.sent"]
 
 
-def test_memory_events_request_includes_required_agent_id_and_fields(monkeypatch):
+def test_memory_events_request_includes_required_agent_id_and_fields(tmp_path, monkeypatch):
     calls = []
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
 
     def fake_request(method, url, json=None, headers=None, timeout=None):
         calls.append((method, url, json, headers))
@@ -243,8 +299,9 @@ def test_memory_events_request_includes_required_agent_id_and_fields(monkeypatch
     assert calls[0][2]["agent_id"] == "agent-1"
 
 
-def test_relationship_projection_response_preserves_memory_projection(monkeypatch):
+def test_relationship_projection_response_preserves_memory_projection(tmp_path, monkeypatch):
     calls = []
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
 
     def fake_request(method, url, json=None, headers=None, timeout=None):
         calls.append((method, url, json, headers))

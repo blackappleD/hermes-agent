@@ -18,6 +18,8 @@ class _FakeLinzService:
         self.fail_register = fail_register
         self.fail_auth = fail_auth
         self.register_calls = 0
+        self.login_calls = 0
+        self.refresh_calls = 0
         self.publish_calls = 0
 
     def register_original_spirit(
@@ -27,6 +29,9 @@ class _FakeLinzService:
         persona_seed: str = "",
         os_type: str = "USER",
         runtime_type: str = "Hermes",
+        public_key: str = "",
+        public_key_type: str = "RSA",
+        fingerprint: str = "",
     ):
         self.register_calls += 1
         if self.fail_register:
@@ -46,6 +51,7 @@ class _FakeLinzService:
         }
 
     def login(self, identity):
+        self.login_calls += 1
         return {
             "token": "event-token-secret",
             "expiresAt": "2099-01-01T00:00:00Z",
@@ -57,6 +63,7 @@ class _FakeLinzService:
         return {"ok": True}
 
     def refresh_authorization_map(self, identity, token_ref):
+        self.refresh_calls += 1
         if self.fail_auth:
             raise RuntimeError("auth down")
         return {
