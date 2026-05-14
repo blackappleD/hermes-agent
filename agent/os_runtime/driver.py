@@ -151,7 +151,7 @@ def _get_session_db() -> Any | None:
     if cached is not None:
         return cached
     try:
-        db = SessionDB()
+        db = SessionDB(db_path=Path(home) / "state.db")
     except Exception as exc:  # pragma: no cover
         logger.debug("os_runtime driver: SessionDB unavailable, using meta fallback: %s", exc)
         try:
