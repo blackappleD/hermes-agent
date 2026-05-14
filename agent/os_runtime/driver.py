@@ -14,6 +14,7 @@ from typing import Any
 from agent.os_runtime.adapters.context import ContextAdapter
 from agent.os_runtime.adapters.session_store import OSRuntimeEvent, OSRuntimeEventRepository
 from agent.os_runtime.config import OSRuntimeConfig, default_os_runtime_config
+from agent.os_runtime.debug_log import log_pipeline_step
 from agent.os_runtime.domain import (
     ActionPotential,
     ArbitrationDecision,
@@ -331,6 +332,24 @@ class OSRuntimeDriver:
             if not events:
                 return self._runtime_feedback_stop(state, "recent event missing")
 
+            log_pipeline_step(
+                surface="driver",
+                session_id=self.session_id,
+                phase="after_turn",
+                step="goal_event",
+                data={
+                    "state": {
+                        "status": state.status,
+                        "goal": state.goal,
+                        "turns_used": state.turns_used,
+                        "max_turns": state.max_turns,
+                    },
+                    "source": source,
+                    "final_response_present": bool(final_response.strip()),
+                    "events": events,
+                    "resource_state": resource_state or {},
+                },
+            )
             snapshot = self._build_context(state, events, source=source, resource_state=resource_state)
             signals: SignalSet = self.signal_interpreter.interpret(
                 task_context=snapshot.task_context,
@@ -339,11 +358,33 @@ class OSRuntimeDriver:
                 authorization_map=getattr(snapshot, "authorization_map", None),
                 relationships=getattr(snapshot, "relationships", None),
             )
+            log_pipeline_step(
+                surface="driver",
+                session_id=self.session_id,
+                phase="after_turn",
+                step="signal_set",
+                data={
+                    "task_context": snapshot.task_context,
+                    "agent_context": snapshot.agent_context,
+                    "diagnostics": getattr(snapshot, "diagnostics", {}),
+                    "signals": signals,
+                },
+            )
             life_state = self._previous_life_state(state)
             life_state, life_delta = self.life_system.update(
                 signals,
                 previous_state=life_state,
                 execution_feedback={"status": "success" if final_response.strip() else "empty"},
+            )
+            log_pipeline_step(
+                surface="driver",
+                session_id=self.session_id,
+                phase="after_turn",
+                step="life_state",
+                data={
+                    "life_state": life_state,
+                    "life_delta": life_delta,
+                },
             )
             event_ref = signals.event_refs[0] if signals.event_refs else None
             previous_tensions = self._previous_tension_set(state)
@@ -354,17 +395,46 @@ class OSRuntimeDriver:
                 life_state,
                 previous_tensions,
             )
+            log_pipeline_step(
+                surface="driver",
+                session_id=self.session_id,
+                phase="after_turn",
+                step="tension_operation",
+                data={
+                    "event_ref": event_ref,
+                    "previous_tensions": previous_tensions,
+                    "tension_interpretation": tension_interpretation,
+                    "operations": tension_interpretation.operations,
+                },
+            )
             tension_set, tension_delta = self.tension_engine.update(
                 previous_tensions,
                 tension_interpretation.operations,
                 signals,
                 life_state,
             )
+            log_pipeline_step(
+                surface="driver",
+                session_id=self.session_id,
+                phase="after_turn",
+                step="tension_set",
+                data={
+                    "tension_set": tension_set,
+                    "tension_delta": tension_delta,
+                },
+            )
             action_potential: ActionPotential = self.action_evaluator.evaluate(
                 signal_set=signals,
                 life_state=life_state,
                 tension_set=tension_set,
                 intent_id=f"osr-ap:{self.session_id}:{state.turns_used + 1}",
+            )
+            log_pipeline_step(
+                surface="driver",
+                session_id=self.session_id,
+                phase="after_turn",
+                step="action_potential",
+                data={"action_potential": action_potential},
             )
             self_prompt: SelfPrompt = self.self_prompt_compiler.compile(
                 task_context=snapshot.task_context,
@@ -379,9 +449,23 @@ class OSRuntimeDriver:
                     "continuation must be ordinary user-role text",
                 ],
             )
+            log_pipeline_step(
+                surface="driver",
+                session_id=self.session_id,
+                phase="after_turn",
+                step="self_prompt",
+                data={"self_prompt": self_prompt},
+            )
             intent: OpenIntent = self.intent_generator.generate(
                 self_prompt=self_prompt,
                 action_potential=action_potential,
+            )
+            log_pipeline_step(
+                surface="driver",
+                session_id=self.session_id,
+                phase="after_turn",
+                step="open_intent",
+                data={"intent": intent},
             )
             arbitration: ArbitrationResult = self.arbiter.arbitrate(
                 intent=intent,
@@ -389,6 +473,13 @@ class OSRuntimeDriver:
                 action_potential=action_potential,
                 available_tools=[],
                 allow_auto_execute=False,
+            )
+            log_pipeline_step(
+                surface="driver",
+                session_id=self.session_id,
+                phase="after_turn",
+                step="arbiter",
+                data={"arbitration": arbitration},
             )
             self._capture_evidence(
                 state,

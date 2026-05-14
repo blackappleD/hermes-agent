@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -142,6 +143,41 @@ def test_event_repository_profile_scope_for_driver(hermes_home, tmp_path):
         assert any(event.event_type == "os_runtime_continuation" for event in events)
     finally:
         repo.close()
+
+
+def test_driver_emits_os_runtime_pipeline_debug_steps(hermes_home, monkeypatch):
+    monkeypatch.setenv("HERMES_OS_RUNTIME_LOG", "1")
+    runtime = OSRuntimeDriver(
+        "s-debug",
+        config=OSRuntimeConfig(enabled=True, mode="passive"),
+    )
+    runtime.set_passive()
+
+    runtime.evaluate_after_turn("assistant response", recent_event=_event("s-debug"))
+
+    files = sorted((hermes_home / "logs").glob("os_runtime_*.log"))
+    assert files
+    records = [
+        json.loads(line)
+        for line in files[-1].read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    steps = [
+        record["step"]
+        for record in records
+        if record["session_id"] == "s-debug" and record["surface"] == "driver"
+    ]
+    assert steps == [
+        "goal_event",
+        "signal_set",
+        "life_state",
+        "tension_operation",
+        "tension_set",
+        "action_potential",
+        "self_prompt",
+        "open_intent",
+        "arbiter",
+    ]
 
 
 class _IntentGenerator:

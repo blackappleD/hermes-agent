@@ -8,8 +8,8 @@ def _contexts(*, auth_state="current", login_state="logged_in"):
     auth = {
         "state": auth_state,
         "login_state": login_state,
-        "allowed_subjects": ["wsp.mrk.requirement.published"],
-        "allowed_event_types": ["requirement.published"],
+        "allowed_publish_subjects": ["wsp.mrk.requirement.published"],
+        "allowed_publish_event_types": ["requirement.published"],
         "allowed_capabilities": ["publish"],
         "map_version": "map-v1",
     }
@@ -66,8 +66,8 @@ def test_signal_interpreter_outputs_deterministic_full_signal_set():
     task_context, agent_context = _contexts()
     auth_map = AuthorizationMap(
         state=AuthState.CURRENT,
-        allowed_subjects=["wsp.mrk.requirement.published"],
-        allowed_event_types=["requirement.published"],
+        allowed_publish_subjects=["wsp.mrk.requirement.published"],
+        allowed_publish_event_types=["requirement.published"],
     )
     events = [
         _event(
@@ -168,8 +168,8 @@ def test_world_authorization_blocks_disallowed_and_unknown_structured_events():
     task_context, agent_context = _contexts()
     auth_map = AuthorizationMap(
         state=AuthState.CURRENT,
-        allowed_subjects=["wsp.mrk.requirement.published"],
-        allowed_event_types=["requirement.published"],
+        allowed_publish_subjects=["wsp.mrk.requirement.published"],
+        allowed_publish_event_types=["requirement.published"],
     )
     disallowed = _event(
         "evt-1",

@@ -13,6 +13,7 @@ from agent.os_runtime.adapters.runtime_queue import RuntimeQueueRepository
 from agent.os_runtime.adapters.session_store import OSRuntimeEvent, OSRuntimeEventRepository
 from agent.os_runtime.autonomous_state import AutonomousRuntimeState
 from agent.os_runtime.config import OSRuntimeConfig, default_os_runtime_config
+from agent.os_runtime.debug_log import log_pipeline_step
 from agent.os_runtime.domain import EventSource, LifeState, TensionSet
 from agent.os_runtime.engine import BoYueArbiter, OpenIntentGenerator, SelfPromptCompiler, TensionFieldEngine, TensionInterpreter
 from agent.os_runtime.engine.action_potential import ActionPotentialEvaluator
@@ -238,6 +239,21 @@ class TurnTensionHook:
             session_id=self.session_id,
             profile_id=self.profile_id,
         )
+        log_pipeline_step(
+            surface="turn_hook",
+            session_id=self.session_id,
+            profile_id=self.profile_id,
+            phase=phase,
+            step="goal_event",
+            data={
+                "state": {
+                    "status": state.status,
+                    "last_turn_event_id": state.last_turn_event_id,
+                    "last_intent_id": state.last_intent_id,
+                },
+                "events": events,
+            },
+        )
         adapter = self.context_adapter or ContextAdapter(
             event_repository=self.event_repository,
             config=self.config,
@@ -258,30 +274,87 @@ class TurnTensionHook:
             authorization_map=getattr(snapshot, "authorization_map", None),
             relationships=getattr(snapshot, "relationships", None),
         )
+        log_pipeline_step(
+            surface="turn_hook",
+            session_id=self.session_id,
+            profile_id=self.profile_id,
+            phase=phase,
+            step="signal_set",
+            data={
+                "task_context": snapshot.task_context,
+                "agent_context": snapshot.agent_context,
+                "diagnostics": getattr(snapshot, "diagnostics", {}),
+                "signals": signals,
+            },
+        )
         life_state, life_delta = self.life_system.update(
             signals,
             previous_state=_life_state(state),
             execution_feedback={"status": "observed", "phase": phase},
         )
+        log_pipeline_step(
+            surface="turn_hook",
+            session_id=self.session_id,
+            profile_id=self.profile_id,
+            phase=phase,
+            step="life_state",
+            data={
+                "life_state": life_state,
+                "life_delta": life_delta,
+            },
+        )
         event_ref = signals.event_refs[0] if signals.event_refs else events[0].to_ref()
+        previous_tensions = _tension_set(state)
         tension_interpretation = self.tension_interpreter.interpret(
             event_ref,
             signals,
             snapshot.task_context,
             life_state,
-            _tension_set(state),
+            previous_tensions,
+        )
+        log_pipeline_step(
+            surface="turn_hook",
+            session_id=self.session_id,
+            profile_id=self.profile_id,
+            phase=phase,
+            step="tension_operation",
+            data={
+                "event_ref": event_ref,
+                "previous_tensions": previous_tensions,
+                "tension_interpretation": tension_interpretation,
+                "operations": tension_interpretation.operations,
+            },
         )
         tension_set, tension_delta = self.tension_engine.update(
-            _tension_set(state),
+            previous_tensions,
             tension_interpretation.operations,
             signals,
             life_state,
+        )
+        log_pipeline_step(
+            surface="turn_hook",
+            session_id=self.session_id,
+            profile_id=self.profile_id,
+            phase=phase,
+            step="tension_set",
+            data={
+                "tension_set": tension_set,
+                "tension_delta": tension_delta,
+            },
         )
         action_potential = self.action_evaluator.evaluate(
             signal_set=signals,
             life_state=life_state,
             tension_set=tension_set,
             intent_id=f"turn-ap:{self.session_id}:{events[0].event_id}",
+        )
+        log_pipeline_step(
+            surface="turn_hook",
+            session_id=self.session_id,
+            profile_id=self.profile_id,
+            phase=phase,
+            step="action_potential",
+            data={"action_potential": action_potential},
         )
         self_prompt = self.self_prompt_compiler.compile(
             task_context=snapshot.task_context,
@@ -296,9 +369,25 @@ class TurnTensionHook:
                 "no world publish",
             ],
         )
+        log_pipeline_step(
+            surface="turn_hook",
+            session_id=self.session_id,
+            profile_id=self.profile_id,
+            phase=phase,
+            step="self_prompt",
+            data={"self_prompt": self_prompt},
+        )
         intent = self.intent_generator.generate(
             self_prompt=self_prompt,
             action_potential=action_potential,
+        )
+        log_pipeline_step(
+            surface="turn_hook",
+            session_id=self.session_id,
+            profile_id=self.profile_id,
+            phase=phase,
+            step="open_intent",
+            data={"intent": intent},
         )
         arbitration = self.arbiter.arbitrate(
             intent=intent,
@@ -306,6 +395,14 @@ class TurnTensionHook:
             action_potential=action_potential,
             available_tools=[],
             allow_auto_execute=False,
+        )
+        log_pipeline_step(
+            surface="turn_hook",
+            session_id=self.session_id,
+            profile_id=self.profile_id,
+            phase=phase,
+            step="arbiter",
+            data={"arbitration": arbitration},
         )
         state.last_turn_event_id = events[0].event_id
         state.last_intent_id = intent.intent_id

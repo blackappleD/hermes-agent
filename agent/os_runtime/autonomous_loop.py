@@ -19,6 +19,7 @@ from agent.os_runtime.autonomous_state import (
     AutonomousWakeRecord,
 )
 from agent.os_runtime.config import OSRuntimeConfig, default_os_runtime_config
+from agent.os_runtime.debug_log import log_pipeline_step
 from agent.os_runtime.domain import (
     ArbitrationDecision,
     EventSource,
@@ -114,6 +115,25 @@ class AutonomousRuntimeLoop:
                 session_id=self.session_id,
                 profile_id=self.profile_id,
             )
+            log_pipeline_step(
+                surface="autonomous_loop",
+                session_id=self.session_id,
+                profile_id=self.profile_id,
+                phase="run_once",
+                step="goal_event",
+                data={
+                    "wake": wake,
+                    "wake_reason": wake_reason,
+                    "event_ref": event_ref,
+                    "events": events,
+                    "state": {
+                        "status": state.status,
+                        "last_wake_reason": state.last_wake_reason,
+                        "last_intent_id": state.last_intent_id,
+                    },
+                },
+                trace_id=wake.wake_id,
+            )
             snapshot = self._context(events, wake_reason=wake_reason)
             signals = self.signal_interpreter.interpret(
                 task_context=snapshot.task_context,
@@ -122,30 +142,92 @@ class AutonomousRuntimeLoop:
                 authorization_map=getattr(snapshot, "authorization_map", None),
                 relationships=getattr(snapshot, "relationships", None),
             )
+            log_pipeline_step(
+                surface="autonomous_loop",
+                session_id=self.session_id,
+                profile_id=self.profile_id,
+                phase="run_once",
+                step="signal_set",
+                data={
+                    "task_context": snapshot.task_context,
+                    "agent_context": snapshot.agent_context,
+                    "diagnostics": getattr(snapshot, "diagnostics", {}),
+                    "signals": signals,
+                },
+                trace_id=wake.wake_id,
+            )
             life_state, life_delta = self.life_system.update(
                 signals,
                 previous_state=_life_state(state),
                 execution_feedback={"status": "autonomous_wake", "wake_reason": wake_reason},
             )
+            log_pipeline_step(
+                surface="autonomous_loop",
+                session_id=self.session_id,
+                profile_id=self.profile_id,
+                phase="run_once",
+                step="life_state",
+                data={
+                    "life_state": life_state,
+                    "life_delta": life_delta,
+                },
+                trace_id=wake.wake_id,
+            )
             signal_ref = signals.event_refs[0] if signals.event_refs else events[0].to_ref()
+            previous_tensions = _tension_set(state)
             tension_interpretation = self.tension_interpreter.interpret(
                 signal_ref,
                 signals,
                 snapshot.task_context,
                 life_state,
-                _tension_set(state),
+                previous_tensions,
+            )
+            log_pipeline_step(
+                surface="autonomous_loop",
+                session_id=self.session_id,
+                profile_id=self.profile_id,
+                phase="run_once",
+                step="tension_operation",
+                data={
+                    "event_ref": signal_ref,
+                    "previous_tensions": previous_tensions,
+                    "tension_interpretation": tension_interpretation,
+                    "operations": tension_interpretation.operations,
+                },
+                trace_id=wake.wake_id,
             )
             tension_set, tension_delta = self.tension_engine.update(
-                _tension_set(state),
+                previous_tensions,
                 tension_interpretation.operations,
                 signals,
                 life_state,
+            )
+            log_pipeline_step(
+                surface="autonomous_loop",
+                session_id=self.session_id,
+                profile_id=self.profile_id,
+                phase="run_once",
+                step="tension_set",
+                data={
+                    "tension_set": tension_set,
+                    "tension_delta": tension_delta,
+                },
+                trace_id=wake.wake_id,
             )
             action_potential = self.action_evaluator.evaluate(
                 signal_set=signals,
                 life_state=life_state,
                 tension_set=tension_set,
                 intent_id=f"autonomous-ap:{self.session_id}:{wake.wake_id}",
+            )
+            log_pipeline_step(
+                surface="autonomous_loop",
+                session_id=self.session_id,
+                profile_id=self.profile_id,
+                phase="run_once",
+                step="action_potential",
+                data={"action_potential": action_potential},
+                trace_id=wake.wake_id,
             )
             self_prompt = self.self_prompt_compiler.compile(
                 task_context=snapshot.task_context,
@@ -160,9 +242,27 @@ class AutonomousRuntimeLoop:
                     "no world publish without policy, catalog, authorization, STVB, evidence, and approval",
                 ],
             )
+            log_pipeline_step(
+                surface="autonomous_loop",
+                session_id=self.session_id,
+                profile_id=self.profile_id,
+                phase="run_once",
+                step="self_prompt",
+                data={"self_prompt": self_prompt},
+                trace_id=wake.wake_id,
+            )
             intent = self.intent_generator.generate(
                 self_prompt=self_prompt,
                 action_potential=action_potential,
+            )
+            log_pipeline_step(
+                surface="autonomous_loop",
+                session_id=self.session_id,
+                profile_id=self.profile_id,
+                phase="run_once",
+                step="open_intent",
+                data={"intent": intent},
+                trace_id=wake.wake_id,
             )
             arbitration = self.arbiter.arbitrate(
                 intent=intent,
@@ -174,6 +274,15 @@ class AutonomousRuntimeLoop:
                 policy_preflight=_policy_preflight(),
                 event_catalog_preflight=_catalog_preflight(),
                 authorization_summary=_authorization_summary(snapshot),
+            )
+            log_pipeline_step(
+                surface="autonomous_loop",
+                session_id=self.session_id,
+                profile_id=self.profile_id,
+                phase="run_once",
+                step="arbiter",
+                data={"arbitration": arbitration},
+                trace_id=wake.wake_id,
             )
             action_summary = _action_summary(arbitration.decision, action_potential.recommended_depth)
             evidence = {

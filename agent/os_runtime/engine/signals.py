@@ -217,7 +217,7 @@ class SignalInterpreter:
                     status = "blocked"
                     code = "world_authorization_map_blocked"
                     reason = "Structured authorization map does not allow subject and event_type."
-            elif subject in auth_meta.get("allowed_subjects", []) and world_event_type in auth_meta.get("allowed_event_types", []):
+            elif subject in auth_meta.get("allowed_publish_subjects", []) and world_event_type in auth_meta.get("allowed_publish_event_types", []):
                 status = "allowed"
                 code = "world_authorization_allowed"
                 reason = "Context authorization metadata allows subject and event_type."

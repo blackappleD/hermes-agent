@@ -206,8 +206,10 @@ class ContextAdapter:
         return {
             "state": _enum_value(getattr(auth_map, "state", "")) or AuthState.UNKNOWN.value,
             "map_version": _string_attr(auth_map, "map_version"),
-            "allowed_subjects": sorted(str(item) for item in getattr(auth_map, "allowed_subjects", []) or []),
-            "allowed_event_types": sorted(str(item) for item in getattr(auth_map, "allowed_event_types", []) or []),
+            "allowed_publish_subjects": sorted(str(item) for item in getattr(auth_map, "allowed_publish_subjects", []) or []),
+            "allowed_publish_event_types": sorted(str(item) for item in getattr(auth_map, "allowed_publish_event_types", []) or []),
+            "allowed_subscribe_subjects": sorted(str(item) for item in getattr(auth_map, "allowed_subscribe_subjects", []) or []),
+            "allowed_subscribe_event_types": sorted(str(item) for item in getattr(auth_map, "allowed_subscribe_event_types", []) or []),
             "allowed_capabilities": sorted(str(item) for item in getattr(auth_map, "allowed_capabilities", []) or []),
             "last_refresh_at": _string_attr(auth_map, "last_refresh_at"),
             "last_error": _string_attr(auth_map, "last_error"),

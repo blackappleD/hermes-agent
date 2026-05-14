@@ -75,8 +75,10 @@ def test_context_adapter_projects_complete_read_only_context():
     auth_map = AuthorizationMap(
         state=AuthState.CURRENT,
         map_version="map-v1",
-        allowed_subjects=["wsp.mrk.requirement.published"],
-        allowed_event_types=["requirement.published"],
+        allowed_publish_subjects=["wsp.mrk.requirement.published"],
+        allowed_publish_event_types=["requirement.published"],
+        allowed_subscribe_subjects=["wsp.agent-1"],
+        allowed_subscribe_event_types=["wsp.sys.login.response"],
         allowed_capabilities=["publish", "relationship"],
     )
     repo = FakeRepo(
@@ -137,6 +139,10 @@ def test_context_adapter_projects_complete_read_only_context():
     assert snapshot.task_context.tool_names == ["read_file", "send_message", "terminal"]
     assert snapshot.task_context.metadata["authorization"]["state"] == "current"
     assert snapshot.task_context.metadata["authorization"]["map_version"] == "map-v1"
+    assert snapshot.task_context.metadata["authorization"]["allowed_publish_subjects"] == ["wsp.mrk.requirement.published"]
+    assert snapshot.task_context.metadata["authorization"]["allowed_publish_event_types"] == ["requirement.published"]
+    assert snapshot.task_context.metadata["authorization"]["allowed_subscribe_subjects"] == ["wsp.agent-1"]
+    assert snapshot.task_context.metadata["authorization"]["allowed_subscribe_event_types"] == ["wsp.sys.login.response"]
     assert snapshot.task_context.metadata["relationship_ids"] == ["rel-1", "rel-2"]
     assert snapshot.agent_context.agent_id == "agent-1"
     assert snapshot.agent_context.profile_name == "profile-a"
