@@ -2,8 +2,20 @@
 
 from __future__ import annotations
 
-FORMAL_EVENTS: dict[str, set[str]] = {
+DIRECT_INBOX_EVENT_TYPES = {
+    "wsp.chat.message.sent",
+    "wsp.chat.message.read",
+}
+RESERVED_WSP_INBOX_NAMES = {"chat", "sys", "task", "mrk"}
+
+LEGACY_CHAT_EVENTS: dict[str, set[str]] = {
+    # Kept as receive-side compatibility for early Hermes native events.
+    # New chat publishes should target the recipient inbox subject
+    # (wsp.<recipient_os_id>) with event_type=wsp.chat.message.sent.
     "wsp.chat.message.sent": {"message.sent"},
+}
+
+FORMAL_EVENTS: dict[str, set[str]] = {
     "wsp.mrk.requirement.published": {"requirement.published"},
     "wsp.task.created": {"task.created"},
     "wsp.task.updated": {"task.updated"},
@@ -30,7 +42,24 @@ def is_formal_event(subject: str, event_type: str) -> bool:
         return False
     if subject.startswith(LEGACY_EVENT_PREFIXES) or event_type.startswith(LEGACY_EVENT_PREFIXES):
         return False
+    if is_direct_inbox_event(subject, event_type):
+        return True
+    if event_type in LEGACY_CHAT_EVENTS.get(subject, set()):
+        return True
     return event_type in FORMAL_EVENTS.get(subject, set())
+
+
+def is_direct_inbox_subject(subject: str) -> bool:
+    if not subject.startswith("wsp."):
+        return False
+    # Direct inbox subjects are exactly "wsp.<os_id>". Namespaced subjects like
+    # "wsp.chat.message.sent" are event families, not recipient inboxes.
+    inbox_name = subject.removeprefix("wsp.")
+    return subject.count(".") == 1 and bool(inbox_name) and inbox_name not in RESERVED_WSP_INBOX_NAMES
+
+
+def is_direct_inbox_event(subject: str, event_type: str) -> bool:
+    return is_direct_inbox_subject(subject) and event_type in DIRECT_INBOX_EVENT_TYPES
 
 
 def is_forbidden_direct_settlement_transfer(subject: str, event_type: str) -> bool:
@@ -38,7 +67,7 @@ def is_forbidden_direct_settlement_transfer(subject: str, event_type: str) -> bo
 
 
 def event_category(subject: str, event_type: str) -> str:
-    if subject == "wsp.chat.message.sent" and event_type == "message.sent":
+    if is_direct_inbox_event(subject, event_type) or event_type in LEGACY_CHAT_EVENTS.get(subject, set()):
         return "world_message"
     if subject.startswith("wsp.task."):
         return "task_signal"

@@ -44,9 +44,26 @@ def test_memory_requires_artifact_ref_and_sink_reason(linz_home, FakeLinzService
     assert entry.status.value == "rejected"
 
 
-def test_relationship_mutation_without_confirmed_route_fails_closed(linz_home, FakeLinzService):
+def test_relationship_add_uses_login_identity_and_records_active_projection(linz_home, FakeLinzService):
     svc = FakeLinzService()
     repo = _ready_repo(linz_home, svc)
-    result = add_active_relationship("actor_2", "trusted collaborator", repo, svc)
+    result = add_active_relationship("actor_2", "trusted collaborator", repo, svc, relation_type="COLLABORATOR")
+    assert result["success"] is True
+    assert result["relationship"]["counterparty_id"] == "actor_2"
+    assert result["relationship"]["state"] == "ACTIVE"
+    assert result["relationship"]["summary"] == "trusted collaborator"
+    assert result["relationship"]["relation_type"] == "COLLABORATOR"
+    assert svc.relationship_calls == 1
+    assert svc.last_relationship["identity"]["agent_id"] == repo.get_identity().agent_id
+    assert svc.last_relationship["token_ref"] == repo.get_login().token_ref
+    assert repo.relationships()[0]["counterparty_id"] == "actor_2"
+
+
+def test_relationship_add_fails_closed_when_authorization_refresh_fails(linz_home, FakeLinzService):
+    svc = FakeLinzService(fail_auth=True)
+    repo = _ready_repo(linz_home, svc)
+    result = add_active_relationship("actor_2", "trusted collaborator", repo, svc, relation_type="COLLABORATOR")
     assert result["success"] is False
-    assert result["error"]["code"] == "unsupported_relationship_mutation"
+    assert result["error"]["code"] == "authorization_refresh_failed"
+    assert svc.relationship_calls == 0
+    assert repo.relationships() == []

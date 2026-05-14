@@ -118,8 +118,10 @@ class LinzStateRepository:
         return AuthorizationMap(
             state=AuthState(raw.get("state", AuthState.UNKNOWN.value)),
             map_version=str(raw.get("map_version") or ""),
-            allowed_subjects=list(raw.get("allowed_subjects") or []),
-            allowed_event_types=list(raw.get("allowed_event_types") or []),
+            allowed_publish_subjects=list(raw.get("allowed_publish_subjects") or []),
+            allowed_publish_event_types=list(raw.get("allowed_publish_event_types") or []),
+            allowed_subscribe_subjects=list(raw.get("allowed_subscribe_subjects") or []),
+            allowed_subscribe_event_types=list(raw.get("allowed_subscribe_event_types") or []),
             allowed_capabilities=list(raw.get("allowed_capabilities") or []),
             last_refresh_at=str(raw.get("last_refresh_at") or ""),
             last_error=str(raw.get("last_error") or ""),

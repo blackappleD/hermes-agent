@@ -2,14 +2,59 @@ import pytest
 
 from agent.os_runtime.adapters.runtime_queue import RuntimeQueueRepository
 from agent.os_runtime.config import OSRuntimeConfig
+from agent.linz_world.config import LinzWorldConfig
 from agent.linz_world.event_bus import project_to_message_event
 from agent.linz_world.event_state import LinzStateRepository
-from agent.linz_world.gateway_adapter import dispatch_world_event, persist_world_event_for_gateway
+from agent.linz_world.gateway_adapter import LinzWorldPlatformAdapter, dispatch_world_event, persist_world_event_for_gateway
+from agent.linz_world.models import AuthState, AuthorizationMap
+from gateway.config import PlatformConfig
 from gateway.platform_registry import platform_registry
 
 
 def test_linz_world_platform_is_registered():
     assert platform_registry.is_registered("linz_world")
+
+
+@pytest.mark.asyncio
+async def test_linz_world_adapter_connect_starts_nats_listener(monkeypatch, linz_home):
+    started = {}
+
+    class _FakeListener:
+        def __init__(self, *, nats_url, subjects, on_event):
+            started["nats_url"] = nats_url
+            started["subjects"] = subjects
+            self.on_event = on_event
+
+        def start(self):
+            started["started"] = True
+
+        def stop(self):
+            started["stopped"] = True
+
+    monkeypatch.setattr(
+        "agent.linz_world.gateway_adapter.auth.refresh_authorization_map",
+        lambda repo: AuthorizationMap(
+            state=AuthState.CURRENT,
+            allowed_subscribe_subjects=["wsp.agent_b"],
+            allowed_subscribe_event_types=["wsp.chat.message.sent"],
+        ),
+    )
+    monkeypatch.setattr(
+        "agent.linz_world.gateway_adapter.load_linz_world_config",
+        lambda: LinzWorldConfig(nats_url="nats://127.0.0.1:4222"),
+    )
+    monkeypatch.setattr("agent.linz_world.gateway_adapter.NatsEventListener", _FakeListener)
+
+    adapter = LinzWorldPlatformAdapter(PlatformConfig(enabled=True))
+    assert await adapter.connect() is True
+    await adapter.disconnect()
+
+    assert started == {
+        "nats_url": "nats://127.0.0.1:4222",
+        "subjects": ["wsp.agent_b"],
+        "started": True,
+        "stopped": True,
+    }
 
 
 def test_world_event_projection_uses_redacted_summary(linz_home):

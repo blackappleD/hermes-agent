@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
@@ -10,20 +11,48 @@ from gateway.config import Platform, PlatformConfig
 from gateway.platform_registry import PlatformEntry, platform_registry
 from gateway.platforms.base import BasePlatformAdapter, MessageEvent, SendResult
 
+from . import auth
+from .config import load_linz_world_config
 from .event_bus import project_to_message_event
 from .event_state import LinzStateRepository
 from .models import EventDispatchRecord
+from .nats_transport import NatsEventListener
 
 
 class LinzWorldPlatformAdapter(BasePlatformAdapter):
     def __init__(self, config: PlatformConfig):
         super().__init__(config, Platform("linz_world"))
+        self._repository = LinzStateRepository()
+        self._listener: NatsEventListener | None = None
+        self._loop = None
 
     async def connect(self) -> bool:
+        try:
+            auth_map = auth.refresh_authorization_map(self._repository)
+            subjects = list(auth_map.allowed_subscribe_subjects)
+            cfg = load_linz_world_config()
+            self._loop = asyncio.get_running_loop()
+            if subjects:
+                self._listener = NatsEventListener(
+                    nats_url=cfg.nats_url,
+                    subjects=subjects,
+                    on_event=self._dispatch_from_listener,
+                )
+                self._listener.start()
+        except Exception as exc:
+            self._set_fatal_error(
+                "linz_world_listener_failed",
+                f"Linz World listener failed to start: {exc}",
+                retryable=True,
+            )
+            return False
         self._mark_connected()
         return True
 
     async def disconnect(self) -> None:
+        if self._listener is not None:
+            self._listener.stop()
+            self._listener = None
         self._mark_disconnected()
 
     async def send(
@@ -34,6 +63,14 @@ class LinzWorldPlatformAdapter(BasePlatformAdapter):
         metadata: Optional[dict[str, Any]] = None,
     ) -> SendResult:
         return SendResult(success=False, error="Linz World gateway adapter is receive-only; use linz_publish for external publish.")
+
+    async def get_chat_info(self, chat_id: str) -> dict[str, Any]:
+        return {
+            "id": chat_id,
+            "name": "Linz World",
+            "type": "channel",
+            "platform": "linz_world",
+        }
 
     async def handle_world_event(
         self,
@@ -46,6 +83,23 @@ class LinzWorldPlatformAdapter(BasePlatformAdapter):
             repository,
             session_store=getattr(self, "_session_store", None),
         )
+
+    def _dispatch_from_listener(self, raw_event: dict[str, Any]) -> None:
+        if self._loop is None:
+            return
+
+        future = asyncio.run_coroutine_threadsafe(
+            self.handle_world_event(raw_event, self._repository),
+            self._loop,
+        )
+
+        def _consume_error(done):
+            try:
+                done.result()
+            except Exception:
+                return
+
+        future.add_done_callback(_consume_error)
 
 
 @dataclass

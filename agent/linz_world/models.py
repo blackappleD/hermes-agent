@@ -12,6 +12,19 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _matches_any(value: str, patterns: list[str]) -> bool:
+    value = str(value or "")
+    for pattern in patterns:
+        pattern = str(pattern or "")
+        if not pattern:
+            continue
+        if pattern == "*" or pattern == value:
+            return True
+        if pattern.endswith(".*") and value.startswith(pattern[:-1]):
+            return True
+    return False
+
+
 class RegistrationStatus(str, Enum):
     PENDING = "pending"
     REGISTERED = "registered"
@@ -109,14 +122,16 @@ class LoginSession:
 class AuthorizationMap:
     state: AuthState = AuthState.UNKNOWN
     map_version: str = ""
-    allowed_subjects: list[str] = field(default_factory=list)
-    allowed_event_types: list[str] = field(default_factory=list)
+    allowed_publish_subjects: list[str] = field(default_factory=list)
+    allowed_publish_event_types: list[str] = field(default_factory=list)
+    allowed_subscribe_subjects: list[str] = field(default_factory=list)
+    allowed_subscribe_event_types: list[str] = field(default_factory=list)
     allowed_capabilities: list[str] = field(default_factory=list)
     last_refresh_at: str = ""
     last_error: str = ""
 
     def allows_event(self, subject: str, event_type: str) -> bool:
-        return subject in self.allowed_subjects and event_type in self.allowed_event_types
+        return _matches_any(subject, self.allowed_publish_subjects) and _matches_any(event_type, self.allowed_publish_event_types)
 
     def allows_capability(self, capability: str) -> bool:
         return capability in self.allowed_capabilities
@@ -215,6 +230,7 @@ class RelationshipRecord:
     counterparty_id: str
     state: str
     summary: str = ""
+    relation_type: str = "OTHER"
     recorded_at: str = field(default_factory=utc_now_iso)
 
 

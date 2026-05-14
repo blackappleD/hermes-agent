@@ -73,6 +73,37 @@ def test_run_agent_default_identity_gate_blocks_persona_load(monkeypatch):
         AIAgent(model="test", skip_context_files=True, skip_memory=True)
 
 
+def test_run_agent_identity_gate_auto_ensures_login(monkeypatch):
+    from run_agent import AIAgent
+
+    calls = []
+    monkeypatch.setattr(
+        "agent.linz_world.config.load_linz_world_config",
+        lambda: SimpleNamespace(identity_required_on_agent_load=True),
+    )
+    monkeypatch.setattr(
+        "agent.linz_world.runtime_bridge.ensure_linz_identity_for_persona",
+        lambda: calls.append("identity"),
+    )
+    monkeypatch.setattr(
+        "agent.linz_world.auth.ensure_login_session",
+        lambda: calls.append("login"),
+    )
+
+    AIAgent(
+        api_key="test-key",
+        base_url="https://openrouter.ai/api/v1",
+        provider="openrouter",
+        api_mode="chat_completions",
+        model="test",
+        quiet_mode=True,
+        skip_context_files=True,
+        skip_memory=True,
+    )
+
+    assert calls == ["identity", "login"]
+
+
 def test_blank_service_url_uses_default_http_endpoint_for_identity(linz_home, monkeypatch):
     calls = []
 

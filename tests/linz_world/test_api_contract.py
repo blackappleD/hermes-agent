@@ -6,6 +6,7 @@ from agent.linz_world.api_client import (
     HttpLinzWorldService,
     LinzWorldServiceError,
     derive_authorization_summary,
+    derive_listener_authorization_summary,
     normalize_api_base_url,
     resolve_secret_ref,
     store_runtime_secret,
@@ -35,6 +36,74 @@ class _TextResponse:
 def test_service_url_normalization_supports_origin_and_api_root():
     assert normalize_api_base_url("http://8.156.84.202:17878") == "http://8.156.84.202:17878/api/v1"
     assert normalize_api_base_url("http://8.156.84.202:17878/api/v1") == "http://8.156.84.202:17878/api/v1"
+
+
+def test_private_service_url_bypasses_environment_proxy(monkeypatch):
+    calls = []
+
+    def fake_request(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return _Response(
+            {
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "agentId": "agent-1",
+                    "soulId": "soul-1",
+                    "soulHash": "hash-1",
+                    "accessToken": "token-secret",
+                    "expiresIn": 86400,
+                    "registeredAt": "2026-05-12T00:00:00Z",
+                },
+            }
+        )
+
+    monkeypatch.setattr("httpx.request", fake_request)
+
+    HttpLinzWorldService("http://192.168.1.2:8080").register_original_spirit(
+        "profile-1",
+        "Hermes",
+        "seed",
+        public_key="public-key",
+        fingerprint="fingerprint",
+    )
+
+    assert calls[0][1] == "http://192.168.1.2:8080/api/v1/auth/register"
+    assert calls[0][2]["trust_env"] is False
+
+
+def test_wsl_virtual_gateway_url_bypasses_environment_proxy(monkeypatch):
+    calls = []
+
+    def fake_request(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return _Response(
+            {
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "agentId": "agent-1",
+                    "soulId": "soul-1",
+                    "soulHash": "hash-1",
+                    "accessToken": "token-secret",
+                    "expiresIn": 86400,
+                    "registeredAt": "2026-05-12T00:00:00Z",
+                },
+            }
+        )
+
+    monkeypatch.setattr("httpx.request", fake_request)
+
+    HttpLinzWorldService("http://198.18.0.2:8080").register_original_spirit(
+        "profile-1",
+        "Hermes",
+        "seed",
+        public_key="public-key",
+        fingerprint="fingerprint",
+    )
+
+    assert calls[0][1] == "http://198.18.0.2:8080/api/v1/auth/register"
+    assert calls[0][2]["trust_env"] is False
 
 
 def test_register_uses_linz_world_auth_register_contract(monkeypatch):
@@ -232,9 +301,20 @@ def test_listener_bootstrap_derives_authorization_summary(tmp_path, monkeypatch)
                 "code": 0,
                 "message": "success",
                 "data": {
-                    "viewVersion": "bootstrap-v1",
-                    "allowedSubjects": ["wsp.chat.message.sent"],
-                    "allowedEventTypes": ["message.sent"],
+                    "osId": "agent-001",
+                    "allowedPublishSubjects": ["sys.heartbeat", "mrk.requirement.published"],
+                    "allowedSubscribeSubjects": [
+                        "wsp.agent-001",
+                        "sys.broadcast",
+                        "mrk.requirement.published.broadcast",
+                    ],
+                    "allowedPublishEventTypes": ["sys.heartbeat.report", "mrk.requirement.published"],
+                    "allowedSubscribeEventTypes": [
+                        "wsp.sys.login.response",
+                        "wsp.sys.subject.changed",
+                        "sys.broadcast.notice_published",
+                        "mrk.requirement.published.broadcast",
+                    ],
                 },
             }
         )
@@ -246,21 +326,34 @@ def test_listener_bootstrap_derives_authorization_summary(tmp_path, monkeypatch)
 
     assert calls[0][1] == "http://linz.test/api/v1/event/agents/listener/bootstrap"
     assert calls[0][3]["Authorization"] == "Bearer event-token"
-    assert result["map_version"] == "bootstrap-v1"
-    assert result["allowed_subjects"] == ["wsp.agent-1", "wsp.chat.message.sent"]
-    assert result["allowed_event_types"] == ["message.sent"]
+    assert result["map_version"] == "agent-001"
+    assert result["allowed_publish_subjects"] == ["mrk.requirement.published", "sys.heartbeat"]
+    assert result["allowed_publish_event_types"] == ["mrk.requirement.published", "sys.heartbeat.report"]
+    assert result["allowed_subscribe_subjects"] == [
+        "mrk.requirement.published.broadcast",
+        "sys.broadcast",
+        "wsp.agent-001",
+    ]
+    assert result["allowed_subscribe_event_types"] == [
+        "mrk.requirement.published.broadcast",
+        "sys.broadcast.notice_published",
+        "wsp.sys.login.response",
+        "wsp.sys.subject.changed",
+    ]
 
 
 def test_derive_authorization_summary_accepts_subjects_array():
     result = derive_authorization_summary(
-        {"subjectClaims": ["wsp.chat.message.sent"], "credentialId": "cred_1"},
-        {"id": "cred_1", "publishScopeSnapshot": ["wsp.chat.message.sent"]},
-        [{"subject": "wsp.chat.message.sent", "eventTypes": ["message.sent"]}],
+        {"subjectClaims": ["wsp.*"], "credentialId": "cred_1"},
+        {"id": "cred_1", "publishScopeSnapshot": ["wsp.*"]},
+        [{"subject": "wsp.*", "eventTypes": ["wsp.chat.message.sent"]}],
     )
 
     assert result["map_version"] == "cred_1"
-    assert result["allowed_subjects"] == ["wsp.chat.message.sent"]
-    assert result["allowed_event_types"] == ["message.sent"]
+    assert result["allowed_publish_subjects"] == ["wsp.*"]
+    assert result["allowed_publish_event_types"] == ["wsp.chat.message.sent"]
+    assert result["allowed_subscribe_subjects"] == []
+    assert result["allowed_subscribe_event_types"] == []
 
 
 def test_memory_events_request_includes_required_agent_id_and_fields(tmp_path, monkeypatch):
@@ -344,3 +437,47 @@ def test_relationship_projection_response_preserves_memory_projection(tmp_path, 
     assert result["projection"]["projection_id"] == "proj_1"
     assert result["projection"]["projection_type"] == "relationships"
     assert result["projection"]["content"]["summary"] == "trusted collaborators"
+
+
+def test_relationship_add_posts_confirmed_memory_relationship_route(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+
+    def fake_request(method, url, json=None, headers=None, timeout=None):
+        calls.append((method, url, json, headers))
+        return _Response(
+            {
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "relationship_id": "rel_1",
+                    "target_os_id": "agent-2",
+                    "relation_type": "FRIEND",
+                    "status": "ACTIVE",
+                    "summary": "trusted",
+                },
+            }
+        )
+
+    monkeypatch.setattr("httpx.request", fake_request)
+    token_ref = store_runtime_secret("event_token", "event-token")
+
+    result = HttpLinzWorldService("http://linz.test").add_active_relationship(
+        {"agent_id": "agent-1"},
+        token_ref,
+        "agent-2",
+        "trusted",
+        "FRIEND",
+    )
+
+    assert calls[0][0] == "POST"
+    assert calls[0][1] == "http://linz.test/api/v1/memory/relationships/agent-1"
+    assert calls[0][3]["Authorization"] == "Bearer event-token"
+    assert calls[0][2] == {
+        "target_os_id": "agent-2",
+        "relation_type": "FRIEND",
+        "status": "ACTIVE",
+        "summary": "trusted",
+        "operator_id": "agent-1",
+    }
+    assert result["relationship_id"] == "rel_1"

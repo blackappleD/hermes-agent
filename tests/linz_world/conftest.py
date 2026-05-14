@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import pytest
 
-from agent.linz_world.api_client import LinzWorldServiceError
-
-
 @pytest.fixture
 def linz_home(tmp_path, monkeypatch):
     home = tmp_path / "hermes"
@@ -21,6 +18,8 @@ class _FakeLinzService:
         self.login_calls = 0
         self.refresh_calls = 0
         self.publish_calls = 0
+        self.relationship_calls = 0
+        self.last_relationship = None
 
     def register_original_spirit(
         self,
@@ -55,7 +54,7 @@ class _FakeLinzService:
         return {
             "token": "event-token-secret",
             "expiresAt": "2099-01-01T00:00:00Z",
-            "subjectClaims": ["wsp.chat.message.sent"],
+            "subjectClaims": ["wsp.*"],
             "credentialId": "cred_1",
         }
 
@@ -68,8 +67,10 @@ class _FakeLinzService:
             raise RuntimeError("auth down")
         return {
             "map_version": "v1",
-            "allowed_subjects": ["wsp.chat.message.sent"],
-            "allowed_event_types": ["message.sent"],
+            "allowed_publish_subjects": ["wsp.*"],
+            "allowed_publish_event_types": ["wsp.chat.message.sent"],
+            "allowed_subscribe_subjects": ["wsp.*"],
+            "allowed_subscribe_event_types": ["wsp.chat.message.sent"],
             "allowed_capabilities": ["publish", "compute", "memory_sink", "relationship"],
         }
 
@@ -94,11 +95,22 @@ class _FakeLinzService:
     def read_relationships(self, identity, token_ref, counterparty_id=""):
         return {"relationships": []}
 
-    def add_active_relationship(self, token_ref, counterparty_id, summary=""):
-        raise LinzWorldServiceError(
-            "unsupported_relationship_mutation",
-            "No confirmed Linz World ACTIVE relationship mutation route exists.",
-        )
+    def add_active_relationship(self, identity, token_ref, counterparty_id, summary="", relation_type="OTHER"):
+        self.relationship_calls += 1
+        self.last_relationship = {
+            "identity": identity,
+            "token_ref": token_ref,
+            "counterparty_id": counterparty_id,
+            "summary": summary,
+            "relation_type": relation_type,
+        }
+        return {
+            "relationship_id": f"rel_{counterparty_id}",
+            "target_os_id": counterparty_id,
+            "relation_type": relation_type or "OTHER",
+            "status": "ACTIVE",
+            "summary": summary,
+        }
 
 
 @pytest.fixture

@@ -54,6 +54,31 @@ def login(
     return saved
 
 
+def ensure_login_session(
+    repository: LinzStateRepository | None = None,
+    service: LinzWorldService | None = None,
+    *,
+    config: dict | None = None,
+    check_server: bool = True,
+) -> LoginSession:
+    """Ensure the current profile has an active Linz World login session.
+
+    Agent startup should not merely validate a missing or expired cached
+    session. Once identity exists, logging in is the safe prerequisite for
+    later governed tools such as chat, compute, memory, and relationship
+    mutation. Transient verification failures that leave a token in
+    ``UNVERIFIED`` state are preserved instead of discarding the cached token.
+    """
+
+    repo = repository or LinzStateRepository()
+    session = validate_login_session(repo, service, config=config, check_server=check_server)
+    if session.state == LoginState.LOGGED_IN and session.token_ref:
+        return session
+    if session.state in {LoginState.LOGGED_OUT, LoginState.EXPIRED} or not session.token_ref:
+        return login(repo, service, config=config)
+    return session
+
+
 def logout(repository: LinzStateRepository | None = None, service: LinzWorldService | None = None) -> LoginSession:
     repo = repository or LinzStateRepository()
     current = repo.get_login()
@@ -158,8 +183,10 @@ def _authorization_map_from_result(result: dict) -> AuthorizationMap:
     return AuthorizationMap(
         state=AuthState.CURRENT,
         map_version=str(result.get("map_version") or ""),
-        allowed_subjects=list(result.get("allowed_subjects") or []),
-        allowed_event_types=list(result.get("allowed_event_types") or []),
+        allowed_publish_subjects=list(result.get("allowed_publish_subjects") or []),
+        allowed_publish_event_types=list(result.get("allowed_publish_event_types") or []),
+        allowed_subscribe_subjects=list(result.get("allowed_subscribe_subjects") or []),
+        allowed_subscribe_event_types=list(result.get("allowed_subscribe_event_types") or []),
         allowed_capabilities=list(result.get("allowed_capabilities") or []),
         last_refresh_at=utc_now_iso(),
     )

@@ -15,7 +15,7 @@ def test_publish_rejects_without_login(linz_home, FakeLinzService):
     svc = FakeLinzService()
     ensure_original_spirit_identity(repo, svc, config=_CONFIG)
 
-    receipt = publish_event("wsp.chat.message.sent", "message.sent", {"text": "hi"}, repo, svc)
+    receipt = publish_event("wsp.agent_b", "wsp.chat.message.sent", {"content": "hi"}, repo, svc)
 
     assert receipt.status.value == "rejected"
     assert receipt.governance_code == "login_missing"
@@ -28,11 +28,60 @@ def test_authorization_refresh_failure_blocks_side_effect(linz_home, FakeLinzSer
     ensure_original_spirit_identity(repo, svc, config=_CONFIG)
     auth.login(repo, svc)
 
-    receipt = publish_event("wsp.chat.message.sent", "message.sent", {"text": "hi"}, repo, svc)
+    receipt = publish_event("wsp.agent_b", "wsp.chat.message.sent", {"content": "hi"}, repo, svc)
 
     assert receipt.status.value == "rejected"
     assert receipt.governance_code == "authorization_refresh_failed"
     assert svc.publish_calls == 0
+
+
+def test_ensure_login_session_logs_in_when_session_is_missing(linz_home, FakeLinzService):
+    repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
+    svc = FakeLinzService()
+    ensure_original_spirit_identity(repo, svc, config=_CONFIG)
+
+    session = auth.ensure_login_session(repo, svc)
+
+    assert session.state == LoginState.LOGGED_IN
+    assert session.token_ref
+    assert svc.login_calls == 1
+    assert svc.refresh_calls == 1
+
+
+def test_ensure_login_session_preserves_valid_logged_in_session(linz_home, FakeLinzService):
+    repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
+    svc = FakeLinzService()
+    ensure_original_spirit_identity(repo, svc, config=_CONFIG)
+    auth.login(repo, svc)
+    svc.login_calls = 0
+    svc.refresh_calls = 0
+
+    session = auth.ensure_login_session(repo, svc)
+
+    assert session.state == LoginState.LOGGED_IN
+    assert svc.login_calls == 0
+    assert svc.refresh_calls == 1
+
+
+def test_ensure_login_session_relogs_expired_session(linz_home, FakeLinzService):
+    repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
+    svc = FakeLinzService()
+    ensure_original_spirit_identity(repo, svc, config=_CONFIG)
+    session = auth.login(repo, svc)
+    repo.save_login(
+        LoginSession(
+            state=LoginState.LOGGED_IN,
+            token_ref=session.token_ref,
+            expires_at="2000-01-01T00:00:00Z",
+        )
+    )
+    svc.login_calls = 0
+
+    refreshed = auth.ensure_login_session(repo, svc)
+
+    assert refreshed.state == LoginState.LOGGED_IN
+    assert refreshed.token_ref
+    assert svc.login_calls == 1
 
 
 def test_status_verifies_login_instead_of_trusting_cached_state(linz_home, FakeLinzService):

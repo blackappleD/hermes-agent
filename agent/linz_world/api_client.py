@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 import os
 import time
@@ -14,7 +15,9 @@ import httpx
 
 from hermes_constants import get_hermes_home
 
+from .config import load_linz_world_config
 from .models import utc_now_iso
+from .nats_transport import NatsPublishError, publish_linz_event
 
 
 class LinzWorldServiceError(RuntimeError):
@@ -139,6 +142,24 @@ def normalize_api_base_url(service_url: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, normalized_path, "", ""))
 
 
+def _should_bypass_env_proxy(service_url: str) -> bool:
+    host = (urlsplit(str(service_url or "")).hostname or "").strip().lower()
+    if not host:
+        return False
+    if host == "localhost" or host.endswith(".localhost"):
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return (
+        address.is_loopback
+        or address.is_private
+        or address.is_link_local
+        or address in ipaddress.ip_network("198.18.0.0/15")
+    )
+
+
 class LinzWorldService(Protocol):
     def register_original_spirit(
         self,
@@ -158,7 +179,14 @@ class LinzWorldService(Protocol):
     def invoke_compute(self, token_ref: str, task: str, input_data: dict[str, Any]) -> dict[str, Any]: ...
     def write_memory(self, identity: dict[str, Any], token_ref: str, artifact_ref: str, sink_reason: str, summary: str) -> dict[str, Any]: ...
     def read_relationships(self, identity: dict[str, Any], token_ref: str, counterparty_id: str = "") -> dict[str, Any]: ...
-    def add_active_relationship(self, token_ref: str, counterparty_id: str, summary: str = "") -> dict[str, Any]: ...
+    def add_active_relationship(
+        self,
+        identity: dict[str, Any],
+        token_ref: str,
+        counterparty_id: str,
+        summary: str = "",
+        relation_type: str = "OTHER",
+    ) -> dict[str, Any]: ...
 
 
 class LocalLinzWorldService:
@@ -193,7 +221,7 @@ class LocalLinzWorldService:
         return {
             "token": f"local_session_{agent_id}",
             "expiresAt": "2099-01-01T00:00:00Z",
-            "subjectClaims": ["wsp.chat.message.sent"],
+            "subjectClaims": ["wsp.*"],
             "credentialId": f"cred_{agent_id}",
         }
 
@@ -203,8 +231,10 @@ class LocalLinzWorldService:
     def refresh_authorization_map(self, identity: dict[str, Any], token_ref: str) -> dict[str, Any]:
         return {
             "map_version": "local-default",
-            "allowed_subjects": ["wsp.chat.message.sent", "wsp.governance.notice"],
-            "allowed_event_types": ["message.sent", "governance.notice"],
+            "allowed_publish_subjects": ["wsp.*", "wsp.governance.notice"],
+            "allowed_publish_event_types": ["wsp.chat.message.sent", "wsp.chat.message.read", "governance.notice"],
+            "allowed_subscribe_subjects": ["wsp.*", "wsp.governance.notice"],
+            "allowed_subscribe_event_types": ["wsp.chat.message.sent", "wsp.chat.message.read", "governance.notice"],
             "allowed_capabilities": ["publish", "compute", "memory_sink", "relationship"],
         }
 
@@ -230,9 +260,22 @@ class LocalLinzWorldService:
     def read_relationships(self, identity: dict[str, Any], token_ref: str, counterparty_id: str = "") -> dict[str, Any]:
         return {"relationships": []}
 
-    def add_active_relationship(self, token_ref: str, counterparty_id: str, summary: str = "") -> dict[str, Any]:
+    def add_active_relationship(
+        self,
+        identity: dict[str, Any],
+        token_ref: str,
+        counterparty_id: str,
+        summary: str = "",
+        relation_type: str = "OTHER",
+    ) -> dict[str, Any]:
         digest = hashlib.sha256(counterparty_id.encode("utf-8")).hexdigest()[:12]
-        return {"relationship_id": f"rel_{digest}", "counterparty_id": counterparty_id, "state": "ACTIVE", "summary": summary}
+        return {
+            "relationship_id": f"rel_{digest}",
+            "counterparty_id": counterparty_id,
+            "relation_type": relation_type or "OTHER",
+            "state": "ACTIVE",
+            "summary": summary,
+        }
 
 
 class HttpLinzWorldService(LocalLinzWorldService):
@@ -241,6 +284,7 @@ class HttpLinzWorldService(LocalLinzWorldService):
     def __init__(self, base_url: str, timeout: float = 5.0):
         self.base_url = normalize_api_base_url(base_url)
         self.timeout = timeout
+        self.trust_env = not _should_bypass_env_proxy(self.base_url)
 
     def _request(
         self,
@@ -252,13 +296,14 @@ class HttpLinzWorldService(LocalLinzWorldService):
         require_object_data: bool = True,
     ) -> Any:
         try:
-            response = httpx.request(
-                method,
-                f"{self.base_url}{path}",
-                json=payload if method.upper() != "GET" else None,
-                headers=headers,
-                timeout=self.timeout,
-            )
+            request_kwargs = {
+                "json": payload if method.upper() != "GET" else None,
+                "headers": headers,
+                "timeout": self.timeout,
+            }
+            if not self.trust_env:
+                request_kwargs["trust_env"] = False
+            response = httpx.request(method, f"{self.base_url}{path}", **request_kwargs)
         except httpx.RequestError as exc:
             raise LinzWorldServiceError("service_unavailable", f"Linz World service unavailable: {exc}") from exc
         try:
@@ -370,10 +415,16 @@ class HttpLinzWorldService(LocalLinzWorldService):
         return derive_listener_authorization_summary(agent_id, view)
 
     def publish_event(self, token_ref: str, subject: str, event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
-        raise LinzWorldServiceError(
-            "unsupported_publish_contract",
-            "Linz World HTTP publish is currently a placeholder contract; publish is blocked.",
-        )
+        cfg = load_linz_world_config()
+        try:
+            return publish_linz_event(
+                nats_url=cfg.nats_url,
+                subject=subject,
+                event_type=event_type,
+                payload=payload,
+            )
+        except NatsPublishError as exc:
+            raise LinzWorldServiceError(exc.code, exc.message) from exc
 
     def invoke_compute(self, token_ref: str, task: str, input_data: dict[str, Any]) -> dict[str, Any]:
         token = _resolve_bearer_value(
@@ -437,8 +488,33 @@ class HttpLinzWorldService(LocalLinzWorldService):
         )
         return _relationship_projection_summary(data, counterparty_id)
 
-    def add_active_relationship(self, token_ref: str, counterparty_id: str, summary: str = "") -> dict[str, Any]:
-        raise LinzWorldServiceError("unsupported_relationship_mutation", "No confirmed Linz World ACTIVE relationship mutation route exists.")
+    def add_active_relationship(
+        self,
+        identity: dict[str, Any],
+        token_ref: str,
+        counterparty_id: str,
+        summary: str = "",
+        relation_type: str = "OTHER",
+    ) -> dict[str, Any]:
+        agent_id = identity.get("agent_id") or identity.get("agentId") or identity.get("os_id")
+        token = _resolve_bearer_value(
+            token_ref,
+            code="login_secret_missing",
+            message="Linz World login token secret is unavailable.",
+        )
+        if not agent_id:
+            raise LinzWorldServiceError("identity_missing", "Linz World agentId is missing.")
+        return self._post(
+            f"/memory/relationships/{agent_id}",
+            {
+                "target_os_id": counterparty_id,
+                "relation_type": relation_type or "OTHER",
+                "status": "ACTIVE",
+                "summary": summary or "手动添加关系",
+                "operator_id": agent_id,
+            },
+            headers={"Authorization": f"Bearer {token}"} if token else None,
+        )
 
 
 def derive_authorization_summary(
@@ -466,25 +542,26 @@ def derive_authorization_summary(
                     event_types.add(str(item[key]))
     return {
         "map_version": str(credential.get("id") or credential.get("permissionProfileId") or refreshed.get("credentialId") or "current"),
-        "allowed_subjects": sorted(set(publish_scope + subscribe_scope + subject_claims)),
-        "allowed_event_types": sorted(event_types),
+        "allowed_publish_subjects": sorted(set(publish_scope + subject_claims)),
+        "allowed_publish_event_types": sorted(event_types),
+        "allowed_subscribe_subjects": sorted(set(subscribe_scope)),
+        "allowed_subscribe_event_types": [],
         "allowed_capabilities": ["publish", "compute", "memory_sink", "relationship"],
         "credential_id": str(credential.get("id") or refreshed.get("credentialId") or ""),
     }
 
 
 def derive_listener_authorization_summary(agent_id: str, view: dict[str, Any]) -> dict[str, Any]:
-    allowed_subjects = _string_list(view.get("allowedSubjects") or view.get("allowed_subjects"))
-    target_inbox = f"wsp.{agent_id}" if agent_id else ""
-    if target_inbox and target_inbox not in allowed_subjects:
-        allowed_subjects.append(target_inbox)
-    allowed_event_types = _string_list(view.get("allowedEventTypes") or view.get("allowed_event_types"))
-    if not allowed_event_types:
-        allowed_event_types = list(allowed_subjects)
+    publish_subjects = _string_list(view.get("allowedPublishSubjects"))
+    publish_event_types = _string_list(view.get("allowedPublishEventTypes"))
+    subscribe_subjects = _string_list(view.get("allowedSubscribeSubjects"))
+    subscribe_event_types = _string_list(view.get("allowedSubscribeEventTypes"))
     return {
-        "map_version": str(view.get("viewVersion") or view.get("view_version") or "listener-bootstrap"),
-        "allowed_subjects": sorted(set(allowed_subjects)),
-        "allowed_event_types": sorted(set(allowed_event_types)),
+        "map_version": str(view.get("viewVersion") or view.get("view_version") or view.get("osId") or view.get("os_id") or "listener-bootstrap"),
+        "allowed_publish_subjects": sorted(set(publish_subjects)),
+        "allowed_publish_event_types": sorted(set(publish_event_types)),
+        "allowed_subscribe_subjects": sorted(set(subscribe_subjects)),
+        "allowed_subscribe_event_types": sorted(set(subscribe_event_types)),
         "allowed_capabilities": ["publish", "compute", "memory_sink", "relationship"],
     }
 
