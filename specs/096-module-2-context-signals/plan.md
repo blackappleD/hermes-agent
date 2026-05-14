@@ -159,8 +159,8 @@ signal_set = SignalInterpreter(risk_config=...).interpret(
 风险分类不等于许可。即使风险为低，也不能生成 intent 或 ticket。世界授权只承认结构化字段：
 
 - identity/login/auth map state
-- `AuthorizationMap.allowed_subjects`
-- `AuthorizationMap.allowed_event_types`
+- `AuthorizationMap.allowed_publish_subjects`
+- `AuthorizationMap.allowed_publish_event_types`
 - event metadata 中的 `subject` / `event_type`
 
 自由文本只可用于任务/风险提示，不可用于身份、授权主体或权限来源。

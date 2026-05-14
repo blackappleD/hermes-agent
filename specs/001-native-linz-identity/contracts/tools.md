@@ -53,6 +53,10 @@ All handlers return JSON strings, following Hermes tool conventions. Tool output
   "success": true,
   "state": "current",
   "map_version": "opaque-version",
+  "allowed_publish_subjects": ["sys.heartbeat", "mrk.requirement.published"],
+  "allowed_publish_event_types": ["sys.heartbeat.report", "mrk.requirement.published"],
+  "allowed_subscribe_subjects": ["wsp.agent-001", "sys.broadcast"],
+  "allowed_subscribe_event_types": ["wsp.sys.login.response", "sys.broadcast.notice_published"],
   "allowed_capabilities": ["publish", "compute", "memory_sink", "relationship"],
   "last_refresh_at": "2026-05-12T00:00:00Z"
 }
@@ -85,8 +89,8 @@ All handlers return JSON strings, following Hermes tool conventions. Tool output
   "events": [
     {
       "event_id": "evt_...",
-      "subject": "wsp.chat.message.sent",
-      "event_type": "message.sent",
+      "subject": "wsp.agent-b",
+      "event_type": "wsp.chat.message.sent",
       "payload_summary": "redacted summary",
       "dispatch_status": "handled",
       "attempt_count": 1,
@@ -98,15 +102,17 @@ All handlers return JSON strings, following Hermes tool conventions. Tool output
 
 ## Tool: `linz_publish`
 
-**Purpose**: Publish a formal Linz World event to NATS after governance checks.
+**Purpose**: Advanced/raw escape hatch for publishing a formal Linz World event to NATS after governance checks. Semantic tools such as `linz_chat_send` should be preferred for common user intents.
 
 **Parameters**
 
 ```json
 {
-  "subject": "wsp.chat.message.sent",
-  "event_type": "message.sent",
-  "payload": {}
+  "subject": "wsp.agent-b",
+  "event_type": "wsp.chat.message.sent",
+  "payload": {
+    "content": "hello"
+  }
 }
 ```
 
@@ -135,6 +141,28 @@ All handlers return JSON strings, following Hermes tool conventions. Tool output
   }
 }
 ```
+
+## Tool: `linz_chat_send`
+
+**Purpose**: Send a Linz World chat/private message to another original spirit.
+
+**Parameters**
+
+```json
+{
+  "to_os_id": "agent-b",
+  "content": "hello",
+  "to_os_name": "optional display name",
+  "conversation_id": "optional existing conversation"
+}
+```
+
+**Rules**
+
+- Use this tool for user intents that mention message, chat, private message, 私聊, 私信, or DM in Linz World.
+- If `content` is missing, ask for the message text before calling.
+- Publishes to the recipient inbox subject `wsp.<to_os_id>` with `event_type=wsp.chat.message.sent`.
+- Must use the governed publish path and real-time authorization map refresh.
 
 ## Tool: `linz_compute`
 
@@ -186,7 +214,9 @@ All handlers return JSON strings, following Hermes tool conventions. Tool output
 ```json
 {
   "action": "read",
-  "counterparty_id": "actor_..."
+  "counterparty_id": "actor_...",
+  "relation_type": "OTHER",
+  "summary": "why this relationship should be active"
 }
 ```
 
@@ -194,6 +224,7 @@ All handlers return JSON strings, following Hermes tool conventions. Tool output
 
 - `action=read` returns redacted summaries plus the preserved Linz World MemoryProjection metadata and content.
 - `action=read` must not drop a valid projection when no structured relationship list can be parsed from `content`.
+- `action=add` / `action=add_active` writes an ACTIVE relationship through `POST /api/v1/memory/relationships/{osId}` with `target_os_id`, `relation_type`, `status=ACTIVE`, `summary`, and `operator_id`.
 - Relationship mutation is an external side effect and requires real-time authorization map refresh.
 
 **Read Result**

@@ -41,7 +41,7 @@
 
 - 继续维护 Hermes 抽象占位接口: 会让实现通过本地 fake 测试但无法接入真实 Linz World 服务。
 - 让用户手工配置任意 endpoint mapping: 增加配置复杂度，也无法保证和 skill 一致。
-- 等 Linz World 后端补齐所有 publish/map/relationship 接口后再推进: 会阻塞已明确的注册、登录、compute、memory 一致性修复；缺失能力应 fail-closed 或标记 unsupported。
+- 等 Linz World 后端补齐所有 publish/map 接口后再推进: 会阻塞已明确的注册、登录、compute、memory、relationship 一致性修复；缺失能力应 fail-closed 或标记 unsupported。
 
 ## Decision: publish 沿用 linz-world-skill 的 NATS 事件发布逻辑，不使用 HTTP publish
 
@@ -72,6 +72,15 @@
 - 继续期望顶层 `relationships` array: 会在真实后端下丢弃 projection 内容并错误显示空关系。
 - 强制要求 `content` 必须 JSON: 与当前后端 markdown/text projection 不兼容。
 - 只显示 projection content 不尝试解析 relationships: 可行但降低工具结果的结构化价值；当前决策允许可解析时派生，解析失败仍保留 projection。
+
+## Decision: relationship add 使用 Linz World skill 已确认的 memory relationships mutation
+
+**Rationale**: 旧 `linz-world-skill` 的 relationship 命令通过 `POST /api/v1/memory/relationships/{osId}` 添加 ACTIVE 关系，payload 包含 `target_os_id`、`relation_type`、`status=ACTIVE`、`summary` 和 `operator_id`。当前 event model 没有关系添加事件定义，因此 Hermes 不应通过 raw publish 自造关系事件。
+
+**Alternatives considered**:
+
+- 通过 `linz_publish` 发布自定义 relationship event: event catalog 中没有该事件定义，会绕开后端已确认关系写入接口。
+- 继续返回 unsupported: 与已确认 skill mutation route 冲突，会让可用能力被错误屏蔽。
 
 ## Decision: compute 使用登录 JWT 契约接入，缺少 login token reference 时 fail-closed
 

@@ -91,8 +91,10 @@ Read-only governance input refreshed before every external side effect.
 - `state`: `unknown | current | refresh_failed`.
 - `map_version`: opaque version or timestamp.
 - `last_refresh_at`: timestamp.
-- `allowed_subjects`: list of allowed subject patterns.
-- `allowed_event_types`: list of allowed event types.
+- `allowed_publish_subjects`: list of allowed publish subject patterns.
+- `allowed_publish_event_types`: list of allowed publish event types.
+- `allowed_subscribe_subjects`: list of allowed subscribe subject patterns.
+- `allowed_subscribe_event_types`: list of allowed subscribe event types.
 - `allowed_capabilities`: list including `publish`, `compute`, `memory_sink`, `relationship`.
 - `subject_claims`: claims returned by `POST /api/v1/event/agents/login` or refresh.
 - `publish_scope_snapshot`: scope returned by `POST /api/v1/event/agents/credentials`.

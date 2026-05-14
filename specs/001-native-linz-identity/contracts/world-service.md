@@ -185,14 +185,26 @@ This array is the current Linz World `PredefinedSubject[]` contract. Hermes must
 
 ```json
 {
-  "map_version": "credential-or-subjects-version",
-  "allowed_subjects": ["wsp.agent-123.sys"],
-  "allowed_event_types": ["sys.login.result", "subject_change"],
+  "map_version": "agent-001",
+  "allowed_publish_subjects": ["sys.heartbeat", "mrk.requirement.published"],
+  "allowed_publish_event_types": ["sys.heartbeat.report", "mrk.requirement.published"],
+  "allowed_subscribe_subjects": [
+    "wsp.agent-001",
+    "sys.broadcast",
+    "mrk.requirement.published.broadcast"
+  ],
+  "allowed_subscribe_event_types": [
+    "wsp.sys.login.response",
+    "wsp.sys.subject.changed",
+    "wsp.sys.registration.succeeded",
+    "sys.broadcast.notice_published",
+    "mrk.requirement.published.broadcast"
+  ],
   "allowed_capabilities": ["publish", "compute", "memory_sink", "relationship"]
 }
 ```
 
-**Hermes rule**: every external side effect must refresh confirmed authorization data immediately before execution. If confirmed authorization data is unavailable, return `unknown` or `unsupported` and block the side effect.
+**Hermes rule**: `/event/agents/listener/bootstrap` returns split publish/subscribe fields (`allowedPublishSubjects`, `allowedSubscribeSubjects`, `allowedPublishEventTypes`, `allowedSubscribeEventTypes`). Hermes maps these directly to `allowed_publish_*` and `allowed_subscribe_*` fields. Publish preflight must use only the publish fields; subscribe fields are preserved for listener/runtime diagnostics. Every external side effect must refresh confirmed authorization data immediately before execution. If confirmed authorization data is unavailable, return `unknown` or `unsupported` and block the side effect.
 
 ## Publish and Events
 
@@ -373,7 +385,7 @@ Current Linz World compute uses the JWT token returned by successful Linz World 
 
 ### Read / Mutate Relationship
 
-Current confirmed relationship read surface is `GET /api/v1/memory/projections/{agentId}/relationships`. A direct ACTIVE relationship mutation endpoint was not found in the checked Linz World backend source.
+Confirmed relationship read surface is `GET /api/v1/memory/projections/{agentId}/relationships`. Confirmed ACTIVE relationship mutation surface is `POST /api/v1/memory/relationships/{osId}`, as used by the Linz World skill relationship command.
 
 **Read Success `data`**
 
@@ -391,4 +403,16 @@ Current confirmed relationship read surface is `GET /api/v1/memory/projections/{
 
 **Hermes read rule**: relationship read is a MemoryProjection response. Hermes must preserve `projection_id`, `agent_id`, `projection_type`, `source_version`, `content`, `generated_at`, and `generated_by` in tool/CLI model output after redaction. If `content` is structured JSON with `relationships` or `items`, Hermes may parse a `relationships` list from it; if `content` is markdown or plain text, Hermes returns the preserved projection and may expose an empty parsed list only with the projection still present. Hermes must not convert a valid MemoryProjection into only an empty `relationships` array.
 
-**Mutation rule**: adding ACTIVE relationship is an external side effect and requires real-time authorization refresh. If no confirmed Linz World mutation route exists, Hermes returns `unsupported` and does not fabricate a local-only remote success.
+**Mutation request**
+
+```json
+{
+  "target_os_id": "agent-...",
+  "relation_type": "OTHER",
+  "status": "ACTIVE",
+  "summary": "why this relationship should be active",
+  "operator_id": "agent-..."
+}
+```
+
+**Mutation rule**: adding ACTIVE relationship is an external side effect and requires real-time authorization refresh. Hermes must not fabricate a local-only remote success; the local relationship projection is updated only after the confirmed route returns successfully.
