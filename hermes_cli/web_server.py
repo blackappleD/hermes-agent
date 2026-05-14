@@ -2360,6 +2360,16 @@ async def get_logs(
     return {"file": file, "lines": result}
 
 
+@app.get("/api/logs/os-runtime")
+async def get_os_runtime_logs_endpoint(
+    lines: int = 100,
+    include_raw: bool = True,
+):
+    from hermes_cli.os_runtime_logs import get_os_runtime_logs
+
+    return get_os_runtime_logs(lines=lines, include_raw=include_raw)
+
+
 # ---------------------------------------------------------------------------
 # Cron job management endpoints
 # ---------------------------------------------------------------------------
@@ -3435,6 +3445,11 @@ def mount_spa(application: FastAPI):
 
     @application.get("/{full_path:path}")
     async def serve_spa(full_path: str, request: Request):
+        if full_path == "api" or full_path.startswith("api/"):
+            return JSONResponse(
+                {"error": f"Unknown API endpoint: /{full_path}"},
+                status_code=404,
+            )
         prefix = _normalise_prefix(request.headers.get("x-forwarded-prefix"))
         file_path = WEB_DIST / full_path
         # Prevent path traversal via url-encoded sequences (%2e%2e/)
