@@ -69,7 +69,7 @@ _HERMES_CORE_TOOLS = [
     "kanban_comment", "kanban_create", "kanban_link",
     "kanban_unblock",
     # Native Linz World identity and world access tools.
-    "linz_status", "linz_map", "linz_events_recent", "linz_publish",
+    "linz_status", "linz_map", "linz_events_recent", "linz_chat_send", "linz_publish",
     "linz_compute", "linz_memory_sink", "linz_relationship",
     # Computer use (macOS, gated on cua-driver being installed via check_fn)
     "computer_use",
@@ -253,7 +253,7 @@ TOOLSETS = {
     "linz_world": {
         "description": "Native Linz World identity, authorization, events, publish, compute, Soul Memory, and relationship tools",
         "tools": [
-            "linz_status", "linz_map", "linz_events_recent", "linz_publish",
+            "linz_status", "linz_map", "linz_events_recent", "linz_chat_send", "linz_publish",
             "linz_compute", "linz_memory_sink", "linz_relationship",
         ],
         "includes": [],

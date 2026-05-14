@@ -7,6 +7,7 @@ import json
 from typing import Any
 
 from agent.linz_world import auth, identity
+from agent.linz_world.api_client import resolve_secret_ref
 from agent.linz_world.event_state import LinzStateRepository
 from agent.linz_world.models import LoginState, to_plain
 from agent.linz_world.publisher import publish_event
@@ -48,6 +49,7 @@ def linz_command(args) -> None:
             "success": session.state == LoginState.LOGGED_IN,
             "message": "接入灵治平台成功！" if session.state == LoginState.LOGGED_IN else session.last_error,
             "login": session,
+            "token": resolve_secret_ref(session.token_ref) if session.state == LoginState.LOGGED_IN else "",
         })
         return
     if action == "logout":
