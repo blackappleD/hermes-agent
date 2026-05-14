@@ -1802,6 +1802,64 @@ def _complete_linz_world_login(config: dict) -> bool:
         return False
 
 
+def _recommended_os_runtime_config() -> dict:
+    runtime = copy.deepcopy(DEFAULT_CONFIG.get("os_runtime", {}))
+    autonomous = runtime.setdefault("autonomous", {})
+    runtime.update(
+        {
+            "enabled": True,
+            "mode": "autonomous_low_risk",
+            "allow_auto_continuation": True,
+        }
+    )
+    autonomous.update(
+        {
+            "enabled": True,
+            "start_on_agent_load": True,
+            "start_with_gateway": True,
+            "apply_to_all_turns": True,
+            "pre_turn_evaluation": True,
+            "post_turn_evaluation": True,
+            "inject_self_prompt": True,
+            "respond_to_world_events": True,
+            "tick_interval_seconds": 30,
+            "idle_cooldown_seconds": 60,
+            "max_turns_per_wake": 3,
+            "max_wakes_per_hour": 20,
+            "allow_tool_execution": True,
+            "allow_world_publish": True,
+            "require_approval_for_world_publish": True,
+        }
+    )
+    return runtime
+
+
+def _os_runtime_is_default_disabled(raw: Any) -> bool:
+    if not raw:
+        return True
+    if not isinstance(raw, dict):
+        return False
+    try:
+        from agent.os_runtime.config import OSRuntimeConfig
+
+        return (
+            OSRuntimeConfig.from_dict(raw).to_dict(include_extra=True)
+            == DEFAULT_CONFIG.get("os_runtime", {})
+        )
+    except Exception:
+        return raw == DEFAULT_CONFIG.get("os_runtime", {})
+
+
+def _apply_os_runtime_install_defaults(config: dict) -> bool:
+    """Enable the safe resident runtime profile during setup when unconfigured."""
+
+    current = config.get("os_runtime")
+    if not _os_runtime_is_default_disabled(current):
+        return False
+    config["os_runtime"] = _recommended_os_runtime_config()
+    return True
+
+
 def setup_linz_world(config: dict):
     """Ensure the Linz World persona seed exists."""
 
@@ -1828,6 +1886,10 @@ def setup_linz_world(config: dict):
     linz["os_type"] = os_type if os_type in {"USER", "SEV", "GOV"} else "USER"
     linz.pop("type", None)
     linz["runtime_type"] = str(linz.get("runtime_type") or "Hermes").strip() or "Hermes"
+    os_runtime_enabled = _apply_os_runtime_install_defaults(config)
+    if os_runtime_enabled:
+        print_success("OS Runtime low-risk autonomy enabled for this profile.")
+        print_info("  Tool execution and world publish remain disabled by default.")
 
     hermes_home = get_hermes_home()
     soul_content = _read_soul_md_content(hermes_home)

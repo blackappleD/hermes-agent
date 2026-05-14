@@ -43,6 +43,75 @@ def test_linz_setup_saves_persona_seed_to_config_and_soul_md(tmp_path, monkeypat
     assert "<!-- LINZ_WORLD:PERSONA_SEED:END -->" in soul
 
 
+def test_linz_setup_enables_os_runtime_when_it_is_still_default_disabled(tmp_path, monkeypatch):
+    (tmp_path / "SOUL.md").write_text(
+        "Base Hermes identity.\n\n"
+        "<!-- LINZ_WORLD:PERSONA_SEED:START -->\n"
+        "## Linz World Persona Seed\n\n"
+        "existing soul seed\n"
+        "<!-- LINZ_WORLD:PERSONA_SEED:END -->\n",
+        encoding="utf-8",
+    )
+    config = {"linz_world": {"enabled": True}, "os_runtime": {"enabled": False}}
+
+    monkeypatch.setattr(setup_mod, "get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr(setup_mod, "save_config", lambda cfg: None)
+    monkeypatch.setattr(setup_mod, "_complete_linz_world_login", lambda cfg: True)
+    monkeypatch.setattr(setup_mod, "prompt_yes_no", _unexpected_prompt("yes/no"))
+    monkeypatch.setattr(setup_mod, "prompt_choice", _unexpected_prompt("choice"))
+    monkeypatch.setattr(setup_mod, "prompt", _unexpected_prompt("persona"))
+
+    setup_mod.setup_linz_world(config)
+
+    runtime = config["os_runtime"]
+    autonomous = runtime["autonomous"]
+    assert runtime["enabled"] is True
+    assert runtime["mode"] == "autonomous_low_risk"
+    assert runtime["allow_auto_continuation"] is True
+    assert runtime["allow_tool_execution"] is False
+    assert autonomous["enabled"] is True
+    assert autonomous["start_on_agent_load"] is True
+    assert autonomous["start_with_gateway"] is True
+    assert autonomous["apply_to_all_turns"] is True
+    assert autonomous["inject_self_prompt"] is True
+    assert autonomous["respond_to_world_events"] is True
+    assert autonomous["allow_tool_execution"] is False
+    assert autonomous["allow_world_publish"] is False
+    assert autonomous["require_approval_for_world_publish"] is True
+
+
+def test_linz_setup_preserves_custom_os_runtime_config(tmp_path, monkeypatch):
+    (tmp_path / "SOUL.md").write_text(
+        "Base Hermes identity.\n\n"
+        "<!-- LINZ_WORLD:PERSONA_SEED:START -->\n"
+        "## Linz World Persona Seed\n\n"
+        "existing soul seed\n"
+        "<!-- LINZ_WORLD:PERSONA_SEED:END -->\n",
+        encoding="utf-8",
+    )
+    config = {
+        "linz_world": {"enabled": True},
+        "os_runtime": {
+            "enabled": True,
+            "mode": "passive",
+            "autonomous": {"enabled": False, "apply_to_all_turns": False},
+        },
+    }
+
+    monkeypatch.setattr(setup_mod, "get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr(setup_mod, "save_config", lambda cfg: None)
+    monkeypatch.setattr(setup_mod, "_complete_linz_world_login", lambda cfg: True)
+    monkeypatch.setattr(setup_mod, "prompt_yes_no", _unexpected_prompt("yes/no"))
+    monkeypatch.setattr(setup_mod, "prompt_choice", _unexpected_prompt("choice"))
+    monkeypatch.setattr(setup_mod, "prompt", _unexpected_prompt("persona"))
+
+    setup_mod.setup_linz_world(config)
+
+    assert config["os_runtime"]["mode"] == "passive"
+    assert config["os_runtime"]["autonomous"]["enabled"] is False
+    assert config["os_runtime"]["autonomous"]["apply_to_all_turns"] is False
+
+
 def test_linz_setup_uses_existing_linz_soul_module_when_seed_prompt_is_blank(tmp_path, monkeypatch):
     (tmp_path / "SOUL.md").write_text(
         "Base Hermes identity.\n\n"
