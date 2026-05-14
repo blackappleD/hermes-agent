@@ -48,6 +48,14 @@ export async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> 
     const text = await res.text().catch(() => res.statusText);
     throw new Error(`${res.status}: ${text}`);
   }
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    const text = await res.text().catch(() => "");
+    const hint = text.trimStart().startsWith("<!DOCTYPE")
+      ? "Dashboard backend returned the SPA HTML shell. Restart the dashboard server so the latest API routes are loaded."
+      : `Expected JSON response from ${url}.`;
+    throw new Error(hint);
+  }
   return res.json();
 }
 
@@ -82,6 +90,12 @@ export const api = {
     if (params.level && params.level !== "ALL") qs.set("level", params.level);
     if (params.component && params.component !== "all") qs.set("component", params.component);
     return fetchJSON<LogsResponse>(`/api/logs?${qs.toString()}`);
+  },
+  getOsRuntimeLogs: (params: { lines?: number; includeRaw?: boolean } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.lines) qs.set("lines", String(params.lines));
+    if (params.includeRaw !== undefined) qs.set("include_raw", String(params.includeRaw));
+    return fetchJSON<OSRuntimeLogsResponse>(`/api/logs/os-runtime?${qs.toString()}`);
   },
   getAnalytics: (days: number) =>
     fetchJSON<AnalyticsResponse>(`/api/analytics/usage?days=${days}`),
@@ -443,6 +457,52 @@ export interface SessionMessagesResponse {
 export interface LogsResponse {
   file: string;
   lines: string[];
+}
+
+export type RuntimeParameterChange =
+  | "up"
+  | "down"
+  | "unchanged"
+  | "changed"
+  | "unknown";
+
+export interface RuntimeParameterReading {
+  key: string;
+  label: string;
+  value: string | number | boolean | null;
+  previous_value: string | number | boolean | null;
+  change: RuntimeParameterChange;
+  delta: number | null;
+  unit: string;
+  evidence_step: string;
+  evidence_trace_id: string;
+}
+
+export interface RuntimeModuleSnapshot {
+  module_id: string;
+  title: string;
+  summary: string;
+  updated_at: string;
+  status: "ok" | "partial" | "empty" | "stale";
+  parameters: RuntimeParameterReading[];
+  raw_line_indexes: number[];
+  metadata: Record<string, unknown>;
+}
+
+export interface OSRuntimeLogsResponse {
+  mode: "os_runtime";
+  source_files: string[];
+  updated_at: string;
+  modules: RuntimeModuleSnapshot[];
+  raw_lines: string[];
+  raw_line_count: number;
+  parse_error_count: number;
+  empty_reason: string;
+  limits: {
+    requested_lines: number;
+    max_lines: number;
+    read_lines: number;
+  };
 }
 
 export interface AnalyticsDailyEntry {

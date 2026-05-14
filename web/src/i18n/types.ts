@@ -216,6 +216,36 @@ export interface Translations {
     component: string;
     lines: string;
     noLogLines: string;
+    osRuntime?: {
+      toggle: string;
+      title: string;
+      rawLines: string;
+      showRaw: string;
+      hideRaw: string;
+      noData: string;
+      moduleNoData: string;
+      updated: string;
+      source: string;
+      parseErrors: string;
+      partial: string;
+      empty: string;
+      change: {
+        up: string;
+        down: string;
+        unchanged: string;
+        changed: string;
+        unknown: string;
+      };
+      modules: {
+        life_state: string;
+        tension_field: string;
+        action_potential: string;
+        self_prompt: string;
+        open_intent: string;
+        arbitration: string;
+        runtime_driver: string;
+      };
+    };
   };
 
   // ── Cron page ──

@@ -314,6 +314,15 @@ class TestWebServerEndpoints:
         except Exception:
             pass  # Not JSON — that's fine (SPA HTML)
 
+    def test_unknown_api_route_returns_json_404(self):
+        """Unknown API paths must not fall through to the SPA HTML shell."""
+        resp = self.client.get("/api/definitely-not-a-real-endpoint")
+
+        assert resp.status_code == 404
+        assert resp.headers["content-type"].startswith("application/json")
+        assert resp.json()["error"].startswith("Unknown API endpoint")
+        assert "<!DOCTYPE" not in resp.text
+
     def test_unauthenticated_api_blocked(self):
         """API requests without the session token should be rejected."""
         from starlette.testclient import TestClient
@@ -581,6 +590,79 @@ class TestNewEndpoints:
     def test_get_logs_invalid_file(self):
         resp = self.client.get("/api/logs?file=nonexistent")
         assert resp.status_code == 400
+
+    def test_get_logs_shape_unchanged(self):
+        resp = self.client.get("/api/logs")
+        assert resp.status_code == 200
+        assert set(resp.json()) == {"file", "lines"}
+
+    def test_get_os_runtime_logs_empty(self):
+        resp = self.client.get("/api/logs/os-runtime")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["mode"] == "os_runtime"
+        assert data["empty_reason"]
+        assert [m["module_id"] for m in data["modules"]] == [
+            "life_state",
+            "tension_field",
+            "action_potential",
+        ]
+
+    def test_get_os_runtime_logs_with_sample(self):
+        from hermes_constants import get_hermes_home
+
+        log_dir = get_hermes_home() / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        record = {
+            "timestamp": "2026-05-14T15:30:00.000+08:00",
+            "surface": "test",
+            "session_id": "session-1",
+            "phase": "after_turn",
+            "step": "life_state",
+            "trace_id": "trace-1",
+            "data": {"life_state": {"energy": 0.82}},
+        }
+        (log_dir / "os_runtime_20260514.log").write_text(
+            json.dumps(record) + "\n",
+            encoding="utf-8",
+        )
+
+        resp = self.client.get("/api/logs/os-runtime")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["source_files"] == ["os_runtime_20260514.log"]
+        assert data["updated_at"] == "2026-05-14T15:30:00.000+08:00"
+        assert data["raw_line_count"] == 1
+        life = next(m for m in data["modules"] if m["module_id"] == "life_state")
+        assert life["parameters"][0]["key"] == "energy"
+
+    def test_get_os_runtime_logs_include_raw_false(self):
+        from hermes_constants import get_hermes_home
+
+        log_dir = get_hermes_home() / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        (log_dir / "os_runtime_20260514.log").write_text(
+            json.dumps(
+                {
+                    "timestamp": "2026-05-14T15:30:00.000+08:00",
+                    "step": "life_state",
+                    "data": {"life_state": {"energy": 0.82}},
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        resp = self.client.get("/api/logs/os-runtime?include_raw=false")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["raw_lines"] == []
+        assert next(m for m in data["modules"] if m["module_id"] == "life_state")["status"] == "ok"
+
+    def test_get_os_runtime_logs_clamps_lines(self):
+        resp = self.client.get("/api/logs/os-runtime?lines=9999")
+        assert resp.status_code == 200
+        assert resp.json()["limits"]["max_lines"] == 500
 
     def test_cron_list(self):
         resp = self.client.get("/api/cron/jobs")
