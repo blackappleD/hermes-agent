@@ -2371,6 +2371,92 @@ async def get_os_runtime_logs_endpoint(
 
 
 # ---------------------------------------------------------------------------
+# Gateway MessageEvent projection diagnostics
+# ---------------------------------------------------------------------------
+
+
+def _gateway_message_event_source_status() -> dict[str, Any]:
+    status = read_runtime_status() or {}
+    platforms = status.get("platforms") if isinstance(status.get("platforms"), dict) else {}
+    updated_at = status.get("updated_at") or ""
+    return {
+        "gateway_state": status.get("gateway_state") or "unknown",
+        "updated_at": updated_at,
+        "linz_world": platforms.get("linz_world") or {},
+    }
+
+
+@app.get("/api/gateway/message-events")
+async def list_gateway_message_events_endpoint(
+    request: Request,
+    limit: int = 100,
+    cursor: Optional[str] = None,
+    source_category: Optional[str] = None,
+    consume_status: Optional[str] = None,
+    projection_status: Optional[str] = None,
+    source: Optional[str] = None,
+    subject: Optional[str] = None,
+    event_type: Optional[str] = None,
+    q: Optional[str] = None,
+):
+    if limit < 1 or limit > 500:
+        raise HTTPException(status_code=400, detail="limit must be between 1 and 500")
+    from_time = request.query_params.get("from")
+    to_time = request.query_params.get("to")
+    from gateway.event_projection_store import EventProjectionStore
+
+    store = EventProjectionStore()
+    try:
+        try:
+            result = store.list_records(
+                limit=limit,
+                cursor=cursor,
+                source_category=source_category,
+                consume_status=consume_status,
+                projection_status=projection_status,
+                source=source,
+                subject=subject,
+                event_type=event_type,
+                q=q,
+                from_time=from_time,
+                to_time=to_time,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {
+            "mode": "gateway_message_events",
+            "records": result["records"],
+            "next_cursor": result["next_cursor"],
+            "source_status": _gateway_message_event_source_status(),
+            "limits": {
+                "requested_limit": limit,
+                "returned": len(result["records"]),
+            },
+        }
+    finally:
+        store.close()
+
+
+@app.get("/api/gateway/message-events/{record_id}")
+async def get_gateway_message_event_detail_endpoint(record_id: str):
+    from gateway.event_projection_store import EventProjectionStore
+
+    store = EventProjectionStore()
+    try:
+        detail = store.get_record(record_id)
+    finally:
+        store.close()
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Projection record not found")
+    return {
+        "mode": "gateway_message_event_detail",
+        "record": detail["record"],
+        "projection": detail["projection"],
+        "transitions": detail["transitions"],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Cron job management endpoints
 # ---------------------------------------------------------------------------
 

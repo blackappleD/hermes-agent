@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from gateway.config import Platform, PlatformConfig
+from gateway.event_projection_store import EventProjectionStore
 from gateway.platform_registry import PlatformEntry, platform_registry
 from gateway.platforms.base import BasePlatformAdapter, MessageEvent, SendResult
 
@@ -126,11 +127,26 @@ def persist_world_event_for_gateway(
     repo = repository or LinzStateRepository()
     record, created = repo.persist_world_event(raw_event)
     if not created:
+        _record_projection_ledger(
+            raw_event,
+            record,
+            consume_status="duplicate",
+            projection_status="pending",
+            dedupe_status="duplicate",
+        )
         return PersistedWorldEvent(record=record, message_event=None, created=False)
     refreshed = repo.mark_processing(record.event_id)
+    message_event = project_to_message_event(refreshed)
+    _record_projection_ledger(
+        raw_event,
+        refreshed,
+        message_event=message_event,
+        consume_status="processing",
+        projection_status="projected",
+    )
     return PersistedWorldEvent(
         record=refreshed,
-        message_event=project_to_message_event(refreshed),
+        message_event=message_event,
         created=True,
     )
 
@@ -167,6 +183,7 @@ async def dispatch_world_event(
             f"{type(exc).__name__}: {exc}",
             retry_limit=retry_limit,
         )
+        _mark_projection_failed(persisted.message_event, failed.last_error)
         return WorldEventDispatchResult(
             persisted=persisted,
             handled=False,
@@ -175,11 +192,71 @@ async def dispatch_world_event(
         )
 
     handled = repo.mark_handled(persisted.record.event_id)
+    _mark_projection_handled(persisted.message_event)
     return WorldEventDispatchResult(
         persisted=persisted,
         handled=True,
         record=handled,
     )
+
+
+def _record_projection_ledger(
+    raw_event: dict[str, Any],
+    record: EventDispatchRecord,
+    *,
+    message_event: MessageEvent | None = None,
+    consume_status: str,
+    projection_status: str,
+    dedupe_status: str | None = None,
+) -> None:
+    store = None
+    try:
+        store = EventProjectionStore()
+        store.record_linz_world_event(
+            raw_event,
+            record,
+            message_event=message_event,
+            consume_status=consume_status,
+            projection_status=projection_status,
+            dedupe_status=dedupe_status,
+        )
+    except Exception:
+        return
+    finally:
+        if store is not None:
+            store.close()
+
+
+def _mark_projection_handled(message_event: MessageEvent | None) -> None:
+    if message_event is None:
+        return
+    store = None
+    try:
+        from gateway.event_projection_store import record_id_for_message_event
+
+        store = EventProjectionStore()
+        store.mark_handled(record_id_for_message_event(message_event))
+    except Exception:
+        return
+    finally:
+        if store is not None:
+            store.close()
+
+
+def _mark_projection_failed(message_event: MessageEvent | None, error: str) -> None:
+    if message_event is None:
+        return
+    store = None
+    try:
+        from gateway.event_projection_store import record_id_for_message_event
+
+        store = EventProjectionStore()
+        store.mark_failed(record_id_for_message_event(message_event), error=error)
+    except Exception:
+        return
+    finally:
+        if store is not None:
+            store.close()
 
 
 def _wake_autonomous_runtime(

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1778555164382,
+  "lastScanned": 1778721508804,
   "projectRoot": "D:\\workspace\\hermes-agent",
   "techStack": {
     "languages": [
@@ -60,10 +60,7 @@
       "scripts",
       "tests"
     ],
-    "gitBranches": {
-      "defaultBranch": "main",
-      "branchingStrategy": null
-    }
+    "gitBranches": null
   },
   "customNotes": [],
   "directoryMap": {
@@ -71,7 +68,7 @@
       "path": "acp_adapter",
       "purpose": null,
       "fileCount": 9,
-      "lastAccessed": 1778555164325,
+      "lastAccessed": 1778721508732,
       "keyFiles": [
         "auth.py",
         "entry.py",
@@ -84,7 +81,7 @@
       "path": "acp_registry",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1778555164326,
+      "lastAccessed": 1778721508733,
       "keyFiles": [
         "agent.json",
         "icon.svg"
@@ -94,7 +91,7 @@
       "path": "agent",
       "purpose": null,
       "fileCount": 53,
-      "lastAccessed": 1778555164335,
+      "lastAccessed": 1778721508743,
       "keyFiles": [
         "account_usage.py",
         "anthropic_adapter.py",
@@ -107,7 +104,7 @@
       "path": "assets",
       "purpose": "Static assets",
       "fileCount": 1,
-      "lastAccessed": 1778555164335,
+      "lastAccessed": 1778721508743,
       "keyFiles": [
         "banner.png"
       ]
@@ -116,7 +113,7 @@
       "path": "cron",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1778555164335,
+      "lastAccessed": 1778721508743,
       "keyFiles": [
         "jobs.py",
         "scheduler.py",
@@ -127,7 +124,7 @@
       "path": "datagen-config-examples",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1778555164336,
+      "lastAccessed": 1778721508744,
       "keyFiles": [
         "example_browser_tasks.jsonl",
         "run_browser_tasks.sh",
@@ -139,7 +136,7 @@
       "path": "docker",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1778555164336,
+      "lastAccessed": 1778721508744,
       "keyFiles": [
         "entrypoint.sh",
         "SOUL.md"
@@ -148,10 +145,11 @@
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 2,
-      "lastAccessed": 1778555164337,
+      "fileCount": 3,
+      "lastAccessed": 1778721508744,
       "keyFiles": [
         "hermes-kanban-v1-spec.pdf",
+        "multica issues.md",
         "基于张力场的Agent自驱动实现计划.md"
       ]
     },
@@ -159,7 +157,7 @@
       "path": "environments",
       "purpose": null,
       "fileCount": 8,
-      "lastAccessed": 1778555164337,
+      "lastAccessed": 1778721508745,
       "keyFiles": [
         "agentic_opd_env.py",
         "agent_loop.py",
@@ -172,7 +170,7 @@
       "path": "gateway",
       "purpose": null,
       "fileCount": 20,
-      "lastAccessed": 1778555164338,
+      "lastAccessed": 1778721508746,
       "keyFiles": [
         "channel_directory.py",
         "config.py",
@@ -181,11 +179,24 @@
         "hooks.py"
       ]
     },
+    "hermes_agent.egg-info": {
+      "path": "hermes_agent.egg-info",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1778721508747,
+      "keyFiles": [
+        "dependency_links.txt",
+        "entry_points.txt",
+        "PKG-INFO",
+        "requires.txt",
+        "SOURCES.txt"
+      ]
+    },
     "hermes_cli": {
       "path": "hermes_cli",
       "purpose": null,
-      "fileCount": 74,
-      "lastAccessed": 1778555164338,
+      "fileCount": 77,
+      "lastAccessed": 1778721508747,
       "keyFiles": [
         "auth.py",
         "auth_commands.py",
@@ -198,7 +209,7 @@
       "path": "locales",
       "purpose": null,
       "fileCount": 16,
-      "lastAccessed": 1778555164339,
+      "lastAccessed": 1778721508747,
       "keyFiles": [
         "af.yaml",
         "de.yaml",
@@ -211,7 +222,7 @@
       "path": "nix",
       "purpose": null,
       "fileCount": 11,
-      "lastAccessed": 1778555164339,
+      "lastAccessed": 1778721508748,
       "keyFiles": [
         "checks.nix",
         "configMergeScript.nix",
@@ -224,7 +235,7 @@
       "path": "optional-skills",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1778555164340,
+      "lastAccessed": 1778721508749,
       "keyFiles": [
         "DESCRIPTION.md"
       ]
@@ -233,14 +244,14 @@
       "path": "packaging",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778555164340,
+      "lastAccessed": 1778721508749,
       "keyFiles": []
     },
     "plans": {
       "path": "plans",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1778555164341,
+      "lastAccessed": 1778721508749,
       "keyFiles": [
         "gemini-oauth-provider.md"
       ]
@@ -249,7 +260,7 @@
       "path": "plugins",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1778555164341,
+      "lastAccessed": 1778721508750,
       "keyFiles": [
         "__init__.py"
       ]
@@ -258,7 +269,7 @@
       "path": "providers",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1778555164341,
+      "lastAccessed": 1778721508750,
       "keyFiles": [
         "base.py",
         "README.md",
@@ -268,8 +279,8 @@
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 19,
-      "lastAccessed": 1778555164342,
+      "fileCount": 20,
+      "lastAccessed": 1778721508751,
       "keyFiles": [
         "benchmark_browser_eval.py",
         "build_model_catalog.py",
@@ -282,14 +293,21 @@
       "path": "skills",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778555164342,
+      "lastAccessed": 1778721508751,
+      "keyFiles": []
+    },
+    "specs": {
+      "path": "specs",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778721508751,
       "keyFiles": []
     },
     "tests": {
       "path": "tests",
       "purpose": "Test files",
       "fileCount": 58,
-      "lastAccessed": 1778555164342,
+      "lastAccessed": 1778721508752,
       "keyFiles": [
         "conftest.py",
         "run_interrupt_test.py",
@@ -302,14 +320,14 @@
       "path": "tinker-atropos",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778555164343,
+      "lastAccessed": 1778721508752,
       "keyFiles": []
     },
     "tools": {
       "path": "tools",
       "purpose": null,
-      "fileCount": 73,
-      "lastAccessed": 1778555164343,
+      "fileCount": 74,
+      "lastAccessed": 1778721508753,
       "keyFiles": [
         "ansi_strip.py",
         "approval.py",
@@ -322,7 +340,7 @@
       "path": "tui_gateway",
       "purpose": null,
       "fileCount": 8,
-      "lastAccessed": 1778555164343,
+      "lastAccessed": 1778721508753,
       "keyFiles": [
         "entry.py",
         "event_publisher.py",
@@ -335,7 +353,7 @@
       "path": "ui-tui",
       "purpose": null,
       "fileCount": 10,
-      "lastAccessed": 1778555164344,
+      "lastAccessed": 1778721508754,
       "keyFiles": [
         "babel.compiler.config.cjs",
         "eslint.config.mjs",
@@ -348,7 +366,7 @@
       "path": "web",
       "purpose": null,
       "fileCount": 9,
-      "lastAccessed": 1778555164344,
+      "lastAccessed": 1778721508755,
       "keyFiles": [
         "eslint.config.js",
         "index.html",
@@ -361,7 +379,7 @@
       "path": "website",
       "purpose": null,
       "fileCount": 7,
-      "lastAccessed": 1778555164345,
+      "lastAccessed": 1778721508755,
       "keyFiles": [
         "docusaurus.config.ts",
         "package-lock.json",
@@ -370,11 +388,24 @@
         "sidebars.ts"
       ]
     },
+    "__pycache__": {
+      "path": "__pycache__",
+      "purpose": null,
+      "fileCount": 10,
+      "lastAccessed": 1778721508755,
+      "keyFiles": [
+        "cli.cpython-314.pyc",
+        "hermes_bootstrap.cpython-314.pyc",
+        "hermes_constants.cpython-314.pyc",
+        "hermes_logging.cpython-314.pyc",
+        "hermes_state.cpython-314.pyc"
+      ]
+    },
     "gateway\\assets": {
       "path": "gateway\\assets",
       "purpose": "Static assets",
       "fileCount": 1,
-      "lastAccessed": 1778555164348,
+      "lastAccessed": 1778721508757,
       "keyFiles": [
         "telegram-botfather-threads-settings.jpg"
       ]
@@ -383,7 +414,7 @@
       "path": "ui-tui\\scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 2,
-      "lastAccessed": 1778555164352,
+      "lastAccessed": 1778721508762,
       "keyFiles": [
         "build.mjs",
         "profile-tui.mjs"
@@ -393,7 +424,7 @@
       "path": "ui-tui\\src",
       "purpose": "Source code",
       "fileCount": 7,
-      "lastAccessed": 1778555164352,
+      "lastAccessed": 1778721508762,
       "keyFiles": [
         "app.tsx",
         "banner.ts",
@@ -404,7 +435,7 @@
       "path": "web\\public",
       "purpose": "Public files",
       "fileCount": 1,
-      "lastAccessed": 1778555164352,
+      "lastAccessed": 1778721508763,
       "keyFiles": [
         "favicon.ico"
       ]
@@ -413,7 +444,7 @@
       "path": "web\\src",
       "purpose": "Source code",
       "fileCount": 3,
-      "lastAccessed": 1778555164353,
+      "lastAccessed": 1778721508764,
       "keyFiles": [
         "App.tsx",
         "index.css",
@@ -424,7 +455,7 @@
       "path": "website\\docs",
       "purpose": "Documentation",
       "fileCount": 2,
-      "lastAccessed": 1778555164353,
+      "lastAccessed": 1778721508765,
       "keyFiles": [
         "index.md",
         "user-stories.mdx"
@@ -434,7 +465,7 @@
       "path": "website\\scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 4,
-      "lastAccessed": 1778555164353,
+      "lastAccessed": 1778721508766,
       "keyFiles": [
         "extract-skills.py",
         "generate-llms-txt.py",
@@ -445,7 +476,7 @@
       "path": "website\\src",
       "purpose": "Source code",
       "fileCount": 0,
-      "lastAccessed": 1778555164354,
+      "lastAccessed": 1778721508766,
       "keyFiles": []
     }
   },
@@ -460,6 +491,42 @@
       "path": "skills\\github\\github-pr-workflow\\references\\conventional-commits.md",
       "accessCount": 1,
       "lastAccessed": 1778558157534,
+      "type": "file"
+    },
+    {
+      "path": "scripts\\install-wsl-test.sh",
+      "accessCount": 1,
+      "lastAccessed": 1778663812697,
+      "type": "file"
+    },
+    {
+      "path": "agent\\os_runtime\\debug_log.py",
+      "accessCount": 1,
+      "lastAccessed": 1778743763712,
+      "type": "file"
+    },
+    {
+      "path": "agent\\linz_world\\chat.py",
+      "accessCount": 1,
+      "lastAccessed": 1778743763760,
+      "type": "file"
+    },
+    {
+      "path": "agent\\linz_world\\nats_transport.py",
+      "accessCount": 1,
+      "lastAccessed": 1778743763895,
+      "type": "file"
+    },
+    {
+      "path": "hermes_cli\\os_runtime_logs.py",
+      "accessCount": 1,
+      "lastAccessed": 1778751306655,
+      "type": "file"
+    },
+    {
+      "path": "tests\\hermes_cli\\test_os_runtime_logs.py",
+      "accessCount": 1,
+      "lastAccessed": 1778751306703,
       "type": "file"
     }
   ],
