@@ -89,3 +89,49 @@ def test_unfinished_goal_positive_feedback_and_silence_update_distinct_fields():
     assert state.boredom > previous.boredom
     assert state.restraint >= previous.restraint
     assert "task_context:active_goal" in delta.evidence
+
+
+def test_ambient_world_constraints_do_not_drain_simple_turn_energy():
+    previous = LifeState(
+        energy=0.95,
+        fatigue=0.05,
+        health=0.98,
+        wakefulness=0.95,
+        restraint=0.2,
+        life_cycle="active",
+    )
+    signal_set = _signal_set(
+        _signal(
+            "constraint_world_identity_missing",
+            group="constraints",
+            level="blocked",
+            status="blocked",
+        ),
+        _signal(
+            "constraint_world_login_not_active",
+            group="constraints",
+            level="blocked",
+            status="blocked",
+        ),
+        _signal(
+            "constraint_world_authorization_unknown",
+            group="constraints",
+            level="blocked",
+            status="blocked",
+        ),
+        _signal("simple_chat_message", group="relationships", level="low"),
+    )
+
+    state, delta = LifeStateSystem().update(
+        signal_set,
+        previous,
+        execution_feedback={"status": "observed", "phase": "after_turn"},
+    )
+
+    assert state.energy >= previous.energy
+    assert state.fatigue <= previous.fatigue
+    assert state.health == previous.health
+    assert state.restraint == previous.restraint
+    assert state.life_cycle == "active"
+    assert "continuous failures increase fatigue and restraint" not in delta.reasons
+    assert "risk, approval, authorization, or settlement constraints raise restraint" not in delta.reasons

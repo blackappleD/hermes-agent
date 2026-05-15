@@ -55,7 +55,7 @@ class LifeStateSystem:
         reasons: list[str] = []
         items = _signal_items(signals)
 
-        failure_count = _count_matching(items, ("failure", "failed", "error", "blocked", "test_failure"))
+        failure_count = _failure_weight(items)
         if _feedback_status(execution_feedback) in {"failed", "failure", "error", "blocked"}:
             failure_count += 1
             evidence.append("execution_feedback:failed")
@@ -69,7 +69,7 @@ class LifeStateSystem:
             reasons.append("continuous failures increase fatigue and restraint")
             evidence.extend(_evidence_for(items, ("failure", "failed", "error", "blocked", "test_failure")))
 
-        continuation_count = _count_matching(items, ("continuation",))
+        continuation_count = _continuation_weight(items)
         continuation_count += int(signals.metadata.get("consecutive_continuations") or 0)
         if continuation_count:
             _add(current, "fatigue", 0.05 * continuation_count)
@@ -130,6 +130,14 @@ class LifeStateSystem:
             _add(current, "social_hunger", 0.07 * social_count)
             evidence.extend(_evidence_for(items, ("relationship", "chat", "message", "social")))
             reasons.append("social signals increase social hunger")
+
+        simple_chat_count = _simple_chat_weight(items)
+        if simple_chat_count:
+            _add(current, "energy", 0.005 * simple_chat_count)
+            _add(current, "fatigue", -0.01 * simple_chat_count)
+            _add(current, "wakefulness", 0.005 * simple_chat_count)
+            reasons.append("simple chat is a low-load interaction")
+            evidence.extend(_evidence_for(items, ("simple_chat",)))
 
         risk_count = _risk_weight(items)
         if risk_count:
@@ -222,13 +230,55 @@ def _evidence_for(items: list[dict[str, Any]], needles: tuple[str, ...]) -> list
     return evidence
 
 
+def _failure_weight(items: list[dict[str, Any]]) -> int:
+    weight = 0
+    for item in items:
+        group = str(item.get("_group") or "").lower()
+        code = str(item.get("code") or item.get("kind") or item.get("type") or "").lower()
+        status = str(item.get("status") or item.get("level") or "").lower()
+        if group == "constraints" and code.startswith("constraint_world_"):
+            continue
+        if "test_failure" in code or "tool_failure" in code:
+            weight += 1
+            continue
+        if any(token in code for token in ("failure", "failed", "error")):
+            weight += 1
+            continue
+        if status in {"failed", "failure", "error"}:
+            weight += 1
+    return weight
+
+
+def _continuation_weight(items: list[dict[str, Any]]) -> int:
+    weight = 0
+    for item in items:
+        code = str(item.get("code") or item.get("kind") or item.get("type") or item.get("value") or "").lower()
+        metadata = item.get("metadata")
+        event_type = str(metadata.get("event_type") or "").lower() if isinstance(metadata, dict) else ""
+        if code in {"continuation_need", "os_runtime_continuation"} or event_type == "os_runtime_continuation":
+            weight += 1
+    return weight
+
+
+def _simple_chat_weight(items: list[dict[str, Any]]) -> int:
+    return sum(1 for item in items if str(item.get("code") or "").lower() == "simple_chat_message")
+
+
 def _risk_weight(items: list[dict[str, Any]]) -> int:
     weight = 0
     for item in items:
         if not _matches(item, ("risk", "authorization", "approval", "settlement", "rent", "constraint")):
             continue
-        level = str(item.get("level") or item.get("status") or "").lower()
+        group = str(item.get("_group") or "").lower()
         code = str(item.get("code") or "").lower()
+        if group == "constraints" and code in {
+            "constraint_world_identity_missing",
+            "constraint_world_identity_incomplete",
+            "constraint_world_login_not_active",
+            "constraint_world_authorization_unknown",
+        }:
+            continue
+        level = str(item.get("level") or item.get("status") or "").lower()
         if level in {"high", "critical", "blocked", "unknown"} or any(
             token in code for token in ("blocked", "unknown", "approval", "settlement", "rent")
         ):
