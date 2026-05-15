@@ -31,6 +31,7 @@ import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Switch } from "@nous-research/ui/ui/components/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { ProfileSelector } from "@/components/ProfileSelector";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
@@ -367,6 +368,7 @@ export default function WorldEventsPage() {
   const { setAfterTitle, setEnd } = usePageHeader();
   const [records, setRecords] = useState<GatewayMessageEventSummary[]>([]);
   const [sourceStatus, setSourceStatus] = useState<GatewaySourceStatus | null>(null);
+  const [profile, setProfile] = useState("current");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<GatewayMessageEventDetailResponse | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -401,6 +403,7 @@ export default function WorldEventsPage() {
   const buildParams = useCallback(
     (cursor?: string | null): GatewayMessageEventQuery => ({
       limit,
+      profile,
       cursor: cursor || undefined,
       source_category: sourceCategory === "all" ? undefined : sourceCategory,
       consume_status: consumeStatus === "all" ? undefined : consumeStatus,
@@ -409,7 +412,7 @@ export default function WorldEventsPage() {
       event_type: eventType.trim() || undefined,
       q: query.trim() || undefined,
     }),
-    [consumeStatus, eventType, limit, projectionStatus, query, sourceCategory, subject],
+    [consumeStatus, eventType, limit, profile, projectionStatus, query, sourceCategory, subject],
   );
 
   const loadRecords = useCallback(
@@ -456,7 +459,7 @@ export default function WorldEventsPage() {
     const timeout = window.setTimeout(() => {
       setDetailLoading(true);
       api
-        .getGatewayMessageEventDetail(selectedId)
+        .getGatewayMessageEventDetail(selectedId, profile)
         .then(setDetail)
         .catch((err) => {
           setDetail(null);
@@ -465,7 +468,7 @@ export default function WorldEventsPage() {
         .finally(() => setDetailLoading(false));
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [selectedId]);
+  }, [profile, selectedId]);
 
   useLayoutEffect(() => {
     setAfterTitle(
@@ -479,6 +482,16 @@ export default function WorldEventsPage() {
     );
     setEnd(
       <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
+        <ProfileSelector
+          value={profile}
+          onChange={(nextProfile) => {
+            setProfile(nextProfile);
+            setRecords([]);
+            setSelectedId(null);
+            setDetail(null);
+            setNextCursor(null);
+          }}
+        />
         <div className="flex items-center gap-2">
           <Switch
             checked={autoRefresh}
@@ -522,6 +535,7 @@ export default function WorldEventsPage() {
     limit,
     loadRecords,
     loading,
+    profile,
     records.length,
     setAfterTitle,
     setEnd,

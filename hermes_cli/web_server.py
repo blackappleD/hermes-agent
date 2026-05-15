@@ -137,6 +137,41 @@ def _require_token(request: Request) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
+def _dashboard_profile_home(profile: Optional[str]) -> Tuple[str, Path]:
+    """Resolve a dashboard profile selector value to a Hermes home directory."""
+    raw = (profile or "").strip()
+    if not raw or raw == "current":
+        return "current", get_hermes_home()
+
+    from hermes_cli import profiles as profiles_mod
+
+    try:
+        name = profiles_mod.normalize_profile_name(raw)
+        profiles_mod.validate_profile_name(name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not profiles_mod.profile_exists(name):
+        raise HTTPException(status_code=404, detail=f"Profile '{name}' does not exist.")
+    return name, profiles_mod.get_profile_dir(name)
+
+
+def _read_runtime_status_for_profile(profile: Optional[str], profile_home: Path) -> dict[str, Any]:
+    if not profile or profile == "current":
+        return read_runtime_status() or {}
+    status_path = profile_home / "gateway_state.json"
+    try:
+        raw = status_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return {}
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 # Accepted Host header values for loopback binds. DNS rebinding attacks
 # point a victim browser at an attacker-controlled hostname (evil.test)
 # which resolves to 127.0.0.1 after a TTL flip — bypassing same-origin
@@ -2315,15 +2350,17 @@ async def get_logs(
     level: Optional[str] = None,
     component: Optional[str] = None,
     search: Optional[str] = None,
+    profile: Optional[str] = None,
 ):
     from hermes_cli.logs import _read_tail, LOG_FILES
 
     log_name = LOG_FILES.get(file)
     if not log_name:
         raise HTTPException(status_code=400, detail=f"Unknown log file: {file}")
-    log_path = get_hermes_home() / "logs" / log_name
+    profile_name, profile_home = _dashboard_profile_home(profile)
+    log_path = profile_home / "logs" / log_name
     if not log_path.exists():
-        return {"file": file, "lines": []}
+        return {"file": file, "profile": profile_name, "profile_path": str(profile_home), "lines": []}
 
     try:
         from hermes_logging import COMPONENT_PREFIXES
@@ -2358,17 +2395,19 @@ async def get_logs(
     if search:
         needle = search.lower()
         result = [l for l in result if needle in l.lower()][-min(lines, 500):]
-    return {"file": file, "lines": result}
+    return {"file": file, "profile": profile_name, "profile_path": str(profile_home), "lines": result}
 
 
 @app.get("/api/logs/os-runtime")
 async def get_os_runtime_logs_endpoint(
     lines: int = 100,
     include_raw: bool = True,
+    profile: Optional[str] = None,
 ):
     from hermes_cli.os_runtime_logs import get_os_runtime_logs
 
-    return get_os_runtime_logs(lines=lines, include_raw=include_raw)
+    profile_name, profile_home = _dashboard_profile_home(profile)
+    return get_os_runtime_logs(lines=lines, include_raw=include_raw, root=profile_home, profile=profile_name)
 
 
 # ---------------------------------------------------------------------------
@@ -2376,8 +2415,8 @@ async def get_os_runtime_logs_endpoint(
 # ---------------------------------------------------------------------------
 
 
-def _gateway_message_event_source_status() -> dict[str, Any]:
-    status = read_runtime_status() or {}
+def _gateway_message_event_source_status(profile: Optional[str], profile_home: Path) -> dict[str, Any]:
+    status = _read_runtime_status_for_profile(profile, profile_home)
     platforms = status.get("platforms") if isinstance(status.get("platforms"), dict) else {}
     updated_at = status.get("updated_at") or ""
     return {
@@ -2399,6 +2438,7 @@ async def list_gateway_message_events_endpoint(
     subject: Optional[str] = None,
     event_type: Optional[str] = None,
     q: Optional[str] = None,
+    profile: Optional[str] = None,
 ):
     if limit < 1 or limit > 500:
         raise HTTPException(status_code=400, detail="limit must be between 1 and 500")
@@ -2406,7 +2446,8 @@ async def list_gateway_message_events_endpoint(
     to_time = request.query_params.get("to")
     from gateway.event_projection_store import EventProjectionStore
 
-    store = EventProjectionStore()
+    profile_name, profile_home = _dashboard_profile_home(profile)
+    store = EventProjectionStore(root=profile_home)
     try:
         try:
             result = store.list_records(
@@ -2426,9 +2467,11 @@ async def list_gateway_message_events_endpoint(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {
             "mode": "gateway_message_events",
+            "profile": profile_name,
+            "profile_path": str(profile_home),
             "records": result["records"],
             "next_cursor": result["next_cursor"],
-            "source_status": _gateway_message_event_source_status(),
+            "source_status": _gateway_message_event_source_status(profile, profile_home),
             "limits": {
                 "requested_limit": limit,
                 "returned": len(result["records"]),
@@ -2439,10 +2482,11 @@ async def list_gateway_message_events_endpoint(
 
 
 @app.get("/api/gateway/message-events/{record_id}")
-async def get_gateway_message_event_detail_endpoint(record_id: str):
+async def get_gateway_message_event_detail_endpoint(record_id: str, profile: Optional[str] = None):
     from gateway.event_projection_store import EventProjectionStore
 
-    store = EventProjectionStore()
+    profile_name, profile_home = _dashboard_profile_home(profile)
+    store = EventProjectionStore(root=profile_home)
     try:
         detail = store.get_record(record_id)
     finally:
@@ -2451,6 +2495,8 @@ async def get_gateway_message_event_detail_endpoint(record_id: str):
         raise HTTPException(status_code=404, detail="Projection record not found")
     return {
         "mode": "gateway_message_event_detail",
+        "profile": profile_name,
+        "profile_path": str(profile_home),
         "record": detail["record"],
         "projection": detail["projection"],
         "transitions": detail["transitions"],

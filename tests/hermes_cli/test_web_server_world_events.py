@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from hermes_constants import get_hermes_home
 from gateway.config import Platform
 from gateway.event_projection_store import EventProjectionStore
 from gateway.platforms.base import MessageEvent, MessageType
@@ -31,7 +32,13 @@ def client(monkeypatch, _isolate_hermes_home):
     return test_client
 
 
-def _record_event(index: int, *, source_category: str = "telegram", status: str = "received") -> str:
+def _record_event(
+    index: int,
+    *,
+    source_category: str = "telegram",
+    status: str = "received",
+    root=None,
+) -> str:
     platform = Platform.TELEGRAM if source_category == "telegram" else Platform.WEBHOOK
     raw = {"message_id": f"msg-{index}", "payload": {"text": f"hello {index}"}}
     if source_category == "linz_world_nats":
@@ -58,7 +65,7 @@ def _record_event(index: int, *, source_category: str = "telegram", status: str 
         raw_message=raw,
         message_id=f"msg-{index}",
     )
-    store = EventProjectionStore()
+    store = EventProjectionStore(root=root) if root is not None else EventProjectionStore()
     try:
         return store.record_message_event_projected(event, consume_status=status, session_id=f"session-{index}")
     finally:
@@ -141,3 +148,43 @@ def test_message_events_handles_empty_unknown_status_and_unserializable_payload(
     detail = client.get(f"/api/gateway/message-events/{record_id}")
     assert detail.status_code == 200
     assert detail.json()["record"]["raw_payload_available"] is False
+
+
+def test_message_events_can_read_selected_profile_ledger(client):
+    profile_home = get_hermes_home() / "profiles" / "shannon"
+    profile_home.mkdir(parents=True)
+    _record_event(7, root=profile_home)
+
+    current_resp = client.get("/api/gateway/message-events")
+    profile_resp = client.get("/api/gateway/message-events?profile=shannon")
+
+    assert current_resp.status_code == 200
+    assert current_resp.json()["records"] == []
+    assert profile_resp.status_code == 200
+    data = profile_resp.json()
+    assert data["profile"] == "shannon"
+    assert data["records"][0]["message_event_id"] == "msg-7"
+
+
+def test_logs_can_read_selected_profile_files(client):
+    profile_home = get_hermes_home() / "profiles" / "shannon"
+    logs_dir = profile_home / "logs"
+    logs_dir.mkdir(parents=True)
+    (logs_dir / "agent.log").write_text(
+        "2026-05-15 09:00:00 INFO gateway.run: shannon line\n",
+        encoding="utf-8",
+    )
+    (logs_dir / "os_runtime_20260515.log").write_text(
+        '{"timestamp":"2026-05-15T09:00:00+00:00","step":"life_state","data":{"energy":1}}\n',
+        encoding="utf-8",
+    )
+
+    logs_resp = client.get("/api/logs?file=agent&profile=shannon")
+    os_resp = client.get("/api/logs/os-runtime?profile=shannon")
+
+    assert logs_resp.status_code == 200
+    assert logs_resp.json()["profile"] == "shannon"
+    assert logs_resp.json()["lines"] == ["2026-05-15 09:00:00 INFO gateway.run: shannon line\n"]
+    assert os_resp.status_code == 200
+    assert os_resp.json()["profile"] == "shannon"
+    assert os_resp.json()["modules"][0]["parameters"][0]["key"] == "energy"

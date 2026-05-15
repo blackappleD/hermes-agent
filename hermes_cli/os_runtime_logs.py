@@ -100,30 +100,43 @@ RUNTIME_DRIVER_FIELDS = (
 )
 
 
-def get_os_runtime_logs(lines: int = DEFAULT_LINES, include_raw: bool = True) -> dict[str, Any]:
-    """Return module snapshots and raw OS_RUNTIME lines for the current profile."""
+def get_os_runtime_logs(
+    lines: int = DEFAULT_LINES,
+    include_raw: bool = True,
+    *,
+    root: Path | None = None,
+    profile: str | None = None,
+) -> dict[str, Any]:
+    """Return module snapshots and raw OS_RUNTIME lines for a Hermes profile."""
 
     requested_lines = _coerce_int(lines, DEFAULT_LINES)
     limit = _clamp_lines(requested_lines)
-    files = _discover_log_files()
+    root = root or get_hermes_home()
+    files = _discover_log_files(root)
     if not files:
-        return _empty_response(
+        response = _empty_response(
             requested_lines=requested_lines,
             read_lines=0,
             include_raw=include_raw,
             empty_reason="No OS_RUNTIME log lines found for the current profile.",
         )
+        response["profile"] = profile or "current"
+        response["profile_path"] = str(root)
+        return response
 
     source = files[0]
     raw_lines = [line.rstrip("\n") for line in _read_last_n_lines(source, limit)]
     if not raw_lines:
-        return _empty_response(
+        response = _empty_response(
             requested_lines=requested_lines,
             read_lines=0,
             include_raw=include_raw,
             source_files=[source.name],
             empty_reason="No OS_RUNTIME log lines found for the current profile.",
         )
+        response["profile"] = profile or "current"
+        response["profile_path"] = str(root)
+        return response
 
     modules: dict[str, dict[str, Any]] = {}
     previous_by_module: dict[str, dict[str, Any]] = {}
@@ -158,6 +171,8 @@ def get_os_runtime_logs(lines: int = DEFAULT_LINES, include_raw: bool = True) ->
     has_data = any(module.get("status") != "empty" for module in ordered_modules)
     return {
         "mode": "os_runtime",
+        "profile": profile or "current",
+        "profile_path": str(root),
         "source_files": [source.name],
         "updated_at": latest_timestamp if has_data else "",
         "modules": ordered_modules,
@@ -173,8 +188,8 @@ def get_os_runtime_logs(lines: int = DEFAULT_LINES, include_raw: bool = True) ->
     }
 
 
-def _discover_log_files() -> list[Path]:
-    log_dir = get_hermes_home() / "logs"
+def _discover_log_files(root: Path | None = None) -> list[Path]:
+    log_dir = (root or get_hermes_home()) / "logs"
     if not log_dir.exists():
         return []
     return sorted(
