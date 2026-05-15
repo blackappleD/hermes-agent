@@ -25,6 +25,7 @@ import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Switch } from "@nous-research/ui/ui/components/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { ProfileSelector } from "@/components/ProfileSelector";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { PluginSlot } from "@/plugins";
@@ -192,6 +193,7 @@ export default function LogsPage() {
   const [component, setComponent] =
     useState<(typeof COMPONENTS)[number]>("all");
   const [lineCount, setLineCount] = useState<(typeof LINE_COUNTS)[number]>(100);
+  const [profile, setProfile] = useState("current");
   const [autoRefresh, setAutoRefresh] = useState(false);
   // Switch acceptance: OS_RUNTIME sits before auto refresh, preserves normal filters, and shares auto refresh.
   const [osRuntimeMode, setOsRuntimeMode] = useState(false);
@@ -235,7 +237,7 @@ export default function LogsPage() {
           el.scrollHeight - el.scrollTop - el.clientHeight < 24;
       }
       api
-        .getOsRuntimeLogs({ lines: lineCount, includeRaw: true })
+        .getOsRuntimeLogs({ lines: lineCount, includeRaw: true, profile })
         .then((resp) => {
           setRuntimeData(resp);
           scrollRawLogToBottom();
@@ -246,7 +248,7 @@ export default function LogsPage() {
     }
 
     api
-      .getLogs({ file, lines: lineCount, level, component })
+      .getLogs({ file, lines: lineCount, level, component, profile })
       .then((resp) => {
         setLines(resp.lines);
         scrollNormalLogToBottom();
@@ -259,6 +261,7 @@ export default function LogsPage() {
     level,
     lineCount,
     osRuntimeMode,
+    profile,
     scrollNormalLogToBottom,
     scrollRawLogToBottom,
   ]);
@@ -276,6 +279,14 @@ export default function LogsPage() {
     );
     setEnd(
       <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
+        <ProfileSelector
+          value={profile}
+          onChange={(nextProfile) => {
+            setProfile(nextProfile);
+            setLines([]);
+            setRuntimeData(null);
+          }}
+        />
         <div className="flex items-center gap-2">
           <Switch
             checked={osRuntimeMode}
@@ -327,6 +338,7 @@ export default function LogsPage() {
     lineCount,
     loading,
     osRuntimeMode,
+    profile,
     runtimeText.title,
     runtimeText.toggle,
     setAfterTitle,
