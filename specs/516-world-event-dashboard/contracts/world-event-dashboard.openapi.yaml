@@ -1,0 +1,270 @@
+openapi: 3.1.0
+info:
+  title: Hermes World Event Dashboard API
+  version: 0.1.0
+  description: Read-only dashboard API for gateway inbound event and Hermes MessageEvent projection diagnostics.
+paths:
+  /api/gateway/message-events:
+    get:
+      summary: List gateway inbound event projection records
+      operationId: listGatewayMessageEvents
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: source_category
+          in: query
+          description: Source category filter. Must support linz_world_nats.
+          schema:
+            type: string
+            examples: [linz_world_nats, telegram, slack, webhook]
+        - name: consume_status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ConsumeStatus"
+        - name: projection_status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ProjectionStatus"
+        - name: source
+          in: query
+          schema:
+            type: string
+        - name: subject
+          in: query
+          schema:
+            type: string
+        - name: event_type
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          description: Free-text search over event id, subject, type, message id, and source summary.
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Event projection list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventListResponse"
+        "400":
+          description: Invalid filter or pagination parameter
+  /api/gateway/message-events/{record_id}:
+    get:
+      summary: Get gateway inbound event projection detail
+      operationId: getGatewayMessageEvent
+      parameters:
+        - name: record_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Event projection detail, including full raw payload when available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetailResponse"
+        "404":
+          description: Projection record not found
+components:
+  schemas:
+    ConsumeStatus:
+      type: string
+      enum:
+        - received
+        - queued
+        - processing
+        - handled
+        - failed
+        - duplicate
+        - ignored
+        - unauthorized
+    ProjectionStatus:
+      type: string
+      enum:
+        - pending
+        - projected
+        - failed
+    SourceStatus:
+      type: object
+      required: [gateway_state, updated_at]
+      properties:
+        gateway_state:
+          type: string
+          examples: [running, stopped, unknown]
+        updated_at:
+          type: string
+        linz_world:
+          type: object
+          additionalProperties: true
+    EventSummary:
+      type: object
+      required:
+        - record_id
+        - source_category
+        - consumed_at
+        - updated_at
+        - payload_summary
+        - consume_status
+        - projection_status
+      properties:
+        record_id:
+          type: string
+        event_id:
+          type: string
+        source_category:
+          type: string
+        platform:
+          type: string
+        subject:
+          type: string
+        event_type:
+          type: string
+        consumed_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        payload_summary:
+          type: string
+        source_summary:
+          type: string
+        consume_status:
+          $ref: "#/components/schemas/ConsumeStatus"
+        projection_status:
+          $ref: "#/components/schemas/ProjectionStatus"
+        message_event_id:
+          type: string
+        message_event_summary:
+          type: string
+        session_id:
+          type: string
+        last_error:
+          type: string
+        duplicate_of_record_id:
+          type: string
+    EventListResponse:
+      type: object
+      required: [mode, records, next_cursor, source_status, limits]
+      properties:
+        mode:
+          const: gateway_message_events
+        records:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventSummary"
+        next_cursor:
+          type:
+            - string
+            - "null"
+        source_status:
+          $ref: "#/components/schemas/SourceStatus"
+        limits:
+          type: object
+          required: [requested_limit, returned]
+          properties:
+            requested_limit:
+              type: integer
+            returned:
+              type: integer
+    MessageEventProjection:
+      type: object
+      properties:
+        message_event_id:
+          type: string
+        message_type:
+          type: string
+        text_summary:
+          type: string
+        source_snapshot:
+          type: object
+          additionalProperties: true
+        raw_message_summary:
+          type: string
+        media_count:
+          type: integer
+        session_id:
+          type: string
+        session_key:
+          type: string
+        session_message_ref:
+          type: string
+        projected_at:
+          type: string
+          format: date-time
+    EventTransition:
+      type: object
+      required: [transition_id, record_id, to_status, at]
+      properties:
+        transition_id:
+          type: string
+        record_id:
+          type: string
+        from_status:
+          type: string
+        to_status:
+          type: string
+        at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        error:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    EventDetailResponse:
+      type: object
+      required: [mode, record, projection, transitions]
+      properties:
+        mode:
+          const: gateway_message_event_detail
+        record:
+          allOf:
+            - $ref: "#/components/schemas/EventSummary"
+            - type: object
+              properties:
+                occurred_at:
+                  type: string
+                  format: date-time
+                sequence_key:
+                  type: string
+                nats_sequence:
+                  type: string
+                raw_payload_available:
+                  type: boolean
+                raw_payload_error:
+                  type: string
+                raw_payload:
+                  description: Full original payload when serializable/available. Dashboard displays this only after explicit expansion.
+        projection:
+          $ref: "#/components/schemas/MessageEventProjection"
+        transitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventTransition"

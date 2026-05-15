@@ -72,6 +72,7 @@ export const it: Translations = {
       config: "Configurazione",
       cron: "Cron",
       documentation: "Documentazione",
+      events: "Events",
       keys: "Chiavi",
       logs: "Log",
       models: "Modelli",

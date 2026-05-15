@@ -72,6 +72,7 @@ export const hu: Translations = {
       config: "Beállítások",
       cron: "Cron",
       documentation: "Dokumentáció",
+      events: "Events",
       keys: "Kulcsok",
       logs: "Naplók",
       models: "Modellek",

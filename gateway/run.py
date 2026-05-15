@@ -5676,6 +5676,70 @@ class GatewayRunner:
 
         await adapter.send(source.chat_id, content, metadata=metadata)
 
+    def _record_event_projection(
+        self,
+        event: MessageEvent,
+        *,
+        consume_status: str = "received",
+        projection_status: str = "projected",
+        session_id: Optional[str] = None,
+        session_key: Optional[str] = None,
+        session_message_ref: Optional[str] = None,
+    ) -> Optional[str]:
+        try:
+            from gateway.event_projection_store import EventProjectionStore
+
+            store = EventProjectionStore()
+            try:
+                return store.record_message_event_projected(
+                    event,
+                    consume_status=consume_status,
+                    projection_status=projection_status,
+                    session_id=session_id,
+                    session_key=session_key,
+                    session_message_ref=session_message_ref,
+                )
+            finally:
+                store.close()
+        except Exception:
+            logger.debug("Gateway event projection ledger write failed", exc_info=True)
+            return None
+
+    def _mark_event_projection_status(
+        self,
+        event: MessageEvent,
+        status: str,
+        *,
+        reason: Optional[str] = None,
+        error: Optional[str] = None,
+        session_id: Optional[str] = None,
+        session_key: Optional[str] = None,
+    ) -> None:
+        try:
+            from gateway.event_projection_store import EventProjectionStore, record_id_for_message_event
+
+            store = EventProjectionStore()
+            try:
+                record_id = record_id_for_message_event(event)
+                if status == "processing":
+                    store.mark_processing(record_id, session_id=session_id, session_key=session_key)
+                elif status == "handled":
+                    store.mark_handled(record_id)
+                elif status == "failed":
+                    store.mark_failed(record_id, error=error)
+                elif status == "ignored":
+                    store.mark_ignored(record_id, reason=reason)
+                elif status == "unauthorized":
+                    store.mark_unauthorized(record_id, reason=reason)
+                elif status == "duplicate":
+                    store.mark_duplicate(record_id)
+                else:
+                    store.record_transition(record_id, status, reason=reason, error=error)
+            finally:
+                store.close()
+        except Exception:
+            logger.debug("Gateway event projection ledger status update failed", exc_info=True)
+
     async def _handle_message(self, event: MessageEvent) -> Optional[str]:
         """
         Handle an incoming message from any platform.
@@ -5690,6 +5754,7 @@ class GatewayRunner:
         7. Return response
         """
         source = event.source
+        self._record_event_projection(event, consume_status="received")
 
         # Internal events (e.g. background-process completion notifications)
         # are system-generated and must skip user authorization.
@@ -5726,6 +5791,7 @@ class GatewayRunner:
                         source.platform.value if source.platform else "unknown",
                         source.chat_id or "unknown",
                     )
+                    self._mark_event_projection_status(event, "ignored", reason=str(_result.get("reason") or "pre_gateway_dispatch_skip"))
                     return None
                 if _action == "rewrite":
                     _new_text = _result.get("text")
@@ -5744,6 +5810,7 @@ class GatewayRunner:
             # authorized — drop silently instead of triggering the pairing
             # flow with a None user_id.
             logger.debug("Ignoring message with no user_id from %s", source.platform.value)
+            self._mark_event_projection_status(event, "ignored", reason="missing_user_id")
             return None
         elif not self._is_user_authorized(source):
             logger.warning("Unauthorized user: %s (%s) on %s", source.user_id, source.user_name, source.platform.value)
@@ -5778,6 +5845,7 @@ class GatewayRunner:
                         )
                     # Record rate limit so subsequent messages are silently ignored
                     self.pairing_store._record_rate_limit(platform_name, source.user_id)
+            self._mark_event_projection_status(event, "unauthorized", reason="user_not_authorized")
             return None
         
         # Intercept messages that are responses to a pending /update prompt.
@@ -6668,6 +6736,7 @@ class GatewayRunner:
             # topic mode and fires ten prompts doesn't get ten copies.
             if self._should_send_telegram_lobby_reminder(source):
                 return self._telegram_topic_root_lobby_message()
+            self._mark_event_projection_status(event, "ignored", reason="telegram_topic_root_lobby")
             return None
 
         # ── Claim this session before any await ───────────────────────
@@ -7005,6 +7074,13 @@ class GatewayRunner:
         session_entry = self.session_store.get_or_create_session(source)
         session_key = session_entry.session_key
         self._cache_session_source(session_key, source)
+        self._record_event_projection(
+            event,
+            consume_status="processing",
+            session_id=session_entry.session_id,
+            session_key=session_key,
+            session_message_ref=self._reply_anchor_for_event(event),
+        )
         if self._is_telegram_topic_lane(source):
             try:
                 binding = self._session_db.get_telegram_topic_binding(
@@ -7552,6 +7628,7 @@ class GatewayRunner:
             history=history,
         )
         if message_text is None:
+            self._mark_event_projection_status(event, "ignored", reason="empty_inbound_message")
             return
 
         # Bind this gateway run generation to the adapter's active-session
@@ -7930,11 +8007,17 @@ class GatewayRunner:
                             )
                     except Exception as _e:
                         logger.debug("trailing footer send failed: %s", _e)
+                self._mark_event_projection_status(event, "handled")
                 return None
 
+            if agent_result.get("failed"):
+                self._mark_event_projection_status(event, "failed", error=str(agent_result.get("error") or "agent failed"))
+            else:
+                self._mark_event_projection_status(event, "handled")
             return response
             
         except Exception as e:
+            self._mark_event_projection_status(event, "failed", error=str(e))
             # Stop typing indicator on error too
             try:
                 _err_adapter = self.adapters.get(source.platform)

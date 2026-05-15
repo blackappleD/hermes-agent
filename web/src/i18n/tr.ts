@@ -72,6 +72,7 @@ export const tr: Translations = {
       config: "Yapılandırma",
       cron: "Cron",
       documentation: "Dokümantasyon",
+      events: "Events",
       keys: "Anahtarlar",
       logs: "Günlükler",
       models: "Modeller",

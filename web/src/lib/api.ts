@@ -97,6 +97,28 @@ export const api = {
     if (params.includeRaw !== undefined) qs.set("include_raw", String(params.includeRaw));
     return fetchJSON<OSRuntimeLogsResponse>(`/api/logs/os-runtime?${qs.toString()}`);
   },
+  getGatewayMessageEvents: (params: GatewayMessageEventQuery = {}) => {
+    const qs = new URLSearchParams();
+    if (params.limit) qs.set("limit", String(params.limit));
+    if (params.cursor) qs.set("cursor", params.cursor);
+    if (params.source_category) qs.set("source_category", params.source_category);
+    if (params.consume_status) qs.set("consume_status", params.consume_status);
+    if (params.projection_status) qs.set("projection_status", params.projection_status);
+    if (params.source) qs.set("source", params.source);
+    if (params.subject) qs.set("subject", params.subject);
+    if (params.event_type) qs.set("event_type", params.event_type);
+    if (params.q) qs.set("q", params.q);
+    if (params.from) qs.set("from", params.from);
+    if (params.to) qs.set("to", params.to);
+    const query = qs.toString();
+    return fetchJSON<GatewayMessageEventsResponse>(
+      `/api/gateway/message-events${query ? `?${query}` : ""}`,
+    );
+  },
+  getGatewayMessageEventDetail: (recordId: string) =>
+    fetchJSON<GatewayMessageEventDetailResponse>(
+      `/api/gateway/message-events/${encodeURIComponent(recordId)}`,
+    ),
   getAnalytics: (days: number) =>
     fetchJSON<AnalyticsResponse>(`/api/analytics/usage?days=${days}`),
   getModelsAnalytics: (days: number) =>
@@ -503,6 +525,109 @@ export interface OSRuntimeLogsResponse {
     max_lines: number;
     read_lines: number;
   };
+}
+
+export type GatewayConsumeStatus =
+  | "received"
+  | "queued"
+  | "processing"
+  | "handled"
+  | "failed"
+  | "duplicate"
+  | "ignored"
+  | "unauthorized";
+
+export type GatewayProjectionStatus = "pending" | "projected" | "failed";
+
+export interface GatewayMessageEventQuery {
+  limit?: number;
+  cursor?: string | null;
+  source_category?: string;
+  consume_status?: GatewayConsumeStatus;
+  projection_status?: GatewayProjectionStatus;
+  source?: string;
+  subject?: string;
+  event_type?: string;
+  q?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface GatewaySourceStatus {
+  gateway_state: string;
+  updated_at: string;
+  linz_world?: Record<string, unknown>;
+}
+
+export interface GatewayMessageEventSummary {
+  record_id: string;
+  event_id?: string | null;
+  source_category: string;
+  platform?: string | null;
+  subject?: string | null;
+  event_type?: string | null;
+  consumed_at: string;
+  updated_at: string;
+  payload_summary: string;
+  source_summary?: string | null;
+  consume_status: GatewayConsumeStatus;
+  projection_status: GatewayProjectionStatus;
+  message_event_id?: string | null;
+  message_event_summary?: string | null;
+  session_id?: string | null;
+  last_error?: string | null;
+  duplicate_of_record_id?: string | null;
+}
+
+export interface GatewayMessageEventsResponse {
+  mode: "gateway_message_events";
+  records: GatewayMessageEventSummary[];
+  next_cursor: string | null;
+  source_status: GatewaySourceStatus;
+  limits: {
+    requested_limit: number;
+    returned: number;
+  };
+}
+
+export interface GatewayMessageEventProjection {
+  message_event_id?: string | null;
+  message_type?: string | null;
+  text_summary: string;
+  source_snapshot: Record<string, unknown>;
+  raw_message_summary: string;
+  media_count: number;
+  session_id?: string | null;
+  session_key?: string | null;
+  session_message_ref?: string | null;
+  projected_at: string;
+}
+
+export interface GatewayMessageEventTransition {
+  transition_id: number;
+  record_id: string;
+  from_status?: string | null;
+  to_status: string;
+  at: string;
+  reason?: string | null;
+  error?: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface GatewayMessageEventDetailRecord extends GatewayMessageEventSummary {
+  occurred_at?: string | null;
+  sequence_key?: string | null;
+  nats_sequence?: string | null;
+  raw_payload_available: boolean;
+  raw_payload_error?: string | null;
+  raw_payload?: unknown;
+}
+
+export interface GatewayMessageEventDetailResponse {
+  mode: "gateway_message_event_detail";
+  record: GatewayMessageEventDetailRecord;
+  projection: GatewayMessageEventProjection | null;
+  transitions: GatewayMessageEventTransition[];
 }
 
 export interface AnalyticsDailyEntry {

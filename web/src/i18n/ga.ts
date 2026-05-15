@@ -72,6 +72,7 @@ export const ga: Translations = {
       config: "Cumraíocht",
       cron: "Cron",
       documentation: "Doiciméadú",
+      events: "Events",
       keys: "Eochracha",
       logs: "Logaí",
       models: "Samhlacha",

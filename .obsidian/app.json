@@ -1,3 +1,9 @@
 {
-  "showLineNumber": false
+  "showLineNumber": false,
+  "userIgnoreFilters": [
+    "venv/",
+    ".venv/",
+    "node_modules/",
+    ".git/"
+  ]
 }

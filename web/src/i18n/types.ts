@@ -88,6 +88,7 @@ export interface Translations {
       config: string;
       cron: string;
       documentation: string;
+      events: string;
       keys: string;
       logs: string;
       models: string;

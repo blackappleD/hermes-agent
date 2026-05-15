@@ -8,6 +8,7 @@ from agent.linz_world.event_state import LinzStateRepository
 from agent.linz_world.gateway_adapter import LinzWorldPlatformAdapter, dispatch_world_event, persist_world_event_for_gateway
 from agent.linz_world.models import AuthState, AuthorizationMap
 from gateway.config import PlatformConfig
+from gateway.event_projection_store import EventProjectionStore
 from gateway.platform_registry import platform_registry
 
 
@@ -106,6 +107,35 @@ def test_persist_world_event_for_gateway_builds_message_after_state_write(linz_h
     assert "secret" not in result.message_event.text
     assert duplicate.created is False
     assert duplicate.message_event is None
+
+
+def test_persist_world_event_for_gateway_records_projection_ledger(linz_home):
+    repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
+    raw = {
+        "event_id": "evt_ledger",
+        "subject": "wsp.chat.message.sent",
+        "event_type": "message.sent",
+        "payload": {"text": "hello", "token": "secret"},
+        "source": {"room_id": "room_1", "actor_id": "actor_1", "os_id": "os_1", "soul_id": "soul_1"},
+        "sequence": {"stream": "world-events", "consumer": "hermes-profile", "nats_sequence": 91},
+    }
+
+    result = persist_world_event_for_gateway(raw, repo)
+    store = EventProjectionStore(root=linz_home)
+    try:
+        detail = store.get_record("linz_world_nats:evt_ledger")
+    finally:
+        store.close()
+
+    assert result.message_event is not None
+    assert detail is not None
+    assert detail["record"]["source_category"] == "linz_world_nats"
+    assert detail["record"]["subject"] == "wsp.chat.message.sent"
+    assert detail["record"]["event_id"] == "evt_ledger"
+    assert detail["record"]["nats_sequence"] == "91"
+    assert detail["record"]["raw_payload"]["payload"]["token"] == "secret"
+    assert detail["projection"]["message_event_id"] == "evt_ledger"
+    assert "secret" not in detail["projection"]["text_summary"]
 
 
 @pytest.mark.asyncio
