@@ -796,6 +796,170 @@ class TestNewEndpoints:
         profiles = {p["name"]: p for p in self.client.get("/api/profiles").json()["profiles"]}
         assert profiles["cloned"]["skill_count"] == 1
 
+    def test_profiles_create_linz_world_spirit_registers_profile_local_identity(self, monkeypatch):
+        from hermes_constants import get_hermes_home
+        import hermes_cli.profiles as profiles_mod
+        import yaml
+
+        class FakeLinzService:
+            def register_original_spirit(
+                self,
+                hermes_profile,
+                os_name,
+                persona_seed="",
+                os_type="USER",
+                runtime_type="Hermes",
+                public_key="",
+                public_key_type="RSA",
+                fingerprint="",
+            ):
+                assert hermes_profile == "spirit-one"
+                assert os_name == "Linz One"
+                assert persona_seed == "distinct persona seed"
+                assert public_key.strip()
+                assert fingerprint
+                return {
+                    "agentId": f"agent_{hermes_profile}",
+                    "soulId": f"soul_{hermes_profile}",
+                    "soulHash": f"hash_{fingerprint[:12]}",
+                    "accessToken": "access-token-secret",
+                    "expiresIn": 86400,
+                    "registeredAt": "2026-05-15T00:00:00Z",
+                    "os_name": os_name,
+                }
+
+            def login(self, identity):
+                return {
+                    "token": "event-token-secret",
+                    "expiresAt": "2099-01-01T00:00:00Z",
+                    "subjectClaims": ["wsp.*"],
+                    "credentialId": "cred_1",
+                }
+
+            def refresh_authorization_map(self, identity, token_ref):
+                return {
+                    "map_version": "v1",
+                    "allowed_publish_subjects": ["wsp.*"],
+                    "allowed_publish_event_types": ["wsp.chat.message.sent"],
+                    "allowed_subscribe_subjects": ["wsp.*"],
+                    "allowed_subscribe_event_types": ["wsp.chat.message.sent"],
+                    "allowed_capabilities": ["publish", "compute", "memory_sink", "relationship"],
+                }
+
+        svc = FakeLinzService()
+        original_home = os.environ.get("HERMES_HOME")
+        monkeypatch.setattr(profiles_mod, "create_wrapper_script", lambda name: None)
+        monkeypatch.setattr(profiles_mod, "seed_profile_skills", lambda *a, **kw: None)
+        monkeypatch.setattr("agent.linz_world.identity.default_service", lambda config=None: svc)
+        monkeypatch.setattr("agent.linz_world.auth.default_service", lambda config=None: svc)
+
+        resp = self.client.post(
+            "/api/profiles/linz-world-spirit",
+            json={
+                "name": "spirit-one",
+                "agent_name": "Linz One",
+                "persona_seed": "distinct persona seed",
+                "clone_from_default": False,
+            },
+        )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["identity"]["agent_id"] == "agent_spirit-one"
+        profile_dir = get_hermes_home() / "profiles" / "spirit-one"
+        saved_config = yaml.safe_load((profile_dir / "config.yaml").read_text(encoding="utf-8"))
+        assert saved_config["linz_world"]["os_name"] == "Linz One"
+        assert saved_config["linz_world"]["persona_seed"] == "distinct persona seed"
+        assert "distinct persona seed" in (profile_dir / "SOUL.md").read_text(encoding="utf-8")
+
+        state = json.loads((profile_dir / "linz_world" / "state.json").read_text(encoding="utf-8"))
+        assert state["identity"]["profile_id"] == "spirit-one"
+        assert state["identity"]["agent_id"] == "agent_spirit-one"
+        private_key_path = Path(state["identity"]["private_key_path"])
+        assert str(private_key_path).startswith(str(profile_dir))
+        assert private_key_path.exists()
+        assert os.environ.get("HERMES_HOME") == original_home
+
+    def test_profiles_create_linz_world_spirit_rejects_default_persona_seed(self):
+        from hermes_constants import get_hermes_home
+        import yaml
+
+        home = get_hermes_home()
+        home.mkdir(parents=True, exist_ok=True)
+        (home / "config.yaml").write_text(
+            yaml.safe_dump({"linz_world": {"persona_seed": "default seed"}}, sort_keys=False),
+            encoding="utf-8",
+        )
+
+        resp = self.client.post(
+            "/api/profiles/linz-world-spirit",
+            json={
+                "name": "copy-default",
+                "agent_name": "Copy Default",
+                "persona_seed": "default seed",
+                "clone_from_default": True,
+            },
+        )
+
+        assert resp.status_code == 400
+        assert "must differ from the default profile" in resp.text
+        assert not (home / "profiles" / "copy-default").exists()
+
+    def test_profiles_create_linz_world_spirit_rejects_identity_matching_default(self, monkeypatch):
+        from agent.linz_world.event_state import LinzStateRepository
+        from agent.linz_world.models import RegistrationStatus, WorldIdentity
+        from hermes_constants import get_hermes_home
+        import hermes_cli.profiles as profiles_mod
+
+        home = get_hermes_home()
+        home.mkdir(parents=True, exist_ok=True)
+        default_repo = LinzStateRepository(root=home / "linz_world", profile_id="default")
+        default_repo.save_identity(
+            WorldIdentity(
+                profile_id="default",
+                agent_id="same_agent",
+                os_id="same_agent",
+                os_name="Default",
+                soul_id="same_soul",
+                soul_hash="same_hash",
+                account_id="same_agent",
+                registration_state=RegistrationStatus.REGISTERED,
+            )
+        )
+
+        class DuplicateLinzService:
+            def register_original_spirit(self, *args, **kwargs):
+                return {
+                    "agentId": "same_agent",
+                    "soulId": "same_soul",
+                    "soulHash": "same_hash",
+                    "accessToken": "access-token-secret",
+                    "expiresIn": 86400,
+                    "registeredAt": "2026-05-15T00:00:00Z",
+                    "os_name": "Dup",
+                }
+
+        svc = DuplicateLinzService()
+        monkeypatch.setattr(profiles_mod, "create_wrapper_script", lambda name: None)
+        monkeypatch.setattr(profiles_mod, "seed_profile_skills", lambda *a, **kw: None)
+        monkeypatch.setattr("agent.linz_world.identity.default_service", lambda config=None: svc)
+
+        resp = self.client.post(
+            "/api/profiles/linz-world-spirit",
+            json={
+                "name": "dup-spirit",
+                "agent_name": "Dup",
+                "persona_seed": "different seed",
+                "clone_from_default": False,
+            },
+        )
+
+        assert resp.status_code == 409
+        dup_repo = LinzStateRepository(root=home / "profiles" / "dup-spirit" / "linz_world", profile_id="dup-spirit")
+        saved = dup_repo.get_identity()
+        assert saved.registration_state.value == "failed"
+        assert "same identity as default" in saved.last_error
+
     def test_profiles_create_without_clone_seeds_bundled_skills(self, monkeypatch):
         from hermes_constants import get_hermes_home
         import hermes_cli.profiles as profiles_mod

@@ -10,6 +10,7 @@ Usage:
 """
 
 import asyncio
+from contextlib import contextmanager
 import hmac
 import importlib.util
 import json
@@ -2554,6 +2555,14 @@ class ProfileCreate(BaseModel):
     no_skills: bool = False
 
 
+class LinzSpiritCreate(BaseModel):
+    name: str
+    agent_name: str = ""
+    persona_seed: str
+    clone_from_default: bool = False
+    no_skills: bool = False
+
+
 class ProfileRename(BaseModel):
     new_name: str
 
@@ -2639,6 +2648,210 @@ def _profile_setup_command(name: str) -> str:
     return "hermes setup" if name == "default" else f"{name} setup"
 
 
+def _create_profile_directory(
+    *,
+    name: str,
+    clone_from_default: bool = False,
+    no_skills: bool = False,
+) -> Path:
+    """Create a named profile and mirror the CLI/dashboard post-create setup."""
+    from hermes_cli import profiles as profiles_mod
+
+    path = profiles_mod.create_profile(
+        name=name,
+        clone_from="default" if clone_from_default else None,
+        clone_config=clone_from_default,
+        no_skills=no_skills,
+    )
+    # Match the CLI's profile-create flow: fresh named profiles get the
+    # bundled skills installed. When cloning from default, create_profile()
+    # has already copied the source profile's skills, including any
+    # user-installed skills. When no_skills=True, create_profile() wrote
+    # the opt-out marker and seed_profile_skills() will no-op.
+    if not clone_from_default:
+        profiles_mod.seed_profile_skills(path, quiet=True)
+
+    # Match the CLI's profile-create flow: named profiles should get a
+    # wrapper in ~/.local/bin when the alias is safe to create.
+    collision = profiles_mod.check_alias_collision(name)
+    if not collision:
+        profiles_mod.create_wrapper_script(name)
+    return path
+
+
+def _load_profile_config_file(profile_dir: Path) -> Dict[str, Any]:
+    path = profile_dir / "config.yaml"
+    if not path.exists():
+        return {}
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError) as exc:
+        raise HTTPException(status_code=500, detail=f"Could not read profile config.yaml: {exc}")
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="Profile config.yaml must contain a YAML object.")
+    return data
+
+
+def _save_profile_config_file(profile_dir: Path, config: Dict[str, Any]) -> None:
+    try:
+        from utils import atomic_yaml_write
+
+        atomic_yaml_write(profile_dir / "config.yaml", config, sort_keys=False)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Could not write profile config.yaml: {exc}")
+
+
+def _read_linz_persona_seed(profile_dir: Path, config: Dict[str, Any] | None = None) -> str:
+    raw_linz = (config or {}).get("linz_world") if isinstance(config, dict) else {}
+    if isinstance(raw_linz, dict):
+        seed = str(raw_linz.get("persona_seed") or "").strip()
+        if seed:
+            return seed
+    try:
+        from hermes_cli.setup import _extract_linz_persona_seed_from_soul
+
+        return _extract_linz_persona_seed_from_soul(
+            (profile_dir / "SOUL.md").read_text(encoding="utf-8")
+        ).strip()
+    except OSError:
+        return ""
+
+
+def _configure_linz_world_profile(
+    *,
+    profile_dir: Path,
+    agent_name: str,
+    persona_seed: str,
+) -> Dict[str, Any]:
+    from agent.linz_world.config import (
+        DEFAULT_LINZ_WORLD_NATS_URL,
+        DEFAULT_LINZ_WORLD_SERVICE_URL,
+    )
+    from hermes_cli import setup as setup_mod
+
+    config = _load_profile_config_file(profile_dir)
+    linz = config.get("linz_world")
+    if not isinstance(linz, dict):
+        linz = {}
+        config["linz_world"] = linz
+
+    linz["enabled"] = True
+    linz["identity_required_on_agent_load"] = True
+    linz["service_url"] = str(linz.get("service_url") or DEFAULT_LINZ_WORLD_SERVICE_URL).strip()
+    linz["nats_url"] = str(linz.get("nats_url") or DEFAULT_LINZ_WORLD_NATS_URL).strip()
+    linz["os_name"] = agent_name
+    os_type = str(linz.get("os_type") or linz.get("type") or "USER").strip().upper()
+    linz["os_type"] = os_type if os_type in {"USER", "SEV", "GOV"} else "USER"
+    linz["runtime_type"] = str(linz.get("runtime_type") or "Hermes").strip() or "Hermes"
+    linz["persona_seed"] = persona_seed
+    linz.pop("server_url", None)
+    linz.pop("compute_api_key_ref", None)
+    linz.pop("type", None)
+
+    setup_mod._apply_os_runtime_install_defaults(config)
+    setup_mod._write_linz_persona_seed_to_soul(profile_dir, persona_seed)
+    _save_profile_config_file(profile_dir, config)
+    return config
+
+
+@contextmanager
+def _temporary_hermes_home(profile_dir: Path):
+    """Route Linz key/secrets side effects into the target profile directory."""
+    old_home = os.environ.get("HERMES_HOME")
+    os.environ["HERMES_HOME"] = str(profile_dir)
+    try:
+        yield
+    finally:
+        if old_home is None:
+            os.environ.pop("HERMES_HOME", None)
+        else:
+            os.environ["HERMES_HOME"] = old_home
+
+
+def _assert_linz_spirit_differs_from_default(profile_name: str, identity_obj) -> None:
+    if profile_name == "default":
+        raise HTTPException(status_code=400, detail="Cannot create a Linz World spirit for the default profile here.")
+    from agent.linz_world.event_state import LinzStateRepository
+    from hermes_cli import profiles as profiles_mod
+
+    default_dir = profiles_mod.get_profile_dir("default")
+    default_identity = LinzStateRepository(
+        root=default_dir / "linz_world",
+        profile_id="default",
+    ).get_identity()
+    if not default_identity or not default_identity.is_complete():
+        return
+    duplicate_fields = [
+        field
+        for field in ("agent_id", "os_id", "soul_id", "soul_hash")
+        if getattr(default_identity, field, "") and getattr(default_identity, field, "") == getattr(identity_obj, field, "")
+    ]
+    if duplicate_fields:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Linz World returned the same identity as default "
+                f"({', '.join(duplicate_fields)}). Use a distinct persona seed and retry."
+            ),
+        )
+
+
+def _register_linz_world_spirit(
+    *,
+    profile_name: str,
+    profile_dir: Path,
+    config: Dict[str, Any],
+) -> Dict[str, Any]:
+    from agent.linz_world import auth, identity
+    from agent.linz_world.event_state import LinzStateRepository
+    from agent.linz_world.models import AuthState, LoginState
+
+    repo = LinzStateRepository(root=profile_dir / "linz_world", profile_id=profile_name)
+    with _temporary_hermes_home(profile_dir):
+        world_identity = identity.ensure_original_spirit_identity(repo, config=config)
+        if not world_identity.is_complete():
+            raise HTTPException(
+                status_code=502,
+                detail=world_identity.last_error or "Linz World identity registration failed.",
+            )
+        try:
+            _assert_linz_spirit_differs_from_default(profile_name, world_identity)
+        except HTTPException as exc:
+            repo.save_failed_identity(
+                str(exc.detail),
+                "Use a distinct Linz World persona seed and retry registration.",
+            )
+            raise
+        session = auth.login(repo, config=config)
+        auth_map = repo.get_auth_map()
+
+    if session.state != LoginState.LOGGED_IN:
+        raise HTTPException(
+            status_code=502,
+            detail=session.last_error or "Linz World login failed after registration.",
+        )
+    if auth_map.state != AuthState.CURRENT and auth_map.last_error:
+        _log.warning("Linz World authorization map is not current for %s: %s", profile_name, auth_map.last_error)
+
+    return {
+        "identity": {
+            "profile_id": world_identity.profile_id,
+            "agent_id": world_identity.agent_id,
+            "os_id": world_identity.os_id,
+            "soul_id": world_identity.soul_id,
+            "soul_hash": world_identity.soul_hash,
+            "os_name": world_identity.os_name,
+            "registered_at": world_identity.registered_at,
+            "public_key_fingerprint": world_identity.public_key_fingerprint,
+        },
+        "login": {
+            "state": session.state.value,
+            "expires_at": session.expires_at,
+            "authorization_state": auth_map.state.value,
+        },
+    }
+
+
 @app.get("/api/profiles")
 async def list_profiles_endpoint():
     from hermes_cli import profiles as profiles_mod
@@ -2651,33 +2864,68 @@ async def list_profiles_endpoint():
 
 @app.post("/api/profiles")
 async def create_profile_endpoint(body: ProfileCreate):
-    from hermes_cli import profiles as profiles_mod
     try:
-        path = profiles_mod.create_profile(
+        path = _create_profile_directory(
             name=body.name,
-            clone_from="default" if body.clone_from_default else None,
-            clone_config=body.clone_from_default,
+            clone_from_default=body.clone_from_default,
             no_skills=body.no_skills,
         )
-        # Match the CLI's profile-create flow: fresh named profiles get the
-        # bundled skills installed. When cloning from default, create_profile()
-        # has already copied the source profile's skills, including any
-        # user-installed skills. When no_skills=True, create_profile() wrote
-        # the opt-out marker and seed_profile_skills() will no-op.
-        if not body.clone_from_default:
-            profiles_mod.seed_profile_skills(path, quiet=True)
-
-        # Match the CLI's profile-create flow: named profiles should get a
-        # wrapper in ~/.local/bin when the alias is safe to create.
-        collision = profiles_mod.check_alias_collision(body.name)
-        if not collision:
-            profiles_mod.create_wrapper_script(body.name)
     except (ValueError, FileExistsError, FileNotFoundError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         _log.exception("POST /api/profiles failed")
         raise HTTPException(status_code=500, detail=str(e))
     return {"ok": True, "name": body.name, "path": str(path)}
+
+
+@app.post("/api/profiles/linz-world-spirit")
+async def create_linz_world_spirit_endpoint(body: LinzSpiritCreate):
+    from hermes_cli import profiles as profiles_mod
+
+    try:
+        profile_name = profiles_mod.normalize_profile_name(body.name)
+        profiles_mod.validate_profile_name(profile_name)
+        if profile_name == "default":
+            raise ValueError("Cannot create a Linz World spirit named 'default'.")
+        persona_seed = str(body.persona_seed or "").strip()
+        if not persona_seed:
+            raise ValueError("Linz World persona_seed is required.")
+        agent_name = str(body.agent_name or "").strip() or profile_name
+        if not agent_name:
+            raise ValueError("Linz World agent_name is required.")
+
+        default_dir = profiles_mod.get_profile_dir("default")
+        default_config = _load_profile_config_file(default_dir) if default_dir.exists() else {}
+        default_seed = _read_linz_persona_seed(default_dir, default_config)
+        if default_seed and persona_seed == default_seed:
+            raise ValueError(
+                "Linz World persona_seed must differ from the default profile's persona seed "
+                "so the new spirit is not the same as default."
+            )
+
+        path = _create_profile_directory(
+            name=profile_name,
+            clone_from_default=body.clone_from_default,
+            no_skills=body.no_skills,
+        )
+        config = _configure_linz_world_profile(
+            profile_dir=path,
+            agent_name=agent_name,
+            persona_seed=persona_seed,
+        )
+        registration = _register_linz_world_spirit(
+            profile_name=profile_name,
+            profile_dir=path,
+            config=config,
+        )
+    except HTTPException:
+        raise
+    except (ValueError, FileExistsError, FileNotFoundError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        _log.exception("POST /api/profiles/linz-world-spirit failed")
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"ok": True, "name": profile_name, "path": str(path), **registration}
 
 
 @app.get("/api/profiles/{name}/setup-command")
