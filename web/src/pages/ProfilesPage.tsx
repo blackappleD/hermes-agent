@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, Pencil, Plus, Terminal, Trash2, Users } from "lucide-react";
+import { Check, ChevronDown, Pencil, Plus, Terminal, Trash2, Users } from "lucide-react";
 import { H2 } from "@/components/NouiTypography";
 import { api } from "@/lib/api";
 import type { ProfileInfo } from "@/lib/api";
@@ -30,6 +30,7 @@ export default function ProfilesPage() {
   const [creating, setCreating] = useState(false);
   const [linzAgentName, setLinzAgentName] = useState("");
   const [personaSeed, setPersonaSeed] = useState("");
+  const [showSpiritForm, setShowSpiritForm] = useState(false);
   const [creatingSpirit, setCreatingSpirit] = useState(false);
 
   // Inline rename state
@@ -80,7 +81,8 @@ export default function ProfilesPage() {
   };
 
   const handleCreateSpirit = async () => {
-    const name = newName.trim();
+    const agentName = linzAgentName.trim();
+    const name = newName.trim() || agentName;
     const seed = personaSeed.trim();
     if (!name) {
       showToast(t.profiles.nameRequired, "error");
@@ -98,7 +100,7 @@ export default function ProfilesPage() {
     try {
       const res = await api.createLinzWorldSpirit({
         name,
-        agent_name: linzAgentName.trim() || name,
+        agent_name: agentName || name,
         persona_seed: seed,
         clone_from_default: cloneFromDefault,
       });
@@ -106,6 +108,7 @@ export default function ProfilesPage() {
       setNewName("");
       setLinzAgentName("");
       setPersonaSeed("");
+      setShowSpiritForm(false);
       load();
     } catch (e) {
       showToast(`${t.status.error}: ${e}`, "error");
@@ -273,43 +276,63 @@ export default function ProfilesPage() {
               {t.profiles.cloneFromDefault}
             </label>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="linz-agent-name">Linz World agent name</Label>
-                <Input
-                  id="linz-agent-name"
-                  placeholder="Hermes Test"
-                  value={linzAgentName}
-                  onChange={(e) => setLinzAgentName(e.target.value)}
-                  disabled={creatingSpirit}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="linz-persona-seed">Persona seed</Label>
-                <textarea
-                  id="linz-persona-seed"
-                  className="flex min-h-[74px] w-full border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  placeholder="reliable, direct, and careful"
-                  value={personaSeed}
-                  onChange={(e) => setPersonaSeed(e.target.value)}
-                  disabled={creatingSpirit}
-                />
-              </div>
-            </div>
-
             <div className="flex flex-wrap items-center gap-2">
               <Button onClick={handleCreate} disabled={creating || creatingSpirit}>
                 <Plus className="h-3 w-3" />
                 {creating ? t.common.creating : t.common.create}
               </Button>
               <Button
-                onClick={handleCreateSpirit}
-                disabled={creating || creatingSpirit}
+                onClick={() => setShowSpiritForm(true)}
+                disabled={creating || creatingSpirit || showSpiritForm}
               >
                 <Plus className="h-3 w-3" />
-                {creatingSpirit ? t.common.creating : "创建元神"}
+                创建元神
               </Button>
             </div>
+
+            {showSpiritForm && (
+              <div className="grid gap-4 border-t border-border pt-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="linz-agent-name">Linz World agent name</Label>
+                    <Input
+                      id="linz-agent-name"
+                      placeholder="Hermes Test"
+                      value={linzAgentName}
+                      onChange={(e) => setLinzAgentName(e.target.value)}
+                      disabled={creatingSpirit}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="linz-persona-seed">Persona seed</Label>
+                    <textarea
+                      id="linz-persona-seed"
+                      className="flex min-h-[74px] w-full border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="reliable, direct, and careful"
+                      value={personaSeed}
+                      onChange={(e) => setPersonaSeed(e.target.value)}
+                      disabled={creatingSpirit}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    onClick={handleCreateSpirit}
+                    disabled={creating || creatingSpirit}
+                  >
+                    <Check className="h-3 w-3" />
+                    {creatingSpirit ? t.common.creating : "确定"}
+                  </Button>
+                  <Button
+                    ghost
+                    onClick={() => setShowSpiritForm(false)}
+                    disabled={creatingSpirit}
+                  >
+                    {t.common.cancel}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
