@@ -755,6 +755,18 @@ def load_gateway_config() -> GatewayConfig:
                         merged["extra"] = merged_extra
                     platforms_data[plat_name] = merged
                 gw_data["platforms"] = platforms_data
+
+            # Linz World is configured as a native top-level domain section
+            # rather than as a conventional messaging platform.  Bridge it
+            # into the gateway platform map so a profile with Linz enabled
+            # actually starts the receive-only NATS adapter.  An explicit
+            # platforms.linz_world block still wins, including enabled: false.
+            linz_cfg = yaml_cfg.get("linz_world")
+            if isinstance(linz_cfg, dict) and "linz_world" not in platforms_data:
+                if _coerce_bool(linz_cfg.get("enabled"), True):
+                    platforms_data["linz_world"] = {"enabled": True}
+                    gw_data["platforms"] = platforms_data
+
             for plat in Platform:
                 if plat == Platform.LOCAL:
                     continue
