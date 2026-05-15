@@ -194,7 +194,7 @@ export default function LogsPage() {
     useState<(typeof COMPONENTS)[number]>("all");
   const [lineCount, setLineCount] = useState<(typeof LINE_COUNTS)[number]>(100);
   const [profile, setProfile] = useState("current");
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
   // Switch acceptance: OS_RUNTIME sits before auto refresh, preserves normal filters, and shares auto refresh.
   const [osRuntimeMode, setOsRuntimeMode] = useState(false);
   const [rawExpanded, setRawExpanded] = useState(false);

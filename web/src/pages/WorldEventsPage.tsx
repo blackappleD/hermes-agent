@@ -329,7 +329,7 @@ function DetailPanel({
             </Button>
           </div>
           {payloadExpanded && (
-            <pre className="max-h-[360px] overflow-auto whitespace-pre-wrap break-words p-3 font-mono-ui text-xs leading-5">
+            <pre className="max-h-[360px] overflow-auto whitespace-pre-wrap break-words p-3 font-mono-ui text-xs leading-5 normal-case">
               {payloadText}
             </pre>
           )}
@@ -379,7 +379,7 @@ export default function WorldEventsPage() {
   const [subject, setSubject] = useState("");
   const [eventType, setEventType] = useState("");
   const [query, setQuery] = useState("");
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
   const [loading, setLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
