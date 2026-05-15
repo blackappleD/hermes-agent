@@ -100,7 +100,18 @@ class SignalInterpreter:
             text = event["text"]
             metadata = event["metadata"]
             event_type = event["event_type"]
-            if event_type in {"human_request", "os_runtime_continuation"} or _contains_any(
+            if event_type == "os_runtime_continuation":
+                signals.append(
+                    _signal(
+                        "continuation_need",
+                        "need",
+                        "medium",
+                        "Explicit runtime continuation prompt.",
+                        [event["event_id"]],
+                        {"event_type": event_type, "goal": str(metadata.get("goal") or "")},
+                    )
+                )
+            elif event_type == "human_request" and _contains_any(
                 text,
                 ("todo", "goal", "requirement", "please", "need", "需要", "目标", "任务"),
             ):
@@ -109,7 +120,7 @@ class SignalInterpreter:
                         "event_need",
                         "need",
                         "medium",
-                        "Event carries a user need, TODO, standing goal, or continuation.",
+                        "Event carries a user need, TODO, or standing goal.",
                         [event["event_id"]],
                         {"event_type": event_type, "goal": str(metadata.get("goal") or "")},
                     )
@@ -155,16 +166,17 @@ class SignalInterpreter:
             )
         for event in event_views:
             risk = _classify_risk(event["text"], event["event_type"], event["metadata"])
-            signals.append(
-                _signal(
-                    risk["code"],
-                    "risk",
-                    risk["level"],
-                    risk["reason"],
-                    [event["event_id"]],
-                    {"event_type": event["event_type"]},
+            if risk["code"] != "informational":
+                signals.append(
+                    _signal(
+                        risk["code"],
+                        "risk",
+                        risk["level"],
+                        risk["reason"],
+                        [event["event_id"]],
+                        {"event_type": event["event_type"]},
+                    )
                 )
-            )
         return signals
 
     def _authorization_signals(
@@ -273,6 +285,17 @@ class SignalInterpreter:
                         "Event metadata identifies a relationship counterparty.",
                         [event["event_id"]],
                         {"counterparty_id": counterparty},
+                    )
+                )
+            if event["event_type"] in {"human_request", "assistant_response"} and _is_simple_chat_text(event["text"]):
+                signals.append(
+                    _signal(
+                        "simple_chat_message",
+                        "relationship",
+                        "low",
+                        "Short conversational exchange without task or side-effect intent.",
+                        [event["event_id"]],
+                        {"event_type": event["event_type"]},
                     )
                 )
         return signals
@@ -400,7 +423,7 @@ def _event_view(event: Any, ref: OSRuntimeEventRef, index: int) -> dict[str, Any
         "source": str(source),
         "timestamp": ref.timestamp,
         "summary": ref.summary,
-        "text": f"{event_type} {ref.summary}".lower(),
+        "text": str(ref.summary).lower(),
         "metadata": metadata,
         "status": str(getattr(event, "status", "") or metadata.get("status") or ""),
     }
@@ -412,13 +435,85 @@ def _classify_risk(text: str, event_type: str, metadata: dict[str, Any]) -> dict
         return {"code": "approval_sensitive", "level": RiskLevel.CRITICAL.value, "reason": "Approval-sensitive or credential-related surface."}
     if _contains_any(haystack, ("send_message", "external message", "telegram", "discord", "slack", "world_event_published", "publish", "外部消息")):
         return {"code": "external_message", "level": RiskLevel.HIGH.value, "reason": "External platform message or world publish surface."}
-    if _contains_any(haystack, ("network", "http", "browser", "web", "request", "download", "upload", "curl")):
+    if _contains_any(haystack, ("network", "http", "browser", "web", "download", "upload", "curl")):
         return {"code": "network_send", "level": RiskLevel.HIGH.value, "reason": "Network or remote I/O surface."}
     if _contains_any(haystack, ("terminal", "shell", "command", "apply_patch", "file write", "write_file", "edit", "code", "pytest", "代码", "文件写入")):
         return {"code": "local_change", "level": RiskLevel.MEDIUM.value, "reason": "Local file, code, test, or terminal change surface."}
     if _contains_any(haystack, ("doc", "document", "summarize", "read", "explain", "文档", "摘要")):
         return {"code": "low_risk_document", "level": RiskLevel.LOW.value, "reason": "Low-risk documentation or read-only task surface."}
     return {"code": "informational", "level": RiskLevel.LOW.value, "reason": "No higher-risk surface detected."}
+
+
+def _is_simple_chat_text(text: str) -> bool:
+    normalized = " ".join(str(text or "").strip().lower().split())
+    if not normalized:
+        return False
+    if _contains_any(
+        normalized,
+        (
+            "todo",
+            "goal",
+            "requirement",
+            "please",
+            "need",
+            "http",
+            "browser",
+            "download",
+            "upload",
+            "curl",
+            "terminal",
+            "shell",
+            "command",
+            "apply_patch",
+            "write_file",
+            "edit",
+            "code",
+            "pytest",
+            "delete",
+            "remove",
+            "commit",
+            "push",
+            "deploy",
+            "需要",
+            "目标",
+            "任务",
+            "代码",
+            "文件",
+            "删除",
+            "删",
+            "文件写入",
+            "审批",
+            "外部消息",
+        ),
+    ):
+        return False
+    if normalized in {
+        "hello",
+        "hi",
+        "ok",
+        "okay",
+        "thanks",
+        "thank you",
+        "你好",
+        "您好",
+        "谢谢",
+        "测试",
+        "收到",
+    }:
+        return True
+    return _contains_any(
+        normalized,
+        (
+            "thank you",
+            "你好",
+            "您好",
+            "谢谢",
+            "测试",
+            "收到",
+            "正常通信",
+            "可以帮你",
+        ),
+    )
 
 
 def _auth_metadata(task_context: TaskContextView, agent_context: AgentContextView) -> dict[str, Any]:

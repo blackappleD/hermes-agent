@@ -62,6 +62,10 @@ def _codes(signal_set, key):
     return {item["code"] for item in signal_set.signals[key]}
 
 
+def _empty_contexts():
+    return TaskContextView(session_id="session-1"), AgentContextView()
+
+
 def test_signal_interpreter_outputs_deterministic_full_signal_set():
     task_context, agent_context = _contexts()
     auth_map = AuthorizationMap(
@@ -143,6 +147,22 @@ def test_signal_risk_rules_distinguish_document_code_terminal_network_and_extern
     assert risks["local_change"] == "medium"
     assert risks["network_send"] == "high"
     assert risks["external_message"] == "high"
+
+
+def test_simple_chat_is_not_treated_as_need_or_network_risk():
+    task_context, agent_context = _empty_contexts()
+    event = _event("evt-1", "human_request", EventSource.HERMES_CONVERSATION, "你好")
+
+    signal_set = SignalInterpreter().interpret(
+        task_context=task_context,
+        agent_context=agent_context,
+        events=[event],
+    )
+
+    assert "event_need" not in _codes(signal_set, "needs")
+    assert "network_send" not in _codes(signal_set, "risks")
+    assert "informational" not in _codes(signal_set, "risks")
+    assert "simple_chat_message" in _codes(signal_set, "relationships")
 
 
 def test_world_authorization_is_fail_closed_and_ignores_free_text_claims():
