@@ -199,6 +199,17 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
+  createLinzWorldSpirit: (body: {
+    name: string;
+    agent_name: string;
+    persona_seed: string;
+    clone_from_default: boolean;
+  }) =>
+    fetchJSON<LinzWorldSpiritCreateResponse>("/api/profiles/linz-world-spirit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
   renameProfile: (name: string, newName: string) =>
     fetchJSON<{ ok: boolean; name: string; path: string }>(
       `/api/profiles/${encodeURIComponent(name)}`,
@@ -694,6 +705,27 @@ export interface ProfileInfo {
   provider: string | null;
   has_env: boolean;
   skill_count: number;
+}
+
+export interface LinzWorldSpiritCreateResponse {
+  ok: boolean;
+  name: string;
+  path: string;
+  identity: {
+    profile_id: string;
+    agent_id: string;
+    os_id: string;
+    soul_id: string;
+    soul_hash: string;
+    os_name: string;
+    registered_at: string;
+    public_key_fingerprint: string;
+  };
+  login: {
+    state: string;
+    expires_at: string;
+    authorization_state: string;
+  };
 }
 
 export interface ModelsAnalyticsModelEntry {
