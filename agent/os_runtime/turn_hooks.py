@@ -404,17 +404,20 @@ class TurnTensionHook:
             step="arbiter",
             data={"arbitration": arbitration},
         )
+        observation_only = phase == "before_turn"
         state.last_turn_event_id = events[0].event_id
         state.last_intent_id = intent.intent_id
         state.last_arbitration = arbitration.to_dict()
         state.last_action_summary = arbitration.rationale
-        state.life_state = life_state.to_dict()
-        state.tension_set = tension_set.to_dict()
-        state.action_potential = action_potential.to_dict()
+        if not observation_only:
+            state.life_state = life_state.to_dict()
+            state.tension_set = tension_set.to_dict()
+            state.action_potential = action_potential.to_dict()
         state.self_prompt = self_prompt.to_dict()
         evidence_refs = list(self_prompt.metadata.get("evidence_refs") or [])
         state.evidence = {
             "phase": phase,
+            "observation_only": observation_only,
             "event_ids": [event.event_id for event in events],
             "life_delta": _safe_to_dict(life_delta),
             "tension_delta": _safe_to_dict(tension_delta),

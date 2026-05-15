@@ -75,6 +75,40 @@ def test_before_turn_observes_without_injection_when_disabled(tmp_path):
         assert result.request == request
         assert event_repo.list_by_session("session-1")[0].event_type == "human_request"
         assert queue_repo.load_state("session-1").last_turn_event_id == result.event_id
+        assert queue_repo.load_state("session-1").life_state == {}
+    finally:
+        event_repo.close()
+        queue_repo.close()
+
+
+def test_simple_chat_turns_do_not_drain_life_state(tmp_path):
+    event_repo = OSRuntimeEventRepository(root=tmp_path)
+    queue_repo = RuntimeQueueRepository(root=tmp_path)
+    hook = TurnTensionHook(
+        "session-1",
+        config=_config(inject_self_prompt=False),
+        event_repository=event_repo,
+        queue_repository=queue_repo,
+    )
+
+    try:
+        for user_text, assistant_text in (
+            ("你好", "你好！有什么可以帮你的吗？"),
+            ("测试", "测试收到！正常通信中。有什么需要帮忙的吗？"),
+        ):
+            hook.before_turn({"messages": [{"role": "user", "content": user_text}]}, message=user_text)
+            hook.after_turn(assistant_response=assistant_text)
+
+        state = queue_repo.load_state("session-1")
+        assert state is not None
+        life_state = state.life_state
+        assert life_state["energy"] >= 0.9
+        assert life_state["fatigue"] <= 0.1
+        assert life_state["wakefulness"] >= 0.9
+        assert life_state["life_cycle"] == "active"
+        reasons = state.evidence["life_delta"]["reasons"]
+        assert "continuous failures increase fatigue and restraint" not in reasons
+        assert "continuations add cognitive load" not in reasons
     finally:
         event_repo.close()
         queue_repo.close()
