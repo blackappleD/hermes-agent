@@ -83,18 +83,20 @@ export const api = {
     fetchJSON<{ ok: boolean }>(`/api/sessions/${encodeURIComponent(id)}`, {
       method: "DELETE",
     }),
-  getLogs: (params: { file?: string; lines?: number; level?: string; component?: string }) => {
+  getLogs: (params: { file?: string; lines?: number; level?: string; component?: string; profile?: string }) => {
     const qs = new URLSearchParams();
     if (params.file) qs.set("file", params.file);
     if (params.lines) qs.set("lines", String(params.lines));
     if (params.level && params.level !== "ALL") qs.set("level", params.level);
     if (params.component && params.component !== "all") qs.set("component", params.component);
+    if (params.profile && params.profile !== "current") qs.set("profile", params.profile);
     return fetchJSON<LogsResponse>(`/api/logs?${qs.toString()}`);
   },
-  getOsRuntimeLogs: (params: { lines?: number; includeRaw?: boolean } = {}) => {
+  getOsRuntimeLogs: (params: { lines?: number; includeRaw?: boolean; profile?: string } = {}) => {
     const qs = new URLSearchParams();
     if (params.lines) qs.set("lines", String(params.lines));
     if (params.includeRaw !== undefined) qs.set("include_raw", String(params.includeRaw));
+    if (params.profile && params.profile !== "current") qs.set("profile", params.profile);
     return fetchJSON<OSRuntimeLogsResponse>(`/api/logs/os-runtime?${qs.toString()}`);
   },
   getGatewayMessageEvents: (params: GatewayMessageEventQuery = {}) => {
@@ -110,15 +112,20 @@ export const api = {
     if (params.q) qs.set("q", params.q);
     if (params.from) qs.set("from", params.from);
     if (params.to) qs.set("to", params.to);
+    if (params.profile && params.profile !== "current") qs.set("profile", params.profile);
     const query = qs.toString();
     return fetchJSON<GatewayMessageEventsResponse>(
       `/api/gateway/message-events${query ? `?${query}` : ""}`,
     );
   },
-  getGatewayMessageEventDetail: (recordId: string) =>
-    fetchJSON<GatewayMessageEventDetailResponse>(
-      `/api/gateway/message-events/${encodeURIComponent(recordId)}`,
-    ),
+  getGatewayMessageEventDetail: (recordId: string, profile?: string) => {
+    const qs = new URLSearchParams();
+    if (profile && profile !== "current") qs.set("profile", profile);
+    const query = qs.toString();
+    return fetchJSON<GatewayMessageEventDetailResponse>(
+      `/api/gateway/message-events/${encodeURIComponent(recordId)}${query ? `?${query}` : ""}`,
+    );
+  },
   getAnalytics: (days: number) =>
     fetchJSON<AnalyticsResponse>(`/api/analytics/usage?days=${days}`),
   getModelsAnalytics: (days: number) =>
@@ -478,6 +485,8 @@ export interface SessionMessagesResponse {
 
 export interface LogsResponse {
   file: string;
+  profile?: string;
+  profile_path?: string;
   lines: string[];
 }
 
@@ -513,6 +522,8 @@ export interface RuntimeModuleSnapshot {
 
 export interface OSRuntimeLogsResponse {
   mode: "os_runtime";
+  profile?: string;
+  profile_path?: string;
   source_files: string[];
   updated_at: string;
   modules: RuntimeModuleSnapshot[];
@@ -542,6 +553,7 @@ export type GatewayProjectionStatus = "pending" | "projected" | "failed";
 export interface GatewayMessageEventQuery {
   limit?: number;
   cursor?: string | null;
+  profile?: string;
   source_category?: string;
   consume_status?: GatewayConsumeStatus;
   projection_status?: GatewayProjectionStatus;
@@ -581,6 +593,8 @@ export interface GatewayMessageEventSummary {
 
 export interface GatewayMessageEventsResponse {
   mode: "gateway_message_events";
+  profile?: string;
+  profile_path?: string;
   records: GatewayMessageEventSummary[];
   next_cursor: string | null;
   source_status: GatewaySourceStatus;
@@ -625,6 +639,8 @@ export interface GatewayMessageEventDetailRecord extends GatewayMessageEventSumm
 
 export interface GatewayMessageEventDetailResponse {
   mode: "gateway_message_event_detail";
+  profile?: string;
+  profile_path?: string;
   record: GatewayMessageEventDetailRecord;
   projection: GatewayMessageEventProjection | null;
   transitions: GatewayMessageEventTransition[];
