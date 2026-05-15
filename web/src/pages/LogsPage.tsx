@@ -278,7 +278,7 @@ export default function LogsPage() {
       </span>,
     );
     setEnd(
-      <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
+      <div className="flex w-full min-w-0 flex-nowrap items-center justify-end gap-1.5 sm:gap-2">
         <ProfileSelector
           value={profile}
           onChange={(nextProfile) => {
@@ -287,7 +287,7 @@ export default function LogsPage() {
             setRuntimeData(null);
           }}
         />
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5">
           <Switch
             checked={osRuntimeMode}
             onCheckedChange={setOsRuntimeMode}
@@ -297,7 +297,7 @@ export default function LogsPage() {
             {runtimeText.toggle}
           </Label>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5">
           <Switch
             checked={autoRefresh}
             onCheckedChange={setAutoRefresh}
