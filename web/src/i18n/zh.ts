@@ -208,6 +208,8 @@ export const zh: Translations = {
       parseErrors: "解析错误",
       partial: "部分数据",
       empty: "空",
+      renderedPrompt: "实际提示词",
+      structuredFields: "结构化字段",
       change: {
         up: "上升",
         down: "下降",

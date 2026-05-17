@@ -210,6 +210,8 @@ export const en: Translations = {
       parseErrors: "Parse errors",
       partial: "Partial",
       empty: "Empty",
+      renderedPrompt: "Rendered Prompt",
+      structuredFields: "Structured Fields",
       change: {
         up: "Up",
         down: "Down",

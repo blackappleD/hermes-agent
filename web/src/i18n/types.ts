@@ -230,6 +230,8 @@ export interface Translations {
       parseErrors: string;
       partial: string;
       empty: string;
+      renderedPrompt?: string;
+      structuredFields?: string;
       change: {
         up: string;
         down: string;
