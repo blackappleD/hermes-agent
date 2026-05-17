@@ -33,6 +33,7 @@ from agent.os_runtime.engine import BoYueArbiter, OpenIntentGenerator, SelfPromp
 from agent.os_runtime.engine.action_potential import ActionPotentialEvaluator
 from agent.os_runtime.engine.life_state import LifeStateSystem
 from agent.os_runtime.engine.signals import SignalInterpreter
+from agent.os_runtime.evidence import build_evidence_package, record_evidence_package
 
 logger = logging.getLogger(__name__)
 
@@ -520,9 +521,10 @@ class OSRuntimeDriver:
             prompt = self._continuation_prompt(state, intent, arbitration)
             try:
                 repo = self._event_repository()
+                continuation_event_id = f"osr-cont-{uuid.uuid4().hex}"
                 repo.append(
                     OSRuntimeEvent(
-                        event_id=f"osr-cont-{uuid.uuid4().hex}",
+                        event_id=continuation_event_id,
                         event_type="os_runtime_continuation",
                         source=EventSource.HERMES_CONVERSATION,
                         session_id=self.session_id,
@@ -534,6 +536,13 @@ class OSRuntimeDriver:
                             "synthetic": True,
                         },
                     )
+                )
+                self._record_continuation_evidence(
+                    repo,
+                    state=state,
+                    intent=intent,
+                    arbitration=arbitration,
+                    continuation_event_id=continuation_event_id,
                 )
             except Exception as exc:
                 logger.debug("os_runtime continuation event projection failed: %s", exc)
@@ -700,6 +709,39 @@ class OSRuntimeDriver:
         if not reason:
             return ""
         return f"OS Runtime {state.status}: {reason}"
+
+    def _record_continuation_evidence(
+        self,
+        repo: OSRuntimeEventRepository,
+        *,
+        state: OSRuntimeState,
+        intent: OpenIntent,
+        arbitration: ArbitrationResult,
+        continuation_event_id: str,
+    ) -> None:
+        event_ids = [
+            item
+            for item in [state.last_world_event_id, continuation_event_id]
+            if item
+        ]
+        package = build_evidence_package(
+            evidence_id=f"evidence_continuation_{continuation_event_id}",
+            trace_id=state.last_world_event_id or continuation_event_id,
+            session_id=self.session_id,
+            event_ids=event_ids,
+            intent=intent,
+            arbitration=arbitration,
+            receipts=[],
+            known_risks=["continuation_evidence_has_no_execution_receipts"],
+            metadata={
+                "continuation_event_id": continuation_event_id,
+                "turns_used": state.turns_used,
+                "max_turns": state.max_turns,
+                "goal": state.goal,
+                "decision_reason": arbitration.rationale,
+            },
+        )
+        record_evidence_package(package, repository=repo, config=self.config)
 
     def _trace_ids(self, state: OSRuntimeState) -> dict[str, str]:
         return {

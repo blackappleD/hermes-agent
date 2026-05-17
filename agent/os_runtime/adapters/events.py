@@ -285,7 +285,17 @@ def redact_for_summary(value: Any) -> Any:
             redacted,
         )
         return _SENSITIVE_ASSIGNMENT_RE.sub(lambda m: f"{m.group(1)}[REDACTED]", redacted)
-    return redact_value(value)
+    return _redact_nested_strings(redact_value(value))
+
+
+def _redact_nested_strings(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _redact_nested_strings(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_redact_nested_strings(item) for item in value]
+    if isinstance(value, str):
+        return redact_for_summary(value)
+    return value
 
 
 def stable_hash(value: Any) -> str:

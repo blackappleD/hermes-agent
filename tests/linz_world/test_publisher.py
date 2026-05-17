@@ -21,6 +21,43 @@ def test_publish_success_records_receipt(linz_home, FakeLinzService):
     assert svc.publish_calls == 1
 
 
+def test_publish_success_projects_os_runtime_receipt_context(linz_home, FakeLinzService, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "agent.os_runtime.adapters.linz_world.project_world_publish_receipt",
+        lambda receipt, **kwargs: calls.append((receipt, kwargs)),
+    )
+    repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
+    svc = FakeLinzService()
+    ensure_original_spirit_identity(repo, svc, config=_CONFIG)
+    auth.login(repo, svc)
+
+    receipt = publish_event(
+        "wsp.agent_b",
+        "wsp.chat.message.sent",
+        {"content": "hi"},
+        repo,
+        svc,
+        os_runtime_context={
+            "event_id": "event-1",
+            "intent_id": "intent-1",
+            "arbitration_id": "arb-1",
+            "permission_ticket_id": "ticket-1",
+            "session_id": "session-1",
+        },
+    )
+
+    assert receipt.status.value == "published"
+    assert calls
+    projected_receipt, kwargs = calls[-1]
+    assert projected_receipt.world_event_id == "evt_published"
+    assert kwargs["authorization_map_version"] == "v1"
+    assert kwargs["arbitration_id"] == "arb-1"
+    assert kwargs["ticket_id"] == "ticket-1"
+    assert kwargs["event_id"] == "event-1"
+    assert kwargs["intent_id"] == "intent-1"
+
+
 def test_chat_send_publishes_to_recipient_inbox(linz_home, FakeLinzService):
     class CapturingService(FakeLinzService):
         def publish_event(self, token_ref, subject, event_type, payload):

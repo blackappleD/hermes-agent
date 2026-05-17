@@ -141,6 +141,13 @@ def test_event_repository_profile_scope_for_driver(hermes_home, tmp_path):
         runtime.evaluate_after_turn("assistant response", recent_event=_event("s-repo"))
         events = repo.list_by_session("s-repo")
         assert any(event.event_type == "os_runtime_continuation" for event in events)
+        evidence_events = [event for event in events if event.event_type == "evidence_package"]
+        assert evidence_events
+        package = evidence_events[0].metadata["evidence_package"]
+        assert package["complete"] is False
+        assert "missing_receipts" in package["diagnostics"]
+        assert package["intent_id"] == "intent-low"
+        assert "continuation_evidence_has_no_execution_receipts" in package["known_risks"]
     finally:
         repo.close()
 

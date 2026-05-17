@@ -458,23 +458,37 @@ class PermissionTicket(JSONRoundTripMixin):
     ticket_id: str
     intent_id: str
     decision: ArbitrationDecision
+    arbitration_id: str = ""
     issued_at: str = ""
     expires_at: str = ""
     allowed_tools: list[str] = field(default_factory=list)
     constraints: list[str] = field(default_factory=list)
+    issuer: str = ""
+    approval_ref: str = ""
+    policy_version: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class ExecutionReceipt(JSONRoundTripMixin):
     receipt_id: str
+    receipt_type: str = ""
     ticket_id: str = ""
     intent_id: str = ""
+    event_id: str = ""
+    arbitration_id: str = ""
+    session_id: str = ""
+    task_id: str = ""
+    tool_call_id: str = ""
     status: str = ""
     started_at: str = ""
     completed_at: str = ""
+    duration_ms: int = 0
+    input_summary: str = ""
     output_summary: str = ""
     error: str = ""
+    payload_hash: str = ""
+    content_ref: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -494,10 +508,18 @@ class BubbleSpec(JSONRoundTripMixin):
 class EvidencePackage(JSONRoundTripMixin):
     evidence_id: str
     trace_id: str = ""
+    session_id: str = ""
+    intent_id: str = ""
+    arbitration_id: str = ""
     event_ids: list[str] = field(default_factory=list)
     receipt_ids: list[str] = field(default_factory=list)
     summary: str = ""
     evidence: list[dict[str, Any]] = field(default_factory=list)
+    receipts: list[ExecutionReceipt] = field(default_factory=list)
+    commands: list[dict[str, Any]] = field(default_factory=list)
+    known_risks: list[str] = field(default_factory=list)
+    diagnostics: list[str] = field(default_factory=list)
+    complete: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
