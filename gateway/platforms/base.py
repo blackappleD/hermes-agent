@@ -50,16 +50,26 @@ def _thread_metadata_for_source(source, reply_to_message_id: str | None = None) 
     supplies both ``message_thread_id`` and ``reply_to_message_id``. Mark those
     lanes so the Telegram adapter can avoid the known-bad partial routes.
     """
+    metadata: dict = {}
     thread_id = getattr(source, "thread_id", None)
-    if thread_id is None:
-        return None
-    metadata = {"thread_id": thread_id}
-    if _platform_name(getattr(source, "platform", None)) == "telegram" and getattr(source, "chat_type", None) == "dm":
+    if thread_id is not None:
+        metadata["thread_id"] = thread_id
+    platform_name = _platform_name(getattr(source, "platform", None))
+    if platform_name == "linz_world":
+        metadata.update(
+            {
+                "linz_world_chat_id": str(getattr(source, "chat_id", "") or ""),
+                "linz_world_user_id": str(getattr(source, "user_id", "") or ""),
+                "linz_world_user_name": str(getattr(source, "user_name", "") or ""),
+                "linz_world_message_id": str(getattr(source, "message_id", "") or ""),
+            }
+        )
+    if platform_name == "telegram" and getattr(source, "chat_type", None) == "dm":
         metadata["telegram_dm_topic_reply_fallback"] = True
         anchor = reply_to_message_id or getattr(source, "message_id", None)
         if anchor is not None:
             metadata["telegram_reply_to_message_id"] = str(anchor)
-    return metadata
+    return metadata or None
 
 
 def _reply_anchor_for_event(event) -> str | None:

@@ -12400,10 +12400,19 @@ class GatewayRunner:
         reply_to_message_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Build the metadata dict platforms need for thread-aware replies."""
+        metadata: Dict[str, Any] = {}
         thread_id = getattr(source, "thread_id", None)
-        if thread_id is None:
-            return None
-        metadata: Dict[str, Any] = {"thread_id": thread_id}
+        if thread_id is not None:
+            metadata["thread_id"] = thread_id
+        if getattr(getattr(source, "platform", None), "value", None) == "linz_world":
+            metadata.update(
+                {
+                    "linz_world_chat_id": str(getattr(source, "chat_id", "") or ""),
+                    "linz_world_user_id": str(getattr(source, "user_id", "") or ""),
+                    "linz_world_user_name": str(getattr(source, "user_name", "") or ""),
+                    "linz_world_message_id": str(getattr(source, "message_id", "") or ""),
+                }
+            )
         if (
             getattr(source, "platform", None) == Platform.TELEGRAM
             and getattr(source, "chat_type", None) == "dm"
@@ -12412,7 +12421,7 @@ class GatewayRunner:
             anchor = reply_to_message_id or getattr(source, "message_id", None)
             if anchor is not None:
                 metadata["telegram_reply_to_message_id"] = str(anchor)
-        return metadata
+        return metadata or None
 
     @staticmethod
     def _reply_anchor_for_event(event: MessageEvent) -> Optional[str]:
