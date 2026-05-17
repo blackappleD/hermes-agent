@@ -7,8 +7,10 @@ import {
 } from "react";
 import {
   AlertTriangle,
+  Check,
   ChevronDown,
   ChevronUp,
+  Copy,
   Database,
   FileText,
   RefreshCw,
@@ -60,6 +62,8 @@ const DEFAULT_TEXT = {
   hidePayload: "Hide payload",
   messageEvent: "Hermes MessageEvent",
   transitions: "Transitions",
+  copyTransitions: "Copy as MD",
+  copiedTransitions: "Copied",
   sourceStatus: "Gateway",
   linzWorld: "Linz World/NATS",
   updated: "Updated",
@@ -137,6 +141,32 @@ function compactJson(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function transitionMarkdown(detail: GatewayMessageEventDetailResponse): string {
+  return detail.transitions
+    .map((transition) => {
+      const title = transition.reason || transition.error || transition.to_status || `transition-${transition.transition_id}`;
+      const metadata = Object.keys(transition.metadata || {}).length > 0 ? transition.metadata : {};
+      return `## ${title}\n\n\`\`\`json\n${compactJson(metadata)}\n\`\`\``;
+    })
+    .join("\n\n");
+}
+
+async function copyText(value: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
 }
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
@@ -223,6 +253,21 @@ function DetailPanel({
   payloadExpanded: boolean;
   setPayloadExpanded: (expanded: boolean) => void;
 }) {
+  const [transitionsCopied, setTransitionsCopied] = useState(false);
+  const transitionsMarkdown = useMemo(() => (detail ? transitionMarkdown(detail) : ""), [detail]);
+
+  useEffect(() => {
+    if (!transitionsCopied) return;
+    const timeout = window.setTimeout(() => setTransitionsCopied(false), 1500);
+    return () => window.clearTimeout(timeout);
+  }, [transitionsCopied]);
+
+  const handleCopyTransitions = useCallback(() => {
+    copyText(transitionsMarkdown)
+      .then(() => setTransitionsCopied(true))
+      .catch(() => setTransitionsCopied(false));
+  }, [transitionsMarkdown]);
+
   if (loading) {
     return (
       <Card className="min-h-[360px]">
@@ -336,7 +381,19 @@ function DetailPanel({
         </div>
 
         <div className="grid gap-2">
-          <p className="text-xs">{DEFAULT_TEXT.transitions}</p>
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+            <p className="text-xs">{DEFAULT_TEXT.transitions}</p>
+            <Button
+              type="button"
+              size="sm"
+              outlined
+              onClick={handleCopyTransitions}
+              disabled={!detail.transitions.length}
+              prefix={transitionsCopied ? <Check /> : <Copy />}
+            >
+              {transitionsCopied ? DEFAULT_TEXT.copiedTransitions : DEFAULT_TEXT.copyTransitions}
+            </Button>
+          </div>
           <div className="grid gap-2">
             {detail.transitions.map((transition) => (
               <div
@@ -353,6 +410,11 @@ function DetailPanel({
                   <p className="break-words font-mono-ui text-[11px] text-muted-foreground">
                     {transition.reason || transition.error}
                   </p>
+                )}
+                {Object.keys(transition.metadata || {}).length > 0 && (
+                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words border border-border/40 bg-background/40 p-2 font-mono-ui text-[11px] leading-5 normal-case text-muted-foreground">
+                    {compactJson(transition.metadata)}
+                  </pre>
                 )}
               </div>
             ))}

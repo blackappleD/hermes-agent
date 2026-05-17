@@ -48,6 +48,8 @@ const DEFAULT_OS_RUNTIME_TEXT = {
   parseErrors: "Parse errors",
   partial: "Partial",
   empty: "Empty",
+  renderedPrompt: "Rendered Prompt",
+  structuredFields: "Structured Fields",
   change: {
     up: "Up",
     down: "Down",
@@ -122,6 +124,11 @@ function moduleTitle(module: RuntimeModuleSnapshot, text: RuntimeText): string {
   return text.modules[key] ?? module.title;
 }
 
+function metadataString(module: RuntimeModuleSnapshot, key: string): string {
+  const value = module.metadata?.[key];
+  return typeof value === "string" ? value : "";
+}
+
 function RuntimeModuleCard({
   module,
   text,
@@ -130,6 +137,10 @@ function RuntimeModuleCard({
   text: RuntimeText;
 }) {
   const isEmpty = module.status === "empty" || module.parameters.length === 0;
+  const renderedPrompt =
+    module.module_id === "self_prompt"
+      ? metadataString(module, "rendered_prompt")
+      : "";
   return (
     <Card>
       <CardHeader className="px-4 py-3">
@@ -156,12 +167,27 @@ function RuntimeModuleCard({
             {module.summary}
           </p>
         )}
+        {renderedPrompt && (
+          <div className="mb-3 border border-border/60 bg-secondary/10 p-3">
+            <p className="mb-2 text-[11px] font-medium uppercase text-muted-foreground">
+              {text.renderedPrompt}
+            </p>
+            <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-words font-mono-ui text-xs leading-5 text-foreground">
+              {renderedPrompt}
+            </pre>
+          </div>
+        )}
         {isEmpty ? (
           <p className="py-4 text-center text-xs text-muted-foreground">
             {text.moduleNoData}
           </p>
         ) : (
           <div className="grid gap-2">
+            {renderedPrompt && (
+              <p className="text-[11px] font-medium uppercase text-muted-foreground">
+                {text.structuredFields}
+              </p>
+            )}
             {module.parameters.map((param) => (
               <div
                 key={`${module.module_id}-${param.key}`}
@@ -208,7 +234,18 @@ export default function LogsPage() {
   const rawScrollRef = useRef<HTMLDivElement>(null);
   const stickRawToBottomRef = useRef(true);
   const { t } = useI18n();
-  const runtimeText = t.logs.osRuntime ?? DEFAULT_OS_RUNTIME_TEXT;
+  const runtimeText: RuntimeText = {
+    ...DEFAULT_OS_RUNTIME_TEXT,
+    ...(t.logs.osRuntime ?? {}),
+    change: {
+      ...DEFAULT_OS_RUNTIME_TEXT.change,
+      ...(t.logs.osRuntime?.change ?? {}),
+    },
+    modules: {
+      ...DEFAULT_OS_RUNTIME_TEXT.modules,
+      ...(t.logs.osRuntime?.modules ?? {}),
+    },
+  };
   const { setAfterTitle, setEnd } = usePageHeader();
 
   const scrollNormalLogToBottom = useCallback(() => {
