@@ -66,9 +66,92 @@ const DEFAULT_OS_RUNTIME_TEXT = {
     arbitration: "Arbitration",
     runtime_driver: "Runtime Driver",
   },
+  fields: {
+    energy: "Energy",
+    fatigue: "Fatigue",
+    health: "Health",
+    wakefulness: "Wakefulness",
+    curiosity: "Curiosity",
+    boredom: "Boredom",
+    creative_pressure: "Creative Pressure",
+    social_hunger: "Social Hunger",
+    silence_pressure: "Silence Pressure",
+    restraint: "Restraint",
+    life_cycle: "Life Cycle",
+    recovery_cycle: "Recovery Cycle",
+    generated_intent_count: "Generated Intent Count",
+    active_tensions: "Active Tensions",
+    top_tension_id: "Top Tension ID",
+    top_tension_type: "Top Tension Type",
+    intensity: "Intensity",
+    activation: "Activation",
+    trend: "Trend",
+    trend_slope: "Trend Slope",
+    confidence: "Confidence",
+    baseline: "Baseline",
+    propagation_edges: "Propagation Edges",
+    value_potential: "Value Potential",
+    mutual_benefit_potential: "Mutual Benefit Potential",
+    learning_potential: "Learning Potential",
+    risk_cost: "Risk Cost",
+    overall_score: "Overall Score",
+    recommended_depth: "Recommended Depth",
+    rationale: "Rationale",
+    prompt_id: "Prompt ID",
+    state_summary: "State Summary",
+    tension_summary: "Tension Summary",
+    potential_summary: "Potential Summary",
+    environment_scope: "Environment Scope",
+    intent_id: "Intent ID",
+    description: "Description",
+    action_family: "Action Family",
+    risk_level: "Risk Level",
+    success_condition: "Success Condition",
+    decision: "Decision",
+    verdict: "Verdict",
+    risk: "Risk",
+    requires_approval: "Requires Approval",
+    status: "Status",
+    should_continue: "Should Continue",
+    reason: "Reason",
+    turns_used: "Turns Used",
+    max_turns: "Max Turns",
+    paused_reason: "Paused Reason",
+  },
+  values: {
+    true: "true",
+    false: "false",
+    unknown: "unknown",
+    active: "Active",
+    stable: "Stable",
+    none: "None",
+    continue_turn: "Continue Turn",
+    report_only: "Report Only",
+    draft_only: "Draft Only",
+    execute: "Execute",
+    skip: "Skip",
+    allow: "Allow",
+    block: "Block",
+    defer: "Defer",
+    approve: "Approve",
+    approved: "Approved",
+    reject: "Reject",
+    rejected: "Rejected",
+    low: "Low",
+    medium: "Medium",
+    high: "High",
+    critical: "Critical",
+    paused: "Paused",
+    running: "Running",
+    idle: "Idle",
+    ok: "OK",
+  },
 };
 
-type RuntimeText = typeof DEFAULT_OS_RUNTIME_TEXT;
+type RuntimeText = Omit<typeof DEFAULT_OS_RUNTIME_TEXT, "fields" | "values"> & {
+  fields: Record<string, string>;
+  values: Record<string, string>;
+};
 
 function classifyLine(line: string): "error" | "warning" | "info" | "debug" {
   const upper = line.toUpperCase();
@@ -95,12 +178,50 @@ const toOptions = <T extends string>(values: readonly T[]) =>
 
 function formatValue(value: RuntimeParameterReading["value"]): string {
   if (typeof value === "number") {
-    return Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+    return Number.isInteger(value)
+      ? String(value)
+      : value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
   }
   if (typeof value === "boolean") return value ? "true" : "false";
   if (value === null || value === undefined) return "unknown";
   if (typeof value === "string") return value || "unknown";
   return JSON.stringify(value);
+}
+
+function normalizeRuntimeValue(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function localizeRuntimeInlineText(value: string, text: RuntimeText): string {
+  return value
+    .replace(/\b([A-Za-z][A-Za-z0-9_]*)\s*=/g, (match, key: string) => {
+      const localizedKey = text.fields[normalizeRuntimeValue(key)];
+      return localizedKey ? `${localizedKey}=` : match;
+    })
+    .replace(/=\s*([A-Za-z][A-Za-z0-9_-]*)\b/g, (match, rawValue: string) => {
+      const localizedValue = text.values[normalizeRuntimeValue(rawValue)];
+      return localizedValue ? `=${localizedValue}` : match;
+    });
+}
+
+function formatRuntimeValue(
+  value: RuntimeParameterReading["value"],
+  text: RuntimeText,
+): string {
+  if (typeof value === "boolean") {
+    return text.values[String(value)] ?? formatValue(value);
+  }
+  if (value === null || value === undefined) {
+    return text.values.unknown ?? formatValue(value);
+  }
+  if (typeof value === "string") {
+    if (!value) return text.values.unknown ?? formatValue(value);
+    return (
+      text.values[normalizeRuntimeValue(value)] ??
+      localizeRuntimeInlineText(value, text)
+    );
+  }
+  return formatValue(value);
 }
 
 function changeTone(change: RuntimeParameterReading["change"]) {
@@ -119,9 +240,37 @@ function changeLabel(param: RuntimeParameterReading, text: RuntimeText): string 
   return base;
 }
 
+function parameterLabel(
+  param: RuntimeParameterReading,
+  text: RuntimeText,
+): string {
+  return text.fields[param.key] ?? param.label;
+}
+
 function moduleTitle(module: RuntimeModuleSnapshot, text: RuntimeText): string {
   const key = module.module_id as keyof RuntimeText["modules"];
   return text.modules[key] ?? module.title;
+}
+
+function moduleSummary(module: RuntimeModuleSnapshot, text: RuntimeText): string {
+  if (
+    module.module_id === "life_state" ||
+    module.module_id === "tension_field" ||
+    module.module_id === "action_potential"
+  ) {
+    return module.parameters
+      .slice(0, 3)
+      .map(
+        (param) =>
+          `${parameterLabel(param, text)} ${formatRuntimeValue(param.value, text)}`,
+      )
+      .join(", ");
+  }
+  return module.summary;
+}
+
+function emptyReason(reason: string, text: RuntimeText): string {
+  return reason === DEFAULT_OS_RUNTIME_TEXT.noData ? text.noData : reason;
 }
 
 function metadataString(module: RuntimeModuleSnapshot, key: string): string {
@@ -141,6 +290,7 @@ function RuntimeModuleCard({
     module.module_id === "self_prompt"
       ? metadataString(module, "rendered_prompt")
       : "";
+  const summary = moduleSummary(module, text);
   return (
     <Card>
       <CardHeader className="px-4 py-3">
@@ -162,9 +312,9 @@ function RuntimeModuleCard({
         </div>
       </CardHeader>
       <CardContent className="px-4 pb-4 pt-0">
-        {module.summary && (
+        {summary && (
           <p className="mb-3 break-words text-xs text-muted-foreground">
-            {module.summary}
+            {summary}
           </p>
         )}
         {renderedPrompt && (
@@ -195,10 +345,10 @@ function RuntimeModuleCard({
               >
                 <div className="min-w-0">
                   <p className="truncate text-xs text-muted-foreground">
-                    {param.label}
+                    {parameterLabel(param, text)}
                   </p>
                   <p className="break-words font-mono-ui text-sm text-foreground">
-                    {formatValue(param.value)}
+                    {formatRuntimeValue(param.value, text)}
                   </p>
                 </div>
                 <Badge tone={changeTone(param.change)} className="text-[10px]">
@@ -244,6 +394,14 @@ export default function LogsPage() {
     modules: {
       ...DEFAULT_OS_RUNTIME_TEXT.modules,
       ...(t.logs.osRuntime?.modules ?? {}),
+    },
+    fields: {
+      ...DEFAULT_OS_RUNTIME_TEXT.fields,
+      ...(t.logs.osRuntime?.fields ?? {}),
+    },
+    values: {
+      ...DEFAULT_OS_RUNTIME_TEXT.values,
+      ...(t.logs.osRuntime?.values ?? {}),
     },
   };
   const { setAfterTitle, setEnd } = usePageHeader();
@@ -462,7 +620,7 @@ export default function LogsPage() {
 
           {runtimeData?.empty_reason && !loading && (
             <div className="border border-border bg-secondary/10 p-4 text-sm text-muted-foreground">
-              {runtimeData.empty_reason || runtimeText.noData}
+              {emptyReason(runtimeData.empty_reason, runtimeText)}
             </div>
           )}
 

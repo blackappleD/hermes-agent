@@ -232,6 +232,8 @@ export interface Translations {
       empty: string;
       renderedPrompt?: string;
       structuredFields?: string;
+      fields?: Record<string, string>;
+      values?: Record<string, string>;
       change: {
         up: string;
         down: string;

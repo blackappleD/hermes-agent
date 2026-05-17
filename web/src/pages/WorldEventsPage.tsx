@@ -143,14 +143,28 @@ function compactJson(value: unknown): string {
   }
 }
 
+function codeBlock(value: string, language = ""): string {
+  const longestFence =
+    value.match(/`{3,}/g)?.reduce((max, fence) => Math.max(max, fence.length), 0) ?? 0;
+  const fence = "`".repeat(Math.max(3, longestFence + 1));
+  return `${fence}${language}\n${value}\n${fence}`;
+}
+
 function transitionMarkdown(detail: GatewayMessageEventDetailResponse): string {
-  return detail.transitions
+  const record = detail.record;
+  const payloadText = record.raw_payload_available
+    ? compactJson(record.raw_payload)
+    : record.raw_payload_error || DEFAULT_TEXT.payloadUnavailable;
+  const payloadSection = `# ${DEFAULT_TEXT.rawPayload}\n\n${codeBlock(payloadText, record.raw_payload_available ? "json" : "")}`;
+  const transitionSections = detail.transitions
     .map((transition) => {
       const title = transition.reason || transition.error || transition.to_status || `transition-${transition.transition_id}`;
       const metadata = Object.keys(transition.metadata || {}).length > 0 ? transition.metadata : {};
-      return `## ${title}\n\n\`\`\`json\n${compactJson(metadata)}\n\`\`\``;
+      return `## ${title}\n\n${codeBlock(compactJson(metadata), "json")}`;
     })
     .join("\n\n");
+
+  return [payloadSection, transitionSections].filter(Boolean).join("\n\n");
 }
 
 async function copyText(value: string): Promise<void> {
@@ -254,7 +268,7 @@ function DetailPanel({
   setPayloadExpanded: (expanded: boolean) => void;
 }) {
   const [transitionsCopied, setTransitionsCopied] = useState(false);
-  const transitionsMarkdown = useMemo(() => (detail ? transitionMarkdown(detail) : ""), [detail]);
+  const detailMarkdown = useMemo(() => (detail ? transitionMarkdown(detail) : ""), [detail]);
 
   useEffect(() => {
     if (!transitionsCopied) return;
@@ -263,10 +277,10 @@ function DetailPanel({
   }, [transitionsCopied]);
 
   const handleCopyTransitions = useCallback(() => {
-    copyText(transitionsMarkdown)
+    copyText(detailMarkdown)
       .then(() => setTransitionsCopied(true))
       .catch(() => setTransitionsCopied(false));
-  }, [transitionsMarkdown]);
+  }, [detailMarkdown]);
 
   if (loading) {
     return (
@@ -388,7 +402,7 @@ function DetailPanel({
               size="sm"
               outlined
               onClick={handleCopyTransitions}
-              disabled={!detail.transitions.length}
+              disabled={!detailMarkdown}
               prefix={transitionsCopied ? <Check /> : <Copy />}
             >
               {transitionsCopied ? DEFAULT_TEXT.copiedTransitions : DEFAULT_TEXT.copyTransitions}
