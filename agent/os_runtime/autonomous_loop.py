@@ -12,6 +12,13 @@ from agent.os_runtime.adapters.context import ContextAdapter
 from agent.os_runtime.adapters.events import EventProjectionAdapter
 from agent.os_runtime.adapters.runtime_queue import RuntimeQueueRepository
 from agent.os_runtime.adapters.session_store import OSRuntimeEvent, OSRuntimeEventRepository
+from agent.os_runtime.action_executor import (
+    AutonomousActionExecutor,
+    is_chat_reply_intent,
+    is_chat_reply_send_intent,
+    is_world_publish_intent,
+    publish_payload_from_intent,
+)
 from agent.os_runtime.autonomous_scheduler import AutonomousScheduler
 from agent.os_runtime.autonomous_state import (
     AutonomousRuntimeState,
@@ -64,6 +71,7 @@ class AutonomousRuntimeLoop:
         self_prompt_compiler: Any = None,
         intent_generator: Any = None,
         arbiter: Any = None,
+        action_executor: Any = None,
     ) -> None:
         self.session_id = session_id
         self.profile_id = profile_id
@@ -90,6 +98,10 @@ class AutonomousRuntimeLoop:
         self.self_prompt_compiler = self_prompt_compiler or SelfPromptCompiler()
         self.intent_generator = intent_generator or OpenIntentGenerator(model_task=self.config.model_task)
         self.arbiter = arbiter or BoYueArbiter()
+        self.action_executor = action_executor or AutonomousActionExecutor(
+            config=self.config,
+            repository=self.event_repository,
+        )
 
     def run_once(
         self,
@@ -138,7 +150,11 @@ class AutonomousRuntimeLoop:
             signals = self.signal_interpreter.interpret(
                 task_context=snapshot.task_context,
                 agent_context=snapshot.agent_context,
-                events=snapshot.recent_events,
+                # Autonomous wakes must be judged against the event that woke
+                # the runtime.  Historical context is still available through
+                # the snapshot, but feeding it into the signal layer makes old
+                # tool/code risks look like current-event risks.
+                events=events,
                 authorization_map=getattr(snapshot, "authorization_map", None),
                 relationships=getattr(snapshot, "relationships", None),
             )
@@ -173,7 +189,7 @@ class AutonomousRuntimeLoop:
                 },
                 trace_id=wake.wake_id,
             )
-            signal_ref = signals.event_refs[0] if signals.event_refs else events[0].to_ref()
+            signal_ref = events[0].to_ref() if events else (signals.event_refs[0] if signals.event_refs else None)
             previous_tensions = _tension_set(state)
             tension_interpretation = self.tension_interpreter.interpret(
                 signal_ref,
@@ -261,6 +277,7 @@ class AutonomousRuntimeLoop:
                 },
                 prefer_llm=self.config.use_llm_intent,
             )
+            _prepare_chat_reply_intent(intent, config=self.config)
             log_pipeline_step(
                 surface="autonomous_loop",
                 session_id=self.session_id,
@@ -274,12 +291,16 @@ class AutonomousRuntimeLoop:
                 intent=intent,
                 self_prompt=self_prompt,
                 action_potential=action_potential,
-                available_tools=[],
+                available_tools=_available_tools(self_prompt),
                 allow_auto_execute=self.config.autonomous.allow_tool_execution,
                 approval_granted=False,
-                policy_preflight=_policy_preflight(),
-                event_catalog_preflight=_catalog_preflight(),
-                authorization_summary=_authorization_summary(snapshot),
+                policy_preflight=_policy_preflight(intent, config=self.config),
+                event_catalog_preflight=_catalog_preflight(intent),
+                authorization_summary=_authorization_summary(
+                    snapshot,
+                    intent,
+                    config=self.config,
+                ),
             )
             log_pipeline_step(
                 surface="autonomous_loop",
@@ -290,7 +311,25 @@ class AutonomousRuntimeLoop:
                 data={"arbitration": arbitration},
                 trace_id=wake.wake_id,
             )
-            action_summary = _action_summary(arbitration.decision, action_potential.recommended_depth)
+            execution = self.action_executor.execute(
+                intent=intent,
+                arbitration=arbitration,
+                self_prompt=self_prompt,
+                event_ids=[event.event_id for event in events],
+                session_id=self.session_id,
+                task_id=f"autonomous:{self.session_id}:{wake_reason}",
+                profile_id=self.profile_id,
+            )
+            log_pipeline_step(
+                surface="autonomous_loop",
+                session_id=self.session_id,
+                profile_id=self.profile_id,
+                phase="run_once",
+                step="action_execution",
+                data={"execution": execution.to_dict()},
+                trace_id=wake.wake_id,
+            )
+            action_summary = execution.action_summary or _action_summary(arbitration.decision, action_potential.recommended_depth)
             evidence = {
                 "wake_reason": wake_reason,
                 "event_ids": [event.event_id for event in events],
@@ -302,6 +341,9 @@ class AutonomousRuntimeLoop:
                 "self_prompt": self_prompt.to_dict(),
                 "open_intent": intent.to_dict(),
                 "arbitration": arbitration.to_dict(),
+                "execution": execution.to_dict(),
+                "execution_feedback": execution.feedback,
+                "evidence_package": execution.evidence_package.to_dict() if execution.evidence_package else {},
                 "action_summary": action_summary,
                 "stop_reason": "bounded single wake completed",
             }
@@ -377,15 +419,34 @@ class AutonomousRuntimeLoop:
             event_repository=self.event_repository,
             config=self.config,
         )
+        recent_events = self._recent_context_events(events)
         return adapter.build_context(
             session_id=self.session_id,
             user_goal="",
             active_goal="",
             task_id=f"autonomous:{self.session_id}:{wake_reason}",
             profile_name=self.profile_id,
-            recent_events=events,
+            recent_events=recent_events,
             resource_state={"source": "autonomous_loop", "wake_reason": wake_reason},
         )
+
+    def _recent_context_events(self, events: list[OSRuntimeEvent]) -> list[OSRuntimeEvent]:
+        merged: list[OSRuntimeEvent] = []
+        seen: set[str] = set()
+        for event in events:
+            if event.event_id not in seen:
+                seen.add(event.event_id)
+                merged.append(event)
+        try:
+            history = self.event_repository.list_by_session(self.session_id, limit=20)
+        except Exception:
+            history = []
+        for event in history:
+            event_id = getattr(event, "event_id", "")
+            if event_id and event_id not in seen:
+                seen.add(event_id)
+                merged.append(event)
+        return merged
 
 
 def _event_payload(event_ref: Any, *, wake_reason: str, session_id: str) -> dict[str, Any]:
@@ -434,17 +495,160 @@ def _tension_set(state: AutonomousRuntimeState) -> TensionSet | None:
         return None
 
 
-def _policy_preflight() -> dict[str, Any]:
-    return {}
+def _policy_preflight(intent: Any, *, config: OSRuntimeConfig) -> dict[str, Any]:
+    if not is_world_publish_intent(intent) and not is_chat_reply_send_intent(intent):
+        return {}
+    publish = publish_payload_from_intent(intent)
+    subject = str(publish.get("subject") or "")
+    event_type = str(publish.get("event_type") or "")
+    payload = publish.get("payload") if isinstance(publish.get("payload"), dict) else {}
+    try:
+        from agent.linz_world.governance import preflight_side_effect
+
+        result = preflight_side_effect(
+            capability="publish",
+            subject=subject,
+            event_type=event_type,
+            payload=payload,
+        )
+    except Exception as exc:
+        return {
+            "decision": "deny",
+            "status": "failed",
+            "code": "policy_preflight_error",
+            "message": f"{type(exc).__name__}: {exc}",
+            "subject": subject,
+            "event_type": event_type,
+        }
+    return {
+        "decision": "allow" if getattr(result, "allowed", False) else "deny",
+        "status": getattr(getattr(result, "status", None), "value", getattr(result, "status", "")),
+        "code": str(getattr(result, "code", "") or ""),
+        "message": str(getattr(result, "message", "") or ""),
+        "next_action": str(getattr(result, "next_action", "") or ""),
+        "subject": subject,
+        "event_type": event_type,
+        "requires_approval": bool(config.autonomous.require_approval_for_world_publish),
+    }
 
 
-def _catalog_preflight() -> dict[str, Any]:
-    return {"status": "missing", "reason": "catalog publish path not requested"}
+def _catalog_preflight(intent: Any) -> dict[str, Any]:
+    if not is_world_publish_intent(intent) and not is_chat_reply_send_intent(intent):
+        return {"status": "not_requested", "reason": "catalog publish path not requested"}
+    publish = publish_payload_from_intent(intent)
+    subject = str(publish.get("subject") or "")
+    event_type = str(publish.get("event_type") or "")
+    try:
+        from agent.linz_world.event_catalog import is_formal_event
+
+        confirmed = is_formal_event(subject, event_type)
+    except Exception as exc:
+        return {
+            "status": "failed",
+            "subject": subject,
+            "event_type": event_type,
+            "subject_confirmed": False,
+            "event_type_confirmed": False,
+            "reason": f"{type(exc).__name__}: {exc}",
+        }
+    return {
+        "status": "allowed" if confirmed else "denied",
+        "subject": subject,
+        "event_type": event_type,
+        "subject_confirmed": confirmed,
+        "event_type_confirmed": confirmed,
+    }
 
 
-def _authorization_summary(snapshot: Any) -> dict[str, Any]:
+def _authorization_summary(
+    snapshot: Any,
+    intent: Any | None = None,
+    *,
+    config: OSRuntimeConfig | None = None,
+) -> dict[str, Any]:
     auth = getattr(getattr(snapshot, "task_context", None), "metadata", {}).get("authorization", {})
-    return auth if isinstance(auth, dict) else {}
+    data = dict(auth) if isinstance(auth, dict) else {}
+    if intent is None or (not is_world_publish_intent(intent) and not is_chat_reply_send_intent(intent)):
+        return data
+    publish = publish_payload_from_intent(intent)
+    subject = str(publish.get("subject") or "")
+    event_type = str(publish.get("event_type") or "")
+    auth_map = getattr(snapshot, "authorization_map", None)
+    allows_event = False
+    if auth_map is not None and hasattr(auth_map, "allows_event"):
+        try:
+            allows_event = bool(auth_map.allows_event(subject, event_type))
+        except Exception:
+            allows_event = False
+    else:
+        allows_event = _matches_allowed(subject, data.get("allowed_publish_subjects", [])) and _matches_allowed(
+            event_type,
+            data.get("allowed_publish_event_types", []),
+        )
+    allows_capability = "publish" in set(str(item) for item in data.get("allowed_capabilities", []) or [])
+    auth_current = str(data.get("state") or "").lower() == "current"
+    login_active = str(data.get("login_state") or "").lower() == "logged_in"
+    allowed = bool(auth_current and login_active and allows_capability and allows_event)
+    data.update(
+        {
+            "decision": "allow" if allowed else "deny",
+            "status": "allowed" if allowed else "denied",
+            "subject": subject,
+            "event_type": event_type,
+            "allows_event": allows_event,
+            "allows_publish_capability": allows_capability,
+            "requires_approval": bool(config.autonomous.require_approval_for_world_publish) if config else True,
+        }
+    )
+    return data
+
+
+def _prepare_chat_reply_intent(intent: Any, *, config: OSRuntimeConfig) -> None:
+    if not is_chat_reply_intent(intent):
+        return
+    metadata = getattr(intent, "metadata", None)
+    if not isinstance(metadata, dict):
+        return
+    reply = metadata.get("reply")
+    if not isinstance(reply, dict):
+        return
+    send_requested = bool(config.autonomous.allow_chat_reply_auto_send and str(reply.get("draft_text") or "").strip())
+    reply["send_requested"] = send_requested
+    metadata["chat_reply_send_requested"] = send_requested
+    metadata["execution_permitted"] = False
+
+
+def _available_tools(self_prompt: Any) -> list[str]:
+    tools = []
+    metadata = getattr(self_prompt, "metadata", {}) or {}
+    if isinstance(metadata, dict):
+        tools.extend(str(item) for item in metadata.get("available_tools") or [])
+    open_space = getattr(self_prompt, "open_space", None)
+    open_metadata = getattr(open_space, "metadata", {}) if open_space is not None else {}
+    if isinstance(open_metadata, dict):
+        tools.extend(str(item) for item in open_metadata.get("available_tools") or [])
+    seen = set()
+    result = []
+    for tool in tools:
+        if not tool or tool in seen:
+            continue
+        seen.add(tool)
+        result.append(tool)
+        if tool == "linz_publish" and "linz_world.publish" not in seen:
+            seen.add("linz_world.publish")
+            result.append("linz_world.publish")
+    return result
+
+
+def _matches_allowed(value: str, patterns: Any) -> bool:
+    text = str(value or "")
+    for pattern in patterns or []:
+        item = str(pattern or "")
+        if item == "*" or item == text:
+            return True
+        if item.endswith(".*") and text.startswith(item[:-1]):
+            return True
+    return False
 
 
 def _action_summary(decision: ArbitrationDecision, depth: RecommendedDepth) -> str:
