@@ -1,5 +1,6 @@
 """Tests for hermes_cli.web_server and related config utilities."""
 
+import asyncio
 import os
 import json
 import tempfile
@@ -15,6 +16,26 @@ from hermes_cli.config import (
     _EXTRA_ENV_KEYS,
     OPTIONAL_ENV_VARS,
 )
+
+
+def test_restart_gateway_endpoint_restarts_all_profiles(monkeypatch):
+    from hermes_cli import web_server
+
+    class _Proc:
+        pid = 4242
+
+    calls = []
+
+    def fake_spawn(subcommand, name):
+        calls.append((subcommand, name))
+        return _Proc()
+
+    monkeypatch.setattr(web_server, "_spawn_hermes_action", fake_spawn)
+
+    response = asyncio.run(web_server.restart_gateway())
+
+    assert calls == [(["gateway", "restart", "--all"], "gateway-restart")]
+    assert response == {"ok": True, "pid": 4242, "name": "gateway-restart"}
 
 
 # ---------------------------------------------------------------------------

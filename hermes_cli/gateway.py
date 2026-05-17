@@ -2504,6 +2504,19 @@ def systemd_start(system: bool = False):
     print(f"✓ {_service_scope_label(system).capitalize()} service started")
 
 
+def systemd_start_no_wait(system: bool = False):
+    """Queue a systemd start job without blocking the caller on service startup."""
+    system = _select_systemd_scope(system)
+    if system:
+        _require_root_for_system_service("start")
+    else:
+        _preflight_user_systemd()
+    _require_service_installed("start", system=system)
+    refresh_systemd_unit_if_needed(system=system)
+    _run_systemctl(["--no-block", "start", get_service_name()], system=system, check=True, timeout=10)
+    print(f"↻ {_service_scope_label(system).capitalize()} service start queued")
+
+
 
 def systemd_stop(system: bool = False):
     system = _select_systemd_scope(system)
@@ -2622,6 +2635,25 @@ def systemd_restart(system: bool = False):
         )
         return
     _wait_for_systemd_service_restart(system=system, previous_pid=pid)
+
+
+def systemd_restart_no_wait(system: bool = False):
+    """Queue a systemd restart job without waiting for gateway drain/startup.
+
+    Setup/config flows should not sit on an active chat turn for the full
+    restart_drain_timeout. Normal `hermes gateway restart` keeps the graceful,
+    drain-aware behavior.
+    """
+    system = _select_systemd_scope(system)
+    if system:
+        _require_root_for_system_service("restart")
+    else:
+        _preflight_user_systemd()
+    _require_service_installed("restart", system=system)
+    refresh_systemd_unit_if_needed(system=system)
+    _sync_hermes_home_from_systemd_unit(system=system)
+    _run_systemctl(["--no-block", "restart", get_service_name()], system=system, check=True, timeout=10)
+    print(f"↻ {_service_scope_label(system).capitalize()} service restart queued")
 
 
 
@@ -3801,6 +3833,41 @@ def _runtime_health_lines() -> list[str]:
     return lines
 
 
+def _start_other_profile_gateways_after_gateway_start() -> None:
+    """Best-effort startup for non-current profile gateways after one starts."""
+    try:
+        from hermes_cli.profile_gateways import (
+            print_profile_gateway_launch_results,
+            start_profile_gateways,
+        )
+
+        results = start_profile_gateways(exclude_current_profile=True)
+        print_profile_gateway_launch_results(
+            results,
+            heading="Starting gateways for other profiles...",
+        )
+    except Exception as exc:
+        print_warning(f"Could not start other profile gateways: {exc}")
+
+
+def _start_all_profile_gateways_after_gateway_restart() -> None:
+    """Best-effort startup for all profile gateways after an all-profile stop."""
+    try:
+        from hermes_cli.profile_gateways import (
+            print_profile_gateway_launch_results,
+            start_profile_gateways,
+        )
+
+        results = start_profile_gateways()
+        print_profile_gateway_launch_results(
+            results,
+            heading="Starting gateways for all profiles...",
+            include_skipped=True,
+        )
+    except Exception as exc:
+        print_warning(f"Could not start profile gateways: {exc}")
+
+
 def _setup_standard_platform(platform: dict):
     """Interactive setup for Telegram, Discord, or Slack."""
     emoji = platform["emoji"]
@@ -4790,6 +4857,7 @@ def gateway_setup():
                     systemd_start()
                 elif is_macos():
                     launchd_start()
+                _start_other_profile_gateways_after_gateway_start()
             except UserSystemdUnavailableError as e:
                 print_error("  Failed to start — user systemd not reachable:")
                 for line in str(e).splitlines():
@@ -4855,11 +4923,14 @@ def gateway_setup():
                 try:
                     if supports_systemd_services():
                         systemd_restart()
+                        _start_other_profile_gateways_after_gateway_start()
                     elif is_macos():
                         launchd_restart()
+                        _start_other_profile_gateways_after_gateway_start()
                     elif is_windows():
                         from hermes_cli import gateway_windows
                         gateway_windows.restart()
+                        _start_other_profile_gateways_after_gateway_start()
                     else:
                         stop_profile_gateway()
                         print_info("Start manually: hermes gateway")
@@ -4884,6 +4955,7 @@ def gateway_setup():
                     elif is_windows():
                         from hermes_cli import gateway_windows
                         gateway_windows.start()
+                    _start_other_profile_gateways_after_gateway_start()
                 except UserSystemdUnavailableError as e:
                     print_error("  Start failed — user systemd not reachable:")
                     for line in str(e).splitlines():
@@ -4921,6 +4993,7 @@ def gateway_setup():
                             gateway_windows.install(force=False)
                             did_install = True
                             started_inline = True
+                            _start_other_profile_gateways_after_gateway_start()
                         print()
                         if did_install and not started_inline and prompt_yes_no("  Start the service now?", True):
                             try:
@@ -4928,6 +5001,7 @@ def gateway_setup():
                                     systemd_start(system=installed_scope == "system")
                                 else:
                                     launchd_start()
+                                _start_other_profile_gateways_after_gateway_start()
                             except UserSystemdUnavailableError as e:
                                 print_error("  Start failed — user systemd not reachable:")
                                 for line in str(e).splitlines():
@@ -5227,16 +5301,19 @@ def _gateway_command_inner(args):
             print("Starting gateway...")
             if supports_systemd_services() and (get_systemd_unit_path(system=False).exists() or get_systemd_unit_path(system=True).exists()):
                 systemd_start(system=system)
+                _start_other_profile_gateways_after_gateway_start()
             elif is_macos() and get_launchd_plist_path().exists():
                 launchd_start()
+                _start_other_profile_gateways_after_gateway_start()
             elif is_windows():
                 from hermes_cli import gateway_windows
                 if gateway_windows.is_installed():
                     gateway_windows.start()
+                    _start_other_profile_gateways_after_gateway_start()
                 else:
-                    run_gateway(verbose=0)
+                    _start_all_profile_gateways_after_gateway_restart()
             else:
-                run_gateway(verbose=0)
+                _start_all_profile_gateways_after_gateway_restart()
             return
         
         if supports_systemd_services() and (get_systemd_unit_path(system=False).exists() or get_systemd_unit_path(system=True).exists()):

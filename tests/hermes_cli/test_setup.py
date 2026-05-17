@@ -237,6 +237,49 @@ def test_setup_gateway_in_container_shows_docker_guidance(monkeypatch, capsys):
     assert "restart" in out.lower()
 
 
+def test_setup_gateway_starts_other_profiles_after_service_start(monkeypatch):
+    import hermes_cli.gateway as gateway_mod
+
+    platform = {
+        "key": "matrix",
+        "emoji": "M",
+        "label": "Matrix",
+        "token_var": "MATRIX_ACCESS_TOKEN",
+    }
+    started = {"service": 0, "profiles": 0}
+
+    monkeypatch.setattr(gateway_mod, "_all_platforms", lambda: [platform])
+    monkeypatch.setattr(gateway_mod, "_platform_status", lambda p: "configured")
+    monkeypatch.setattr(gateway_mod, "_configure_platform", lambda p: None)
+    monkeypatch.setattr(setup_mod, "prompt_checklist", lambda *a, **kw: [0])
+    monkeypatch.setattr(setup_mod, "prompt_yes_no", lambda *a, **kw: True)
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+
+    monkeypatch.setattr(gateway_mod, "_is_service_installed", lambda: True)
+    monkeypatch.setattr(gateway_mod, "_is_service_running", lambda: False)
+    monkeypatch.setattr(gateway_mod, "supports_systemd_services", lambda: True)
+    monkeypatch.setattr(gateway_mod, "has_conflicting_systemd_units", lambda: False)
+    monkeypatch.setattr(gateway_mod, "has_legacy_hermes_units", lambda: False)
+    monkeypatch.setattr(gateway_mod, "_system_scope_wizard_would_need_root", lambda: False)
+
+    def fake_systemd_start(*_args, **_kwargs):
+        started["service"] += 1
+
+    def fake_profile_gateway_start():
+        started["profiles"] += 1
+
+    monkeypatch.setattr(gateway_mod, "systemd_start", fake_systemd_start)
+    monkeypatch.setattr(
+        setup_mod,
+        "_start_other_profile_gateways_after_gateway_start",
+        fake_profile_gateway_start,
+    )
+
+    setup_mod.setup_gateway({})
+
+    assert started == {"service": 1, "profiles": 1}
+
+
 def test_setup_syncs_custom_provider_removal_from_disk(tmp_path, monkeypatch):
     """Removing the last custom provider in model setup should persist."""
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))

@@ -75,9 +75,10 @@ def test_linz_setup_enables_os_runtime_when_it_is_still_default_disabled(tmp_pat
     assert autonomous["apply_to_all_turns"] is True
     assert autonomous["inject_self_prompt"] is True
     assert autonomous["respond_to_world_events"] is True
-    assert autonomous["allow_tool_execution"] is False
-    assert autonomous["allow_world_publish"] is False
-    assert autonomous["require_approval_for_world_publish"] is True
+    assert autonomous["allow_tool_execution"] is True
+    assert autonomous["allow_world_publish"] is True
+    assert autonomous["allow_chat_reply_auto_send"] is True
+    assert autonomous["require_approval_for_world_publish"] is False
 
 
 def test_linz_setup_preserves_custom_os_runtime_config(tmp_path, monkeypatch):

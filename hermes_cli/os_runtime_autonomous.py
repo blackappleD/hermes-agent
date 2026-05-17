@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from agent.os_runtime.action_executor import AutonomousActionExecutor
+from agent.os_runtime.adapters.session_store import OSRuntimeEventRepository
+from agent.os_runtime.approval import OSRuntimeApprovalStore
 from agent.os_runtime.adapters.runtime_queue import RuntimeQueueRepository
 from agent.os_runtime.autonomous_loop import AutonomousRuntimeLoop
 from agent.os_runtime.autonomous_scheduler import AutonomousScheduler
@@ -94,9 +97,49 @@ def handle_autonomous_command(
             for row in rows
         ]
         return AutonomousCommandResult(_rows("intents", payload))
+    if subcommand == "approvals":
+        event_repo = OSRuntimeEventRepository(enabled=config.enabled)
+        try:
+            store = OSRuntimeApprovalStore(event_repo)
+            rows = [
+                row.to_dict()
+                for row in store.list(session_id=session_id, status="pending", limit=10)
+            ]
+            return AutonomousCommandResult(_rows("approvals", rows))
+        finally:
+            event_repo.close()
+    if subcommand in {"approve", "deny"}:
+        approval_id = (parts[1].strip() if len(parts) > 1 else "")
+        if not approval_id:
+            return AutonomousCommandResult(
+                "Usage: /os_runtime autonomous approve <approval_id> | deny <approval_id>"
+            )
+        event_repo = OSRuntimeEventRepository(enabled=config.enabled)
+        try:
+            executor = AutonomousActionExecutor(config=config, repository=event_repo)
+            if subcommand == "deny":
+                resolved = executor.deny_approval(
+                    approval_id,
+                    session_id=session_id,
+                    resolver="os_runtime_command",
+                )
+                if resolved is None:
+                    return AutonomousCommandResult(f"Autonomous approval not found: {approval_id}")
+                return AutonomousCommandResult(f"Autonomous approval denied: {approval_id}")
+            result = executor.approve_and_execute(
+                approval_id,
+                session_id=session_id,
+                resolver="os_runtime_command",
+            )
+            return AutonomousCommandResult(
+                f"Autonomous approval {result.status}: {result.action_summary}",
+                decision=result.to_dict(),
+            )
+        finally:
+            event_repo.close()
 
     return AutonomousCommandResult(
-        "Usage: /os_runtime autonomous status|pause|resume|stop|tick|inbox|events|intents"
+        "Usage: /os_runtime autonomous status|pause|resume|stop|tick|inbox|events|intents|approvals|approve <id>|deny <id>"
     )
 
 
@@ -118,7 +161,19 @@ def _rows(label: str, rows: list[dict[str, Any]]) -> str:
             + " ".join(
                 f"{key}={value}"
                 for key, value in row.items()
-                if key in {"item_id", "wake_id", "event_id", "wake_reason", "status", "intent_id", "decision", "action_summary"}
+                if key in {
+                    "item_id",
+                    "wake_id",
+                    "approval_id",
+                    "event_id",
+                    "wake_reason",
+                    "status",
+                    "intent_id",
+                    "arbitration_id",
+                    "decision",
+                    "action_summary",
+                    "summary",
+                }
                 and value
             )
         )

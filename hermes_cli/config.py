@@ -923,7 +923,8 @@ DEFAULT_CONFIG = {
         "compact": False,
         "personality": "kawaii",
         "resume_display": "full",
-        "busy_input_mode": "interrupt",  # interrupt | queue | steer
+        "busy_input_mode": "queue",  # interrupt | queue | steer
+        "busy_ack_enabled": False,
         # When true, `hermes --tui` auto-resumes the most recent human-
         # facing session on launch instead of forging a fresh one.
         # Mirrors `hermes -c` muscle memory.  Default off so existing
@@ -981,6 +982,9 @@ DEFAULT_CONFIG = {
     # Web dashboard settings
     "dashboard": {
         "theme": "default",  # Dashboard visual theme: "default", "midnight", "ember", "mono", "cyberpunk", "rose"
+        # Start one gateway per profile when `hermes dashboard` starts so the
+        # Events page can inspect each profile's local MessageEvent projection.
+        "auto_start_profile_gateways": True,
     },
 
     # Privacy settings

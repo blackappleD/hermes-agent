@@ -9078,6 +9078,42 @@ def cmd_dashboard(args):
             sys.exit(1)
         print(f"→ Skipping web UI build (--skip-build); using dist at {_dist_root}")
 
+    auto_start_profile_gateways = getattr(args, "profile_gateways", None)
+    if auto_start_profile_gateways is None:
+        try:
+            from hermes_cli.config import cfg_get, load_config
+
+            configured = cfg_get(
+                load_config(),
+                "dashboard",
+                "auto_start_profile_gateways",
+                default=True,
+            )
+            if isinstance(configured, str):
+                auto_start_profile_gateways = configured.strip().lower() not in {
+                    "0",
+                    "false",
+                    "no",
+                    "off",
+                }
+            else:
+                auto_start_profile_gateways = bool(configured)
+        except Exception as exc:
+            auto_start_profile_gateways = True
+            print(f"Warning: could not read dashboard gateway config: {exc}")
+
+    if auto_start_profile_gateways:
+        from hermes_cli.profile_gateways import (
+            print_profile_gateway_launch_results,
+            start_profile_gateways,
+        )
+
+        results = start_profile_gateways()
+        print_profile_gateway_launch_results(
+            results,
+            heading="Starting profile gateways for dashboard event inspection...",
+        )
+
     from hermes_cli.web_server import start_server
 
     embedded_chat = args.tui or os.environ.get("HERMES_DASHBOARD_TUI") == "1"
@@ -11568,6 +11604,23 @@ Examples:
             "Useful for non-interactive contexts (Windows Scheduled Tasks, CI) "
             "where npm may not be available. Pre-build with: cd web && npm run build"
         ),
+    )
+    dashboard_gateway_group = dashboard_parser.add_mutually_exclusive_group()
+    dashboard_gateway_group.add_argument(
+        "--profile-gateways",
+        dest="profile_gateways",
+        action="store_true",
+        default=None,
+        help=(
+            "Start missing gateways for all profiles before launching the dashboard "
+            "(default; also configurable via dashboard.auto_start_profile_gateways)"
+        ),
+    )
+    dashboard_gateway_group.add_argument(
+        "--no-profile-gateways",
+        dest="profile_gateways",
+        action="store_false",
+        help="Do not auto-start profile gateways before launching the dashboard",
     )
     # Lifecycle flags — mutually exclusive with each other and with the
     # start-a-server flags above (if both are passed, --stop / --status win

@@ -1826,9 +1826,10 @@ def _recommended_os_runtime_config() -> dict:
             "idle_cooldown_seconds": 60,
             "max_turns_per_wake": 3,
             "max_wakes_per_hour": 20,
-            "allow_tool_execution": False,
-            "allow_world_publish": False,
-            "require_approval_for_world_publish": True,
+            "allow_tool_execution": True,
+            "allow_world_publish": True,
+            "allow_chat_reply_auto_send": True,
+            "require_approval_for_world_publish": False,
         }
     )
     return runtime
@@ -2631,6 +2632,28 @@ def _setup_webhooks():
     print_info("   Open config in your editor:  hermes config edit")
 
 
+def _start_other_profile_gateways_after_gateway_start() -> None:
+    """Best-effort startup for non-current profile gateways after setup starts one.
+
+    The current profile may be managed by systemd/launchd/Scheduled Task here.
+    Other profiles do not share that service, so start their profile-scoped
+    manual gateways in the background.
+    """
+    try:
+        from hermes_cli.profile_gateways import (
+            print_profile_gateway_launch_results,
+            start_profile_gateways,
+        )
+
+        results = start_profile_gateways(exclude_current_profile=True)
+        print_profile_gateway_launch_results(
+            results,
+            heading="Starting gateways for other profiles...",
+        )
+    except Exception as exc:
+        print_warning(f"Could not start other profile gateways: {exc}")
+
+
 def setup_gateway(config: dict):
     """Configure messaging platform integrations."""
     from hermes_cli.gateway import _all_platforms, _platform_status, _configure_platform
@@ -2763,6 +2786,7 @@ def setup_gateway(config: dict):
                     elif _is_windows:
                         from hermes_cli import gateway_windows
                         gateway_windows.restart()
+                    _start_other_profile_gateways_after_gateway_start()
                 except UserSystemdUnavailableError as e:
                     print_error("  Restart failed — user systemd not reachable:")
                     for line in str(e).splitlines():
@@ -2788,6 +2812,7 @@ def setup_gateway(config: dict):
                     elif _is_windows:
                         from hermes_cli import gateway_windows
                         gateway_windows.start()
+                    _start_other_profile_gateways_after_gateway_start()
                 except UserSystemdUnavailableError as e:
                     print_error("  Start failed — user systemd not reachable:")
                     for line in str(e).splitlines():
@@ -2826,6 +2851,7 @@ def setup_gateway(config: dict):
                         gateway_windows.install(force=False)
                         did_install = True
                         started_inline = True
+                        _start_other_profile_gateways_after_gateway_start()
                     print()
                     if did_install and not started_inline and prompt_yes_no("  Start the service now?", True):
                         try:
@@ -2833,6 +2859,7 @@ def setup_gateway(config: dict):
                                 systemd_start(system=installed_scope == "system")
                             elif _is_macos:
                                 launchd_start()
+                            _start_other_profile_gateways_after_gateway_start()
                         except UserSystemdUnavailableError as e:
                             print_error("  Start failed — user systemd not reachable:")
                             for line in str(e).splitlines():
