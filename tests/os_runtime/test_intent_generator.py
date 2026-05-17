@@ -146,6 +146,72 @@ def test_world_chat_event_enriches_communicate_intent_with_reply_draft():
     assert intent.metadata["reply"]["send_requested"] is False
 
 
+def test_world_chat_closing_context_suppresses_politeness_loop_reply():
+    prompt = _self_prompt()
+    payload = {
+        "intent_id": "intent-chat",
+        "action_family": "communicate",
+        "action_type": "reply_chat_message",
+        "why_now": "social response tension is present",
+        "open_space": prompt.open_space.to_dict(),
+        "target_direction": prompt.target_direction.to_dict(),
+        "tools_needed": [],
+        "proposed_new_tools": [],
+        "proposed_new_skills": [],
+        "success_condition": "draft is auditable",
+        "stop_condition": "no external side effects",
+        "risk_level": "low",
+        "metadata": {"reply": {"draft_text": "继续加油，有进展我会同步。"}},
+    }
+
+    intent = OpenIntentGenerator().generate(
+        self_prompt=prompt,
+        action_potential=ActionPotential(intent_id="ap-1"),
+        llm_json=payload,
+        prefer_llm=True,
+        event_content={
+            "current_events": [
+                {
+                    "event_id": "evt-chat-3",
+                    "event_type": "world_event",
+                    "source": "linz_world",
+                    "summary": '{"text":"谢谢支持！收到你的鼓励，有进展一定及时同步，继续保持动力！"}',
+                    "metadata": {
+                        "subject": "wsp.my-inbox",
+                        "event_type": "wsp.chat.message.sent",
+                        "os_id": "peer-os",
+                        "chat_id": "chat-1",
+                    },
+                }
+            ],
+            "recent_events": [
+                {
+                    "event_id": "evt-chat-1",
+                    "event_type": "world_event",
+                    "source": "linz_world",
+                    "summary": '{"text":"谢谢，我随时准备继续交流。"}',
+                    "metadata": {
+                        "subject": "wsp.my-inbox",
+                        "event_type": "wsp.chat.message.sent",
+                        "os_id": "peer-os",
+                        "chat_id": "chat-1",
+                    },
+                }
+            ],
+        },
+    )
+
+    assert intent.action_type == "close_chat_no_reply"
+    assert intent.metadata["reply"]["target_os_id"] == "peer-os"
+    assert intent.metadata["reply"]["should_reply"] is False
+    assert intent.metadata["reply"]["suppress_reply"] is True
+    assert intent.metadata["reply"]["conversation_stage"] == "closing"
+    assert intent.metadata["reply_control"]["should_reply"] is False
+    assert intent.metadata["should_reply"] is False
+    assert "draft_text" not in intent.metadata["reply"]
+    assert intent.metadata["reply"]["send_requested"] is False
+
+
 def test_rule_path_does_not_synthesize_chat_reply_draft_text():
     prompt = _self_prompt()
     prompt.open_space = OpenSpace(
@@ -178,6 +244,39 @@ def test_rule_path_does_not_synthesize_chat_reply_draft_text():
     assert intent.metadata["reply"]["incoming_summary"] == "你好，在吗？"
     assert "draft_text" not in intent.metadata["reply"]
     assert intent.metadata["reply"]["send_requested"] is False
+
+
+def test_rule_path_marks_closing_chat_as_no_reply():
+    prompt = _self_prompt()
+    prompt.open_space = OpenSpace(
+        space_id="space-chat",
+        available_action_families=[OpenActionFamily.COMMUNICATE],
+    )
+
+    intent = OpenIntentGenerator().generate(
+        self_prompt=prompt,
+        action_potential=ActionPotential(intent_id="ap-chat"),
+        event_content=[
+            {
+                "event_id": "evt-chat",
+                "event_type": "world_event",
+                "source": "linz_world",
+                "summary": '{"text":"Thanks for the support, I will reach out again if needed."}',
+                "metadata": {
+                    "subject": "wsp.my-inbox",
+                    "event_type": "wsp.chat.message.sent",
+                    "os_id": "peer-os",
+                    "chat_id": "chat-1",
+                },
+            }
+        ],
+    )
+
+    assert intent.action_type == "close_chat_no_reply"
+    assert intent.metadata["reply"]["should_reply"] is False
+    assert intent.metadata["reply_control"]["suppress_reply"] is True
+    assert intent.metadata["reply"]["suppress_reason"] == "conversation_closing_context"
+    assert "draft_text" not in intent.metadata["reply"]
 
 
 def test_llm_path_calls_auxiliary_task_with_runtime_payload():
