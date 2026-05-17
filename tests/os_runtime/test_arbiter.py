@@ -152,6 +152,48 @@ def test_linz_world_publish_fails_closed_without_policy_catalog_and_authorizatio
     assert allowed.decision == ArbitrationDecision.AUTO_EXECUTE
 
 
+def test_chat_reply_is_report_only_until_send_is_requested():
+    draft = _intent(action_type="reply_chat_message")
+    draft.metadata = {
+        "reply": {
+            "target_os_id": "peer-os",
+            "draft_text": "你好，我在。",
+            "send_requested": False,
+        }
+    }
+    send = OpenIntent.from_dict(
+        {
+            **draft.to_dict(),
+            "metadata": {
+                "reply": {
+                    "target_os_id": "peer-os",
+                    "draft_text": "你好，我在。",
+                    "send_requested": True,
+                }
+            },
+        }
+    )
+
+    draft_result = BoYueArbiter().arbitrate(intent=draft)
+    approval_result = BoYueArbiter().arbitrate(
+        intent=send,
+        policy_preflight={"decision": "allow", "requires_approval": True},
+        event_catalog_preflight={"subject_confirmed": True, "event_type_confirmed": True},
+        authorization_summary={"decision": "allow"},
+    )
+    auto_result = BoYueArbiter().arbitrate(
+        intent=send,
+        policy_preflight={"decision": "allow", "requires_approval": False},
+        event_catalog_preflight={"subject_confirmed": True, "event_type_confirmed": True},
+        authorization_summary={"decision": "allow"},
+    )
+
+    assert draft_result.decision == ArbitrationDecision.REPORT_ONLY
+    assert approval_result.decision == ArbitrationDecision.REQUIRE_APPROVAL
+    assert approval_result.required_approvals == ["linz_world_chat_reply_approval"]
+    assert auto_result.decision == ArbitrationDecision.AUTO_EXECUTE
+
+
 def test_pre_tool_call_blocks_report_only_and_missing_preflight():
     result = pre_tool_call(
         intent=_intent(family=OpenActionFamily.CREATE, action_type="draft_artifact", tools=["draft_file"]),

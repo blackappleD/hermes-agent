@@ -115,6 +115,12 @@ class BoYueArbiter:
                 [f"unknown tools are outside the allowed action space: {', '.join(unknown_tools)}"],
             )
 
+        if _is_chat_reply(intent):
+            if not _chat_reply_send_requested(intent):
+                reasons.append("chat reply intent is draft-only until send is explicitly requested")
+                return ArbitrationDecision.REPORT_ONLY, approvals, reasons
+            return _chat_reply_send_decision(policy, catalog, authorization, approval_granted)
+
         if _is_linz_publish(intent):
             return _linz_publish_decision(policy, catalog, authorization, approval_granted)
 
@@ -214,7 +220,7 @@ def _scores(
     risk_score = _clamp(max(potential.risk_cost, _risk_cost(intent.risk_level)))
     permission_level = 1.0 if _policy_allowed(policy) or not intent.tools_needed else 0.0
     compliance_fit = 1.0 if not _policy_denied(policy) else 0.0
-    if _is_linz_publish(intent):
+    if _is_linz_publish(intent) or (_is_chat_reply(intent) and _chat_reply_send_requested(intent)):
         compliance_fit = 1.0 if _policy_allowed(policy) and _catalog_allowed(catalog) and _authorization_allowed(authorization) else 0.0
         permission_level = 1.0 if _authorization_allowed(authorization) else 0.0
     trust_impact = _clamp(1.0 - risk_score + (0.10 if compliance_fit else -0.20))
@@ -245,9 +251,45 @@ def _is_linz_publish(intent: OpenIntent) -> bool:
             *intent.tools_needed,
             str(intent.metadata.get("operation") or ""),
             str(intent.metadata.get("linz_world") or ""),
+            str(intent.metadata.get("linz_world_publish") or ""),
+            str(intent.metadata.get("world_publish") or ""),
         ]
     ).lower()
-    return "linz_world" in haystack and "publish" in haystack
+    return ("linz_world" in haystack or "linz_publish" in haystack) and "publish" in haystack
+
+
+def _is_chat_reply(intent: OpenIntent) -> bool:
+    metadata = intent.metadata if isinstance(intent.metadata, dict) else {}
+    return intent.action_type == "reply_chat_message" or isinstance(metadata.get("reply"), dict)
+
+
+def _chat_reply_send_requested(intent: OpenIntent) -> bool:
+    metadata = intent.metadata if isinstance(intent.metadata, dict) else {}
+    reply = metadata.get("reply") if isinstance(metadata.get("reply"), dict) else {}
+    return bool(metadata.get("chat_reply_send_requested") or reply.get("send_requested"))
+
+
+def _chat_reply_send_decision(
+    policy: dict[str, Any],
+    catalog: dict[str, Any],
+    authorization: dict[str, Any],
+    approval_granted: bool,
+) -> tuple[ArbitrationDecision, list[str], list[str]]:
+    if _policy_denied(policy):
+        return ArbitrationDecision.REJECT, [], ["policy preflight denied Linz World chat reply"]
+    if not _policy_allowed(policy):
+        return ArbitrationDecision.REJECT, [], ["Linz World chat reply requires PolicyEngine allow"]
+    if not _catalog_allowed(catalog):
+        return ArbitrationDecision.REJECT, [], ["Linz World chat reply requires confirmed event catalog subject/event_type"]
+    if not _authorization_allowed(authorization):
+        return ArbitrationDecision.REJECT, [], ["Linz World chat reply requires authorization map allow"]
+    if _requires_approval(policy, authorization) and not approval_granted:
+        return (
+            ArbitrationDecision.REQUIRE_APPROVAL,
+            ["linz_world_chat_reply_approval"],
+            ["Linz World chat reply requires approval before execution"],
+        )
+    return ArbitrationDecision.AUTO_EXECUTE, [], ["Linz World chat reply passed policy, catalog, and authorization"]
 
 
 def _policy_allowed(policy: dict[str, Any]) -> bool:
