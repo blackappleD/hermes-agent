@@ -56,15 +56,19 @@ class BoYueArbiter:
             allow_auto_execute=allow_auto_execute,
         )
         risk_level = _combined_risk(intent.risk_level, potential.risk_cost)
+        reply_control = _reply_control(intent)
+        reply_suppressed = bool(reply_control.get("suppress_reply"))
         metadata = {
             "rule_version": self.rule_version,
             "policy_preflight": policy,
             "event_catalog_preflight": catalog,
             "authorization_summary": authorization,
             "self_prompt_id": self_prompt.prompt_id if self_prompt else "",
+            "reply_control": reply_control,
             "legacy_decision_aliases": {
-                "allow_reply": decision == ArbitrationDecision.REPORT_ONLY,
-                "allow_draft": decision in {ArbitrationDecision.REPORT_ONLY, ArbitrationDecision.SANDBOX_EXECUTE},
+                "allow_reply": decision == ArbitrationDecision.REPORT_ONLY and not reply_suppressed,
+                "allow_draft": decision in {ArbitrationDecision.REPORT_ONLY, ArbitrationDecision.SANDBOX_EXECUTE}
+                and not reply_suppressed,
                 "allow_sandbox": decision == ArbitrationDecision.SANDBOX_EXECUTE,
                 "allow_tool": decision in EXECUTABLE_DECISIONS,
                 "allow_world_publish": decision == ArbitrationDecision.AUTO_EXECUTE and _is_linz_publish(intent),
@@ -116,6 +120,9 @@ class BoYueArbiter:
             )
 
         if _is_chat_reply(intent):
+            if _chat_reply_suppressed(intent):
+                reasons.append("chat reply suppressed because the conversation appears to be closing")
+                return ArbitrationDecision.REPORT_ONLY, approvals, reasons
             if not _chat_reply_send_requested(intent):
                 reasons.append("chat reply intent is draft-only until send is explicitly requested")
                 return ArbitrationDecision.REPORT_ONLY, approvals, reasons
@@ -264,9 +271,39 @@ def _is_chat_reply(intent: OpenIntent) -> bool:
 
 
 def _chat_reply_send_requested(intent: OpenIntent) -> bool:
+    if _chat_reply_suppressed(intent):
+        return False
     metadata = intent.metadata if isinstance(intent.metadata, dict) else {}
     reply = metadata.get("reply") if isinstance(metadata.get("reply"), dict) else {}
     return bool(metadata.get("chat_reply_send_requested") or reply.get("send_requested"))
+
+
+def _chat_reply_suppressed(intent: OpenIntent) -> bool:
+    metadata = intent.metadata if isinstance(intent.metadata, dict) else {}
+    reply = metadata.get("reply") if isinstance(metadata.get("reply"), dict) else {}
+    return (
+        reply.get("should_reply") is False
+        or metadata.get("should_reply") is False
+        or _truthy(reply.get("suppress_reply"))
+        or _truthy(reply.get("conversation_end_detected"))
+        or _truthy(metadata.get("suppress_reply"))
+    )
+
+
+def _reply_control(intent: OpenIntent) -> dict[str, Any]:
+    if not _is_chat_reply(intent):
+        return {}
+    metadata = intent.metadata if isinstance(intent.metadata, dict) else {}
+    reply = metadata.get("reply") if isinstance(metadata.get("reply"), dict) else {}
+    suppressed = _chat_reply_suppressed(intent)
+    return {
+        "should_reply": not suppressed,
+        "suppress_reply": suppressed,
+        "conversation_stage": str(reply.get("conversation_stage") or ("closing" if suppressed else "open")),
+        "reason": str(reply.get("suppress_reason") or ("conversation_closing_context" if suppressed else "")),
+        "confidence": reply.get("confidence", 0.0),
+        "detected_cues": list(reply.get("detected_cues") or []),
+    }
 
 
 def _chat_reply_send_decision(
@@ -314,6 +351,14 @@ def _authorization_allowed(authorization: dict[str, Any]) -> bool:
 
 def _requires_approval(policy: dict[str, Any], authorization: dict[str, Any]) -> bool:
     return bool(policy.get("requires_approval") or authorization.get("requires_approval"))
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
 
 
 def _combined_risk(intent_risk: RiskLevel, potential_risk: float) -> RiskLevel:

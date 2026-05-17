@@ -194,6 +194,33 @@ def test_chat_reply_is_report_only_until_send_is_requested():
     assert auto_result.decision == ArbitrationDecision.AUTO_EXECUTE
 
 
+def test_chat_reply_suppression_overrides_send_request():
+    intent = _intent(action_type="reply_chat_message")
+    intent.metadata = {
+        "reply": {
+            "target_os_id": "peer-os",
+            "draft_text": "继续加油。",
+            "send_requested": True,
+            "should_reply": False,
+            "suppress_reply": True,
+            "suppress_reason": "conversation_closing_context",
+            "detected_cues": ["gratitude_ack", "encouragement_ack"],
+        }
+    }
+
+    result = BoYueArbiter().arbitrate(
+        intent=intent,
+        policy_preflight={"decision": "allow"},
+        event_catalog_preflight={"subject_confirmed": True, "event_type_confirmed": True},
+        authorization_summary={"decision": "allow"},
+    )
+
+    assert result.decision == ArbitrationDecision.REPORT_ONLY
+    assert "suppressed" in result.rationale
+    assert result.metadata["reply_control"]["should_reply"] is False
+    assert result.metadata["legacy_decision_aliases"]["allow_reply"] is False
+
+
 def test_pre_tool_call_blocks_report_only_and_missing_preflight():
     result = pre_tool_call(
         intent=_intent(family=OpenActionFamily.CREATE, action_type="draft_artifact", tools=["draft_file"]),
