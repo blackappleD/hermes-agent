@@ -122,3 +122,34 @@ def test_listener_pid_is_rechecked_before_reporting_online(linz_home, FakeLinzSe
     assert checked.state == LoginState.LOGGED_IN
     assert checked.online is False
     assert checked.listener_pid == 0
+
+
+def test_status_includes_linz_gateway_runtime_diagnostics(linz_home, FakeLinzService):
+    (linz_home / "config.yaml").write_text(
+        "linz_world:\n"
+        "  enabled: true\n"
+        "  persona_seed: stable persona seed\n",
+        encoding="utf-8",
+    )
+    repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
+    svc = FakeLinzService()
+    ensure_original_spirit_identity(repo, svc, config=_CONFIG)
+    auth.login(repo, svc)
+
+    from gateway.status import write_runtime_status
+
+    write_runtime_status(gateway_state="running")
+    write_runtime_status(
+        platform="linz_world",
+        platform_state="retrying",
+        error_code="linz_world_listener_not_authorized",
+        error_message="no authorized NATS subscribe subjects",
+    )
+
+    summary = status_summary(repo, svc, check_live=False)
+
+    assert summary["gateway_state"] == "running"
+    assert summary["gateway_pid"]
+    assert summary["gateway_linz_platform_enabled"] is True
+    assert summary["gateway_linz_platform_state"] == "retrying"
+    assert summary["gateway_linz_platform_error"] == "no authorized NATS subscribe subjects"

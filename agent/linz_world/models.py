@@ -114,6 +114,7 @@ class LoginSession:
     online: bool = False
     listener_pid: int = 0
     listener_started_at: str = ""
+    listener_last_error: str = ""
     server_checked_at: str = ""
     updated_at: str = field(default_factory=utc_now_iso)
 

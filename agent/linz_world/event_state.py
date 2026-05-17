@@ -102,6 +102,7 @@ class LinzStateRepository:
             online=bool(raw.get("online", False)),
             listener_pid=int(raw.get("listener_pid") or 0),
             listener_started_at=str(raw.get("listener_started_at") or ""),
+            listener_last_error=str(raw.get("listener_last_error") or ""),
             server_checked_at=str(raw.get("server_checked_at") or ""),
             updated_at=str(raw.get("updated_at") or utc_now_iso()),
         )

@@ -136,6 +136,7 @@ def validate_login_session(
         session.online = False
         session.listener_pid = 0
         session.listener_started_at = ""
+        session.listener_last_error = ""
         return repo.save_login(session)
     if not check_server:
         return session
@@ -157,6 +158,7 @@ def validate_login_session(
             session.online = False
             session.listener_pid = 0
             session.listener_started_at = ""
+            session.listener_last_error = ""
         else:
             session.state = LoginState.UNVERIFIED
         return repo.save_login(session)
@@ -204,9 +206,11 @@ def _sync_listener_liveness(repo: LinzStateRepository) -> LoginSession:
             session.online = False
             session.listener_pid = 0
             session.listener_started_at = ""
+            session.listener_last_error = "Linz World listener process is no longer running."
             changed = True
     elif session.online:
         session.online = False
+        session.listener_last_error = "Linz World listener process is no longer running."
         changed = True
     return repo.save_login(session) if changed else session
 
