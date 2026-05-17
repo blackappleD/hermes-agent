@@ -135,9 +135,19 @@ class OSRuntimeConfig:
     allow_auto_continuation: bool = False
     event_store: str = "sessiondb_side_tables"
     model_task: str = "os_runtime_intent"
+    intent_generation: str = "llm"
     risk: OSRuntimeRiskConfig = field(default_factory=OSRuntimeRiskConfig)
     autonomous: AutonomousRuntimeConfig = field(default_factory=AutonomousRuntimeConfig)
     extra: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def use_llm_intent(self) -> bool:
+        return self.intent_generation.strip().lower() in {
+            "llm",
+            "model",
+            "auxiliary",
+            "llm_with_rule_fallback",
+        }
 
     def to_dict(self, *, include_extra: bool = True) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -149,6 +159,7 @@ class OSRuntimeConfig:
             "allow_auto_continuation": self.allow_auto_continuation,
             "event_store": self.event_store,
             "model_task": self.model_task,
+            "intent_generation": self.intent_generation,
             "risk": self.risk.to_dict(),
             "autonomous": self.autonomous.to_dict(include_extra=include_extra),
         }
@@ -172,6 +183,7 @@ class OSRuntimeConfig:
             "allow_auto_continuation",
             "event_store",
             "model_task",
+            "intent_generation",
             "risk",
             "autonomous",
         }
@@ -188,6 +200,7 @@ class OSRuntimeConfig:
             ),
             event_store=str(data.get("event_store", "sessiondb_side_tables")),
             model_task=str(data.get("model_task", "os_runtime_intent")),
+            intent_generation=str(data.get("intent_generation", "llm")),
             risk=OSRuntimeRiskConfig.from_dict(data.get("risk")),
             autonomous=AutonomousRuntimeConfig.from_dict(data.get("autonomous")),
             extra=extra,

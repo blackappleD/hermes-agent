@@ -19,6 +19,8 @@ def test_default_os_runtime_config_is_passive_and_opt_in():
     assert config.max_continuation_turns == 8
     assert config.event_store == "sessiondb_side_tables"
     assert config.model_task == "os_runtime_intent"
+    assert config.intent_generation == "llm"
+    assert config.use_llm_intent is True
     assert config.risk.require_approval_at is RiskLevel.MEDIUM
     assert config.autonomous.enabled is False
     assert config.autonomous.apply_to_all_turns is False
@@ -37,6 +39,7 @@ def test_default_config_dict_matches_config_contract():
         "allow_auto_continuation": False,
         "event_store": "sessiondb_side_tables",
         "model_task": "os_runtime_intent",
+        "intent_generation": "llm",
         "risk": {"require_approval_at": "medium"},
         "autonomous": AutonomousRuntimeConfig().to_dict(include_extra=False),
     }
@@ -49,6 +52,7 @@ def test_load_os_runtime_config_from_dict_preserves_unknown_keys():
             "mode": "assisted",
             "tick_interval_seconds": 15,
             "allow_tool_execution": "false",
+            "intent_generation": "llm",
             "risk": {"require_approval_at": "high"},
             "autonomous": {
                 "enabled": "true",
@@ -65,6 +69,8 @@ def test_load_os_runtime_config_from_dict_preserves_unknown_keys():
     assert config.mode == "assisted"
     assert config.tick_interval_seconds == 15
     assert config.allow_tool_execution is False
+    assert config.intent_generation == "llm"
+    assert config.use_llm_intent is True
     assert config.risk.require_approval_at is RiskLevel.HIGH
     assert config.autonomous.enabled is True
     assert config.autonomous.apply_to_all_turns is True
