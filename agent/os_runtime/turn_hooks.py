@@ -73,7 +73,7 @@ class TurnTensionHook:
         self.tension_engine = tension_engine or TensionFieldEngine()
         self.action_evaluator = action_evaluator or ActionPotentialEvaluator()
         self.self_prompt_compiler = self_prompt_compiler or SelfPromptCompiler()
-        self.intent_generator = intent_generator or OpenIntentGenerator()
+        self.intent_generator = intent_generator or OpenIntentGenerator(model_task=self.config.model_task)
         self.arbiter = arbiter or BoYueArbiter()
         self.injector = injector or SelfPromptInjector()
 
@@ -380,6 +380,12 @@ class TurnTensionHook:
         intent = self.intent_generator.generate(
             self_prompt=self_prompt,
             action_potential=action_potential,
+            event_content=events,
+            tension_field={
+                "tension_set": tension_set,
+                "tension_interpretation": tension_interpretation,
+            },
+            prefer_llm=self.config.use_llm_intent,
         )
         log_pipeline_step(
             surface="turn_hook",
