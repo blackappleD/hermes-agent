@@ -8,6 +8,7 @@ from typing import Any
 
 from hermes_constants import get_hermes_home
 from hermes_cli.logs import _read_last_n_lines
+from agent.os_runtime.self_prompt_injector import render_self_prompt_user_context
 
 
 MAX_LINES = 500
@@ -385,6 +386,9 @@ def _summary_for_module(module_id: str, params: list[dict[str, Any]], payload: d
 
 
 def _metadata_for_module(module_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    if module_id == "self_prompt":
+        rendered = _render_self_prompt(payload)
+        return {"rendered_prompt": rendered} if rendered else {}
     if module_id != "tension_field":
         return {}
     tensions = []
@@ -397,6 +401,23 @@ def _metadata_for_module(module_id: str, payload: dict[str, Any]) -> dict[str, A
         "dynamic_count": len(payload.get("dynamic_tensions") or []) if isinstance(payload.get("dynamic_tensions"), list) else 0,
         "tension_count": len(tensions),
     }
+
+
+def _render_self_prompt(payload: dict[str, Any]) -> str:
+    metadata = payload.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+    render_payload = {
+        "prompt_id": payload.get("prompt_id"),
+        "state_summary": payload.get("state_summary"),
+        "tension_summary": payload.get("tension_summary"),
+        "potential_summary": payload.get("potential_summary"),
+        "open_space": payload.get("open_space"),
+        "target_direction": payload.get("target_direction"),
+        "constraints": payload.get("constraint_scope"),
+        "evidence_refs": metadata.get("evidence_refs"),
+    }
+    return render_self_prompt_user_context(render_payload)
 
 
 def _ensure_module(modules: dict[str, dict[str, Any]], module_id: str) -> dict[str, Any]:

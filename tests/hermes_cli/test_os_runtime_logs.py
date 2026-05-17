@@ -142,6 +142,42 @@ def test_action_potential_jsonl_maps_to_action_potential_module(tmp_path, monkey
     assert params["recommended_depth"]["value"] == "continue_turn"
 
 
+def test_self_prompt_module_includes_rendered_prompt_preview(tmp_path, monkeypatch):
+    home = tmp_path / ".hermes"
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    _write_os_runtime_log(
+        home,
+        _record(
+            "self_prompt",
+            {
+                "self_prompt": {
+                    "prompt_id": "self-prompt:test",
+                    "state_summary": "cycle=active energy=1.00",
+                    "tension_summary": "constraint:risk:constraint:activation=0.40",
+                    "potential_summary": "value=0.00 risk=1.00 overall=0.00",
+                    "constraint_scope": ["no tool execution", "no world publish"],
+                    "target_direction": {
+                        "description": "Produce an auditable next-step proposal.",
+                        "success_condition": "Produce an auditable next-step proposal.",
+                        "stop_condition": "Stop before external side effects.",
+                    },
+                    "metadata": {"evidence_refs": ["event:world-1"]},
+                }
+            },
+        ),
+    )
+
+    response = get_os_runtime_logs()
+    module = _module(response, "self_prompt")
+    rendered = module["metadata"]["rendered_prompt"]
+
+    assert module["status"] == "ok"
+    assert "<os-runtime-self-prompt>" in rendered
+    assert "State: cycle=active energy=1.00" in rendered
+    assert "Constraints: no tool execution; no world publish" in rendered
+    assert "Evidence refs: event:world-1" in rendered
+
+
 def test_consecutive_snapshots_include_change_direction(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     monkeypatch.setenv("HERMES_HOME", str(home))

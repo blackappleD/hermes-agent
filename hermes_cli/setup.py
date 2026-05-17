@@ -1826,8 +1826,8 @@ def _recommended_os_runtime_config() -> dict:
             "idle_cooldown_seconds": 60,
             "max_turns_per_wake": 3,
             "max_wakes_per_hour": 20,
-            "allow_tool_execution": True,
-            "allow_world_publish": True,
+            "allow_tool_execution": False,
+            "allow_world_publish": False,
             "require_approval_for_world_publish": True,
         }
     )
