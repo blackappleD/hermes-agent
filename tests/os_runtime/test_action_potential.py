@@ -148,6 +148,45 @@ def test_logged_out_world_chat_does_not_recommend_draft():
     assert potential.recommended_depth != RecommendedDepth.DRAFT
 
 
+def test_authorized_world_chat_decays_stale_constraint_tension():
+    potential = ActionPotentialEvaluator().evaluate(
+        signal_set=_signal_set(
+            _signal(
+                "world_authorization_allowed",
+                group="world_authorization",
+                status="allowed",
+                metadata={"subject": "wsp.agent-1", "event_type": "wsp.chat.message.sent"},
+            ),
+            _signal(
+                "simple_chat_message",
+                group="relationships",
+                level="low",
+                metadata={
+                    "chat_kind": "linz_world_direct",
+                    "subject": "wsp.agent-1",
+                    "event_type": "wsp.chat.message.sent",
+                },
+            ),
+        ),
+        life_state=LifeState(
+            energy=0.9,
+            health=1.0,
+            wakefulness=0.95,
+            social_hunger=0.6,
+            restraint=0.2,
+        ),
+        tension_set=TensionSet(
+            dynamic_tensions=[
+                _tension(TensionType.SOCIAL_SIGNAL, intensity=0.8, activation=0.8, tension_id="social:relationship"),
+                _tension(TensionType.CONSTRAINT, intensity=1.0, activation=0.93, tension_id="constraint:risk"),
+            ]
+        ),
+    )
+
+    assert potential.recommended_depth == RecommendedDepth.DRAFT
+    assert potential.risk_cost < 0.42
+
+
 def test_unfinished_low_risk_goal_can_recommend_continue_turn_with_evidence():
     potential = ActionPotentialEvaluator().evaluate(
         signal_set=_signal_set(

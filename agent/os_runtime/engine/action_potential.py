@@ -218,6 +218,7 @@ class ActionPotentialEvaluator:
     ) -> tuple[float, list[str]]:
         score = 0.0
         evidence: list[str] = []
+        current_allowed_chat = _current_allowed_direct_world_chat(items)
         for item in items:
             if _is_allowed_authorization_signal(item):
                 continue
@@ -226,7 +227,8 @@ class ActionPotentialEvaluator:
                 evidence.extend(_item_evidence(item))
         for tension in tensions:
             if tension.tension_type in {TensionType.CONSTRAINT, TensionType.VALUE_CONFLICT}:
-                score += tension.intensity * 0.32 + tension.activation * 0.08
+                weight = 0.25 if current_allowed_chat and tension.tension_type == TensionType.CONSTRAINT else 1.0
+                score += (tension.intensity * 0.32 + tension.activation * 0.08) * weight
                 evidence.extend(_tension_evidence(tension))
         score += max(0.0, life.restraint - 0.25) * 0.22
         score += life.fatigue * 0.18
@@ -449,7 +451,7 @@ def _simple_chat_action_ready(
         return False
     if _readiness(life) < 0.55 or life.energy < 0.30 or life.health < 0.55 or life.wakefulness < 0.45:
         return False
-    if _constraint_activation(active_tensions) >= 0.55:
+    if _constraint_activation(active_tensions, signal_items) >= 0.55:
         return False
     social_activation = _social_activation(active_tensions)
     social_pressure = max(mutual, social_activation, life.social_hunger)
@@ -472,13 +474,29 @@ def _social_activation(active_tensions: list[Tension]) -> float:
     return max(social, default=0.0)
 
 
-def _constraint_activation(active_tensions: list[Tension]) -> float:
+def _constraint_activation(active_tensions: list[Tension], signal_items: list[dict[str, Any]] | None = None) -> float:
     constraints = [
         tension.activation
         for tension in active_tensions
         if tension.tension_type == TensionType.CONSTRAINT
     ]
-    return max(constraints, default=0.0)
+    activation = max(constraints, default=0.0)
+    if signal_items and _current_allowed_direct_world_chat(signal_items):
+        return _clamp(activation * 0.25)
+    return activation
+
+
+def _current_allowed_direct_world_chat(items: list[dict[str, Any]]) -> bool:
+    if not _is_direct_world_chat(items) or not _logged_in_for_world_chat(items):
+        return False
+    for item in items:
+        if _is_allowed_authorization_signal(item):
+            continue
+        if str(item.get("_group") or "").lower() == "risks":
+            return False
+        if _matches(item, ("approval", "settlement", "rent", "constraint", "credential", "secret", "token")):
+            return False
+    return True
 
 
 def _is_allowed_authorization_signal(item: dict[str, Any]) -> bool:
