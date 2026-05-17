@@ -2376,6 +2376,20 @@ class TestBuildCallKwargsToolDedup:
         names = [t["function"]["name"] for t in kwargs["tools"]]
         assert names == ["alpha", "beta"]
 
+    def test_tool_choice_passes_through_when_tools_are_present(self):
+        tools = [self._make_tool("alpha")]
+        tool_choice = {"type": "function", "function": {"name": "alpha"}}
+
+        kwargs = _build_call_kwargs(
+            provider="openai",
+            model="gpt-4o",
+            messages=[],
+            tools=tools,
+            tool_choice=tool_choice,
+        )
+
+        assert kwargs["tool_choice"] == tool_choice
+
     def test_duplicate_tool_names_are_deduplicated(self):
         """RED test — must fail until dedup guard is added."""
         tools = [
@@ -2407,6 +2421,16 @@ class TestBuildCallKwargsToolDedup:
             provider="openai", model="gpt-4o", messages=[], tools=None,
         )
         assert "tools" not in kwargs
+
+    def test_tool_choice_without_tools_is_omitted(self):
+        kwargs = _build_call_kwargs(
+            provider="openai",
+            model="gpt-4o",
+            messages=[],
+            tools=None,
+            tool_choice={"type": "function", "function": {"name": "alpha"}},
+        )
+        assert "tool_choice" not in kwargs
 
 
 @pytest.fixture(autouse=True)

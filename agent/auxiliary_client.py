@@ -2251,6 +2251,7 @@ def _retry_same_provider_sync(
     temperature: Optional[float],
     max_tokens: Optional[int],
     tools: Optional[list],
+    tool_choice: Any,
     effective_timeout: float,
     effective_extra_body: dict,
 ) -> Any:
@@ -2284,6 +2285,7 @@ def _retry_same_provider_sync(
         temperature=temperature,
         max_tokens=max_tokens,
         tools=tools,
+        tool_choice=tool_choice,
         timeout=effective_timeout,
         extra_body=effective_extra_body,
         base_url=retry_base or resolved_base_url,
@@ -2308,6 +2310,7 @@ async def _retry_same_provider_async(
     temperature: Optional[float],
     max_tokens: Optional[int],
     tools: Optional[list],
+    tool_choice: Any,
     effective_timeout: float,
     effective_extra_body: dict,
 ) -> Any:
@@ -2341,6 +2344,7 @@ async def _retry_same_provider_async(
         temperature=temperature,
         max_tokens=max_tokens,
         tools=tools,
+        tool_choice=tool_choice,
         timeout=effective_timeout,
         extra_body=effective_extra_body,
         base_url=retry_base or resolved_base_url,
@@ -3951,6 +3955,7 @@ def _build_call_kwargs(
     temperature: Optional[float] = None,
     max_tokens: Optional[int] = None,
     tools: Optional[list] = None,
+    tool_choice: Any = None,
     timeout: float = 30.0,
     extra_body: Optional[dict] = None,
     base_url: Optional[str] = None,
@@ -4022,6 +4027,8 @@ def _build_call_kwargs(
                 _seen.add(_tname)
             _deduped.append(_t)
         kwargs["tools"] = _deduped
+        if tool_choice is not None:
+            kwargs["tool_choice"] = tool_choice
 
     # Provider-specific extra_body
     merged_extra = dict(extra_body or {})
@@ -4076,6 +4083,7 @@ def call_llm(
     temperature: float = None,
     max_tokens: int = None,
     tools: list = None,
+    tool_choice: Any = None,
     timeout: float = None,
     extra_body: dict = None,
 ) -> Any:
@@ -4094,6 +4102,7 @@ def call_llm(
         temperature: Sampling temperature (None = provider default).
         max_tokens: Max output tokens (handles max_tokens vs max_completion_tokens).
         tools: Tool definitions (for function calling).
+        tool_choice: Optional tool-choice directive for function calling.
         timeout: Request timeout in seconds (None = read from auxiliary.{task}.timeout config).
         extra_body: Additional request body fields.
 
@@ -4181,7 +4190,7 @@ def call_llm(
     kwargs = _build_call_kwargs(
         resolved_provider, final_model, messages,
         temperature=temperature, max_tokens=max_tokens,
-        tools=tools, timeout=effective_timeout, extra_body=effective_extra_body,
+        tools=tools, tool_choice=tool_choice, timeout=effective_timeout, extra_body=effective_extra_body,
         base_url=_base_info or resolved_base_url)
 
     # Convert image blocks for Anthropic-compatible endpoints (e.g. MiniMax)
@@ -4296,6 +4305,7 @@ def call_llm(
                     temperature=temperature,
                     max_tokens=max_tokens,
                     tools=tools,
+                    tool_choice=tool_choice,
                     effective_timeout=effective_timeout,
                     effective_extra_body=effective_extra_body,
                 )
@@ -4330,6 +4340,7 @@ def call_llm(
                     temperature=temperature,
                     max_tokens=max_tokens,
                     tools=tools,
+                    tool_choice=tool_choice,
                     effective_timeout=effective_timeout,
                     effective_extra_body=effective_extra_body,
                 )
@@ -4382,7 +4393,7 @@ def call_llm(
                 fb_kwargs = _build_call_kwargs(
                     fb_label, fb_model, messages,
                     temperature=temperature, max_tokens=max_tokens,
-                    tools=tools, timeout=effective_timeout,
+                    tools=tools, tool_choice=tool_choice, timeout=effective_timeout,
                     extra_body=effective_extra_body,
                     base_url=str(getattr(fb_client, "base_url", "") or ""))
                 return _validate_llm_response(
@@ -4468,6 +4479,7 @@ async def async_call_llm(
     temperature: float = None,
     max_tokens: int = None,
     tools: list = None,
+    tool_choice: Any = None,
     timeout: float = None,
     extra_body: dict = None,
 ) -> Any:
@@ -4539,7 +4551,7 @@ async def async_call_llm(
     kwargs = _build_call_kwargs(
         resolved_provider, final_model, messages,
         temperature=temperature, max_tokens=max_tokens,
-        tools=tools, timeout=effective_timeout, extra_body=effective_extra_body,
+        tools=tools, tool_choice=tool_choice, timeout=effective_timeout, extra_body=effective_extra_body,
         base_url=_client_base or resolved_base_url)
 
     # Convert image blocks for Anthropic-compatible endpoints (e.g. MiniMax)
@@ -4645,6 +4657,7 @@ async def async_call_llm(
                     temperature=temperature,
                     max_tokens=max_tokens,
                     tools=tools,
+                    tool_choice=tool_choice,
                     effective_timeout=effective_timeout,
                     effective_extra_body=effective_extra_body,
                 )
@@ -4678,6 +4691,7 @@ async def async_call_llm(
                     temperature=temperature,
                     max_tokens=max_tokens,
                     tools=tools,
+                    tool_choice=tool_choice,
                     effective_timeout=effective_timeout,
                     effective_extra_body=effective_extra_body,
                 )
@@ -4707,7 +4721,7 @@ async def async_call_llm(
                 fb_kwargs = _build_call_kwargs(
                     fb_label, fb_model, messages,
                     temperature=temperature, max_tokens=max_tokens,
-                    tools=tools, timeout=effective_timeout,
+                    tools=tools, tool_choice=tool_choice, timeout=effective_timeout,
                     extra_body=effective_extra_body,
                     base_url=str(getattr(fb_client, "base_url", "") or ""))
                 # Convert sync fallback client to async
