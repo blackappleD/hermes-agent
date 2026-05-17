@@ -358,7 +358,7 @@ def load_cli_config() -> Dict[str, Any]:
             "resume_display": "full",
             "show_reasoning": False,
             "streaming": True,
-            "busy_input_mode": "interrupt",
+            "busy_input_mode": "queue",
             "persistent_output": True,
             "persistent_output_max_lines": 200,
 
