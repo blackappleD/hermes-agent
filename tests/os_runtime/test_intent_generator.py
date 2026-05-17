@@ -98,6 +98,88 @@ def test_llm_json_success_is_schema_validated_and_not_permission():
     assert '"intent_id": "intent-llm"' in intent.metadata["llm_response"]["raw"]
 
 
+def test_world_chat_event_enriches_communicate_intent_with_reply_draft():
+    prompt = _self_prompt()
+    payload = {
+        "intent_id": "intent-chat",
+        "action_family": "communicate",
+        "action_type": "draft_message",
+        "why_now": "social response tension is present",
+        "open_space": prompt.open_space.to_dict(),
+        "target_direction": prompt.target_direction.to_dict(),
+        "tools_needed": [],
+        "proposed_new_tools": [],
+        "proposed_new_skills": [],
+        "success_condition": "draft is auditable",
+        "stop_condition": "no external side effects",
+        "risk_level": "low",
+        "metadata": {"reply": {"draft_text": "你好，我在。"}},
+    }
+
+    intent = OpenIntentGenerator().generate(
+        self_prompt=prompt,
+        action_potential=ActionPotential(intent_id="ap-1"),
+        llm_json=payload,
+        prefer_llm=True,
+        event_content=[
+            {
+                "event_id": "evt-chat",
+                "event_type": "world_event",
+                "source": "linz_world",
+                "summary": "你好",
+                "metadata": {
+                    "subject": "wsp.my-inbox",
+                    "event_type": "wsp.chat.message.sent",
+                    "os_id": "peer-os",
+                    "chat_id": "chat-1",
+                },
+            }
+        ],
+    )
+
+    assert intent.action_type == "reply_chat_message"
+    assert intent.tools_needed == []
+    assert intent.metadata["reply"]["target_os_id"] == "peer-os"
+    assert intent.metadata["reply"]["conversation_id"] == "chat-1"
+    assert intent.metadata["reply"]["source_event_id"] == "evt-chat"
+    assert intent.metadata["reply"]["draft_text"] == "你好，我在。"
+    assert intent.metadata["reply"]["send_requested"] is False
+
+
+def test_rule_path_does_not_synthesize_chat_reply_draft_text():
+    prompt = _self_prompt()
+    prompt.open_space = OpenSpace(
+        space_id="space-chat",
+        available_action_families=[OpenActionFamily.COMMUNICATE],
+    )
+
+    intent = OpenIntentGenerator().generate(
+        self_prompt=prompt,
+        action_potential=ActionPotential(intent_id="ap-chat"),
+        event_content=[
+            {
+                "event_id": "evt-chat",
+                "event_type": "world_event",
+                "source": "linz_world",
+                "summary": "你好，在吗？",
+                "metadata": {
+                    "subject": "wsp.my-inbox",
+                    "event_type": "wsp.chat.message.sent",
+                    "os_id": "peer-os",
+                    "chat_id": "chat-1",
+                },
+            }
+        ],
+    )
+
+    assert intent.metadata["source"] == "rule"
+    assert intent.action_type == "reply_chat_message"
+    assert intent.metadata["reply"]["target_os_id"] == "peer-os"
+    assert intent.metadata["reply"]["incoming_summary"] == "你好，在吗？"
+    assert "draft_text" not in intent.metadata["reply"]
+    assert intent.metadata["reply"]["send_requested"] is False
+
+
 def test_llm_path_calls_auxiliary_task_with_runtime_payload():
     prompt = _self_prompt()
     llm_payload = {
