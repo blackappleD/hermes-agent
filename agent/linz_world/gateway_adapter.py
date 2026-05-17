@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
+import threading
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
@@ -18,6 +20,8 @@ from .event_bus import project_to_message_event
 from .event_state import LinzStateRepository
 from .models import EventDispatchRecord
 from .nats_transport import NatsEventListener
+
+logger = logging.getLogger(__name__)
 
 
 class LinzWorldPlatformAdapter(BasePlatformAdapter):
@@ -63,7 +67,17 @@ class LinzWorldPlatformAdapter(BasePlatformAdapter):
         reply_to: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
     ) -> SendResult:
-        return SendResult(success=False, error="Linz World gateway adapter is receive-only; use linz_publish for external publish.")
+        logger.info(
+            "Suppressing Linz World gateway response to %s; adapter is receive-only and external publish must use linz_publish.",
+            chat_id,
+        )
+        return SendResult(
+            success=True,
+            raw_response={
+                "suppressed": True,
+                "reason": "linz_world_gateway_receive_only",
+            },
+        )
 
     async def get_chat_info(self, chat_id: str) -> dict[str, Any]:
         return {
@@ -158,6 +172,7 @@ async def dispatch_world_event(
     *,
     retry_limit: int = 3,
     session_store: Any = None,
+    wake_inline: bool = False,
 ) -> WorldEventDispatchResult:
     repo = repository or LinzStateRepository()
     persisted = persist_world_event_for_gateway(raw_event, repo)
@@ -167,11 +182,6 @@ async def dispatch_world_event(
             handled=False,
             record=persisted.record,
         )
-
-    _wake_autonomous_runtime(
-        persisted,
-        session_store=session_store,
-    )
 
     try:
         maybe_result = handle_message(persisted.message_event)
@@ -184,6 +194,12 @@ async def dispatch_world_event(
             retry_limit=retry_limit,
         )
         _mark_projection_failed(persisted.message_event, failed.last_error)
+        _start_autonomous_runtime_wake(
+            persisted,
+            session_store=session_store,
+            final_status="failed",
+            inline=wake_inline,
+        )
         return WorldEventDispatchResult(
             persisted=persisted,
             handled=False,
@@ -193,6 +209,12 @@ async def dispatch_world_event(
 
     handled = repo.mark_handled(persisted.record.event_id)
     _mark_projection_handled(persisted.message_event)
+    _start_autonomous_runtime_wake(
+        persisted,
+        session_store=session_store,
+        final_status="handled",
+        inline=wake_inline,
+    )
     return WorldEventDispatchResult(
         persisted=persisted,
         handled=True,
@@ -259,18 +281,209 @@ def _mark_projection_failed(message_event: MessageEvent | None, error: str) -> N
             store.close()
 
 
-def _wake_autonomous_runtime(
+def _start_autonomous_runtime_wake(
     persisted: PersistedWorldEvent,
     *,
     session_store: Any = None,
+    final_status: str,
+    inline: bool = False,
 ) -> None:
     message = persisted.message_event
     if message is None:
         return
+    config, skip_result = _load_autonomous_world_wake_config()
+    if skip_result is not None:
+        _record_os_runtime_pipeline(message, skip_result, final_status=final_status)
+        return
+    session_id = _resolve_session_id(message, session_store=session_store)
+    profile_id = getattr(session_store, "profile_id", "") if session_store is not None else ""
+    if not session_id:
+        _record_os_runtime_pipeline(
+            message,
+            {"queued": False, "woke": False, "reason": "no gateway session resolved"},
+            final_status=final_status,
+        )
+        return
+
+    _record_os_runtime_wake_scheduled(message, final_status=final_status, session_id=session_id)
+    if inline:
+        wake_result = _wake_autonomous_runtime(
+            persisted,
+            session_id=session_id,
+            profile_id=profile_id,
+            config=config,
+        )
+        _record_os_runtime_pipeline(message, wake_result, final_status=final_status)
+        return
+
+    def _run_wake() -> None:
+        wake_result = _wake_autonomous_runtime(
+            persisted,
+            session_id=session_id,
+            profile_id=profile_id,
+            config=config,
+        )
+        _record_os_runtime_pipeline(message, wake_result, final_status=final_status)
+
+    try:
+        thread = threading.Thread(
+            target=_run_wake,
+            name=f"linz-world-os-runtime-wake-{persisted.record.event_id}",
+            daemon=True,
+        )
+        thread.start()
+    except Exception as exc:
+        _record_os_runtime_pipeline(
+            message,
+            {
+                "queued": False,
+                "woke": False,
+                "reason": "autonomous runtime wake thread failed",
+                "error": f"{type(exc).__name__}: {exc}",
+            },
+            final_status=final_status,
+        )
+
+
+def _record_os_runtime_wake_scheduled(
+    message_event: MessageEvent | None,
+    *,
+    final_status: str,
+    session_id: str,
+) -> None:
+    if message_event is None:
+        return
+    store = None
+    try:
+        from gateway.event_projection_store import record_id_for_message_event
+
+        store = EventProjectionStore()
+        store.record_transition(
+            record_id_for_message_event(message_event),
+            final_status,
+            reason="os_runtime_wake_scheduled",
+            metadata={"session_id": session_id},
+        )
+    except Exception:
+        return
+    finally:
+        if store is not None:
+            store.close()
+
+
+def _load_autonomous_world_wake_config() -> tuple[Any, dict[str, Any] | None]:
     try:
         from hermes_cli.os_runtime import load_runtime_config
 
         config = load_runtime_config()
+    except Exception as exc:
+        return None, {
+            "queued": False,
+            "woke": False,
+            "reason": "autonomous runtime config load failed",
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    autonomous = getattr(config, "autonomous", None)
+    if not getattr(config, "enabled", False):
+        return config, {"queued": False, "woke": False, "reason": "os_runtime disabled"}
+    if autonomous is None or not getattr(autonomous, "enabled", False):
+        return config, {"queued": False, "woke": False, "reason": "autonomous runtime disabled"}
+    if not getattr(autonomous, "respond_to_world_events", False):
+        return config, {"queued": False, "woke": False, "reason": "respond_to_world_events=false"}
+    return config, None
+
+
+def _record_os_runtime_pipeline(
+    message_event: MessageEvent | None,
+    wake_result: Any,
+    *,
+    final_status: str,
+) -> None:
+    if message_event is None or wake_result is None:
+        return
+    store = None
+    try:
+        from gateway.event_projection_store import record_id_for_message_event
+
+        store = EventProjectionStore()
+        record_id = record_id_for_message_event(message_event)
+        wake_metadata = _wake_result_metadata(wake_result)
+        if wake_metadata:
+            store.record_transition(
+                record_id,
+                final_status,
+                reason="os_runtime_wake",
+                metadata=wake_metadata,
+            )
+
+        evidence = _wake_result_evidence(wake_result)
+        if not evidence:
+            return
+
+        steps = [
+            (
+                "os_runtime_life_state",
+                {
+                    "wake_reason": evidence.get("wake_reason"),
+                    "event_ids": evidence.get("event_ids"),
+                    "life_state": evidence.get("life_state"),
+                    "life_delta": evidence.get("life_delta"),
+                },
+            ),
+            (
+                "os_runtime_tension_field",
+                {
+                    "tension_set": evidence.get("tension_set"),
+                    "tension_delta": evidence.get("tension_delta"),
+                },
+            ),
+            (
+                "os_runtime_action_potential",
+                {"action_potential": evidence.get("action_potential")},
+            ),
+            (
+                "os_runtime_self_prompt",
+                {"self_prompt": evidence.get("self_prompt")},
+            ),
+            (
+                "os_runtime_open_intent",
+                {"open_intent": evidence.get("open_intent")},
+            ),
+            (
+                "os_runtime_arbitration",
+                {
+                    "arbitration": evidence.get("arbitration"),
+                    "action_summary": evidence.get("action_summary"),
+                    "stop_reason": evidence.get("stop_reason"),
+                },
+            ),
+        ]
+        for reason, metadata in steps:
+            compact = _compact_metadata(metadata)
+            if compact:
+                store.record_transition(record_id, final_status, reason=reason, metadata=compact)
+    except Exception:
+        return
+    finally:
+        if store is not None:
+            store.close()
+
+
+def _wake_autonomous_runtime(
+    persisted: PersistedWorldEvent,
+    *,
+    session_id: str = "",
+    profile_id: str = "",
+    config: Any = None,
+) -> Any:
+    message = persisted.message_event
+    if message is None:
+        return None
+    try:
+        if config is None:
+            config, skip_result = _load_autonomous_world_wake_config()
+            if skip_result is not None:
+                return skip_result
         autonomous = getattr(config, "autonomous", None)
         if (
             not config.enabled
@@ -278,17 +491,20 @@ def _wake_autonomous_runtime(
             or not autonomous.enabled
             or not autonomous.respond_to_world_events
         ):
-            return
+            return {
+                "queued": False,
+                "woke": False,
+                "reason": "autonomous runtime disabled or not subscribed to world events",
+            }
 
-        session_id = _resolve_session_id(message, session_store=session_store)
         if not session_id:
-            return
+            return {"queued": False, "woke": False, "reason": "no gateway session resolved"}
 
         from agent.os_runtime.world_event_waker import WorldEventWaker
 
-        WorldEventWaker(
+        return WorldEventWaker(
             session_id,
-            profile_id=getattr(session_store, "profile_id", "") if session_store is not None else "",
+            profile_id=profile_id,
             config=config,
         ).handle_persisted_event(
             {
@@ -303,8 +519,81 @@ def _wake_autonomous_runtime(
                 "status": "recorded",
             }
         )
-    except Exception:
-        return
+    except Exception as exc:
+        return {
+            "queued": False,
+            "woke": False,
+            "reason": "autonomous runtime wake failed",
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+
+def _wake_result_metadata(wake_result: Any) -> dict[str, Any]:
+    run_result = _result_get(wake_result, "run_result")
+    wake_record = _result_get(run_result, "wake_record") if run_result is not None else None
+    wake_record_data = _jsonable(wake_record)
+    if isinstance(wake_record_data, dict):
+        wake_record_data.pop("evidence", None)
+    metadata = {
+        "queued": _result_get(wake_result, "queued"),
+        "woke": _result_get(wake_result, "woke"),
+        "reason": _result_get(wake_result, "reason"),
+        "item_id": _result_get(wake_result, "item_id"),
+        "error": _result_get(wake_result, "error"),
+        "run_status": _result_get(run_result, "status") if run_result is not None else None,
+        "run_reason": _result_get(run_result, "reason") if run_result is not None else None,
+        "wake_record": wake_record_data,
+    }
+    return _compact_metadata(metadata)
+
+
+def _wake_result_evidence(wake_result: Any) -> dict[str, Any]:
+    evidence = _result_get(wake_result, "evidence")
+    if isinstance(evidence, dict) and evidence:
+        return _jsonable(evidence)
+    run_result = _result_get(wake_result, "run_result")
+    evidence = _result_get(run_result, "evidence") if run_result is not None else None
+    if isinstance(evidence, dict) and evidence:
+        return _jsonable(evidence)
+    wake_record = _result_get(run_result, "wake_record") if run_result is not None else None
+    evidence = _result_get(wake_record, "evidence") if wake_record is not None else None
+    if isinstance(evidence, dict):
+        return _jsonable(evidence)
+    return {}
+
+
+def _result_get(value: Any, key: str, default: Any = None) -> Any:
+    if value is None:
+        return default
+    if isinstance(value, dict):
+        return value.get(key, default)
+    return getattr(value, key, default)
+
+
+def _compact_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    data = _jsonable(metadata)
+    if not isinstance(data, dict):
+        return {}
+    return {key: value for key, value in data.items() if value not in (None, "", {}, [])}
+
+
+def _jsonable(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_jsonable(item) for item in value]
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        try:
+            return _jsonable(to_dict())
+        except Exception:
+            pass
+    enum_value = getattr(value, "value", None)
+    if enum_value is not None:
+        return str(enum_value)
+    return str(value)
 
 
 def _resolve_session_id(message: MessageEvent, *, session_store: Any = None) -> str:

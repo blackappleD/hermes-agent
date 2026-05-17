@@ -7,13 +7,42 @@ from agent.linz_world.event_bus import project_to_message_event
 from agent.linz_world.event_state import LinzStateRepository
 from agent.linz_world.gateway_adapter import LinzWorldPlatformAdapter, dispatch_world_event, persist_world_event_for_gateway
 from agent.linz_world.models import AuthState, AuthorizationMap
-from gateway.config import PlatformConfig
+from gateway.config import GatewayConfig, Platform, PlatformConfig
 from gateway.event_projection_store import EventProjectionStore
 from gateway.platform_registry import platform_registry
+from gateway.run import GatewayRunner
+from gateway.session import SessionSource
 
 
 def test_linz_world_platform_is_registered():
     assert platform_registry.is_registered("linz_world")
+
+
+def test_linz_world_gateway_events_bypass_human_allowlist(monkeypatch):
+    monkeypatch.delenv("GATEWAY_ALLOW_ALL_USERS", raising=False)
+    monkeypatch.delenv("GATEWAY_ALLOWED_USERS", raising=False)
+
+    runner = GatewayRunner(GatewayConfig())
+    source = SessionSource(
+        platform=Platform("linz_world"),
+        chat_id="wsp.target-os",
+        chat_type="channel",
+        user_id="source-os-id",
+        user_name="Source OS",
+    )
+
+    assert runner._is_user_authorized(source) is True
+
+
+@pytest.mark.asyncio
+async def test_linz_world_gateway_send_is_suppressed_noop():
+    adapter = LinzWorldPlatformAdapter(PlatformConfig(enabled=True))
+
+    result = await adapter.send("wsp.target", "hello")
+
+    assert result.success is True
+    assert result.raw_response["suppressed"] is True
+    assert result.raw_response["reason"] == "linz_world_gateway_receive_only"
 
 
 @pytest.mark.asyncio
@@ -176,6 +205,7 @@ async def test_dispatch_world_event_wakes_autonomous_runtime_after_persist(monke
                 "respond_to_world_events": True,
                 "idle_cooldown_seconds": 0,
             },
+            "intent_generation": "rule",
         }
     )
     monkeypatch.setattr("hermes_cli.os_runtime.load_runtime_config", lambda: cfg)
@@ -201,6 +231,7 @@ async def test_dispatch_world_event_wakes_autonomous_runtime_after_persist(monke
         _handler,
         repo,
         session_store=_SessionStore(),
+        wake_inline=True,
     )
 
     queue_repo = RuntimeQueueRepository(root=linz_home)
@@ -213,6 +244,25 @@ async def test_dispatch_world_event_wakes_autonomous_runtime_after_persist(monke
         assert inbox[0].status == "handled"
         assert wakes
         assert wakes[0].wake_reason == "world_event"
+        store = EventProjectionStore(root=linz_home)
+        try:
+            detail = store.get_record("linz_world_nats:evt_autonomous")
+        finally:
+            store.close()
+        assert detail is not None
+        reasons = [transition["reason"] for transition in detail["transitions"]]
+        assert "os_runtime_wake_scheduled" in reasons
+        assert "os_runtime_wake" in reasons
+        assert "os_runtime_life_state" in reasons
+        assert "os_runtime_tension_field" in reasons
+        assert "os_runtime_action_potential" in reasons
+        assert "os_runtime_self_prompt" in reasons
+        assert "os_runtime_open_intent" in reasons
+        assert "os_runtime_arbitration" in reasons
+        tension_transition = next(
+            transition for transition in detail["transitions"] if transition["reason"] == "os_runtime_tension_field"
+        )
+        assert tension_transition["metadata"]["tension_set"]
     finally:
         queue_repo.close()
 
