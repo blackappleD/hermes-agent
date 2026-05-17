@@ -145,3 +145,17 @@ def test_interpreter_maps_social_and_memory_signals():
     assert "memory-resonance-vs-present-context" in interpretation.detected_conflicts
     assert any(operation.tension_type == TensionType.SOCIAL_SIGNAL for operation in interpretation.operations)
     assert any(operation.tension_type == TensionType.MEMORY_RESONANCE for operation in interpretation.operations)
+
+
+def test_allowed_world_chat_authorization_does_not_create_constraint_tension():
+    task_context = TaskContextView()
+    signal_set = _signal_set(
+        _signal("world_authorization_allowed", "world_authorization", status="allowed"),
+        _signal("simple_chat_message", "relationships", level="low"),
+        task_context=task_context,
+    )
+
+    interpretation = TensionInterpreter().interpret(_event(), signal_set, task_context, LifeState(restraint=0.2), TensionSet())
+
+    assert any(operation.tension_type == TensionType.SOCIAL_SIGNAL for operation in interpretation.operations)
+    assert not any(operation.tension_type == TensionType.CONSTRAINT for operation in interpretation.operations)

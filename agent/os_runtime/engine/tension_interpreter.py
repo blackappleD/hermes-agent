@@ -79,7 +79,7 @@ class TensionInterpreter:
             conflicts.append("value-opportunity-vs-capacity")
             evidence.extend(operation.evidence)
 
-        risk_evidence = _evidence_for(items, ("risk", "authorization", "approval", "settlement", "rent", "constraint"))
+        risk_evidence = _risk_evidence_for(items)
         if risk_evidence or life.restraint >= 0.65:
             tension_id = _existing_id(previous, TensionType.CONSTRAINT) or "constraint:risk"
             operation = _operation(
@@ -272,6 +272,21 @@ def _evidence_for(items: list[dict[str, Any]], needles: tuple[str, ...]) -> list
     return evidence
 
 
+def _risk_evidence_for(items: list[dict[str, Any]]) -> list[str]:
+    evidence: list[str] = []
+    for item in items:
+        if not _matches(item, ("risk", "authorization", "approval", "settlement", "rent", "constraint")):
+            continue
+        if _is_allowed_authorization_signal(item):
+            continue
+        group = str(item.get("_group", "signal"))
+        code = str(item.get("code") or item.get("kind") or item.get("type") or "value")
+        evidence.append(f"signal:{group}:{code}")
+        for event_id in item.get("event_ids") or []:
+            evidence.append(f"event:{event_id}")
+    return evidence
+
+
 def _memory_evidence(signal_set: SignalSet, items: list[dict[str, Any]]) -> list[str]:
     evidence = _evidence_for(items, ("memory", "soul"))
     agent_context = signal_set.agent_context
@@ -291,6 +306,13 @@ def _matches(item: dict[str, Any], needles: tuple[str, ...]) -> bool:
     if isinstance(metadata, dict):
         haystack = f"{haystack} {' '.join(str(value) for value in metadata.values()).lower()}"
     return any(needle in haystack for needle in needles)
+
+
+def _is_allowed_authorization_signal(item: dict[str, Any]) -> bool:
+    group = str(item.get("_group") or "").lower()
+    code = str(item.get("code") or "").lower()
+    status = str(item.get("status") or item.get("level") or "").lower()
+    return group == "world_authorization" and code == "world_authorization_allowed" and status == "allowed"
 
 
 def _event_id(event_ref: OSRuntimeEventRef | None, signal_set: SignalSet) -> str:
