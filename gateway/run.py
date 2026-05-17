@@ -5390,7 +5390,14 @@ class GatewayRunner:
         # connection, so HA events are always authorized.
         # Webhook events are authenticated via HMAC signature validation in
         # the adapter itself — no user allowlist applies.
-        if source.platform in {Platform.HOMEASSISTANT, Platform.WEBHOOK}:
+        # Linz World events are authenticated and scoped by the Linz World
+        # listener/authorization-map path before they are projected into a
+        # gateway MessageEvent.  Do not apply human gateway allowlists to the
+        # source OS id.
+        if (
+            source.platform in {Platform.HOMEASSISTANT, Platform.WEBHOOK}
+            or getattr(source.platform, "value", "") == "linz_world"
+        ):
             return True
 
         user_id = source.user_id
