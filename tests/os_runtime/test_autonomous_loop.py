@@ -6,11 +6,11 @@ from agent.linz_world.models import AuthState, AuthorizationMap, LoginState
 from agent.os_runtime.adapters.context import ContextSnapshot
 from agent.os_runtime.adapters.runtime_queue import RuntimeQueueRepository
 from agent.os_runtime.adapters.session_store import OSRuntimeEvent, OSRuntimeEventRepository
-from agent.os_runtime.autonomous_loop import AutonomousRuntimeLoop
+from agent.os_runtime.autonomous_loop import AutonomousRuntimeLoop, _prepare_chat_reply_intent
 from agent.os_runtime.autonomous_scheduler import AutonomousScheduler
 from agent.os_runtime.autonomous_state import AutonomousRuntimeState, AutonomousRuntimeStatus
 from agent.os_runtime.config import OSRuntimeConfig
-from agent.os_runtime.domain import AgentContextView, EventSource, TaskContextView
+from agent.os_runtime.domain import AgentContextView, EventSource, OpenActionFamily, OpenIntent, TaskContextView
 from agent.os_runtime.engine.signals import SignalInterpreter
 
 
@@ -207,3 +207,28 @@ def test_autonomous_world_wake_uses_current_event_for_signals_not_stale_history(
     finally:
         event_repo.close()
         queue_repo.close()
+
+
+def test_prepare_chat_reply_intent_does_not_auto_send_suppressed_closing_reply():
+    intent = OpenIntent(
+        intent_id="intent-close",
+        action_family=OpenActionFamily.COMMUNICATE,
+        action_type="close_chat_no_reply",
+        metadata={
+            "reply": {
+                "target_os_id": "peer-os",
+                "draft_text": "继续加油。",
+                "send_requested": True,
+                "should_reply": False,
+                "suppress_reply": True,
+                "suppress_reason": "conversation_closing_context",
+            }
+        },
+    )
+
+    _prepare_chat_reply_intent(intent, config=_config(allow_chat_reply_auto_send=True))
+
+    assert intent.metadata["reply"]["send_requested"] is False
+    assert intent.metadata["chat_reply_send_requested"] is False
+    assert intent.metadata["should_reply"] is False
+    assert intent.metadata["reply_control"]["suppress_reply"] is True

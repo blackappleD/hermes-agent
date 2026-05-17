@@ -380,7 +380,10 @@ class TurnTensionHook:
         intent = self.intent_generator.generate(
             self_prompt=self_prompt,
             action_potential=action_potential,
-            event_content=events,
+            event_content={
+                "current_events": events,
+                "recent_events": snapshot.recent_events,
+            },
             tension_field={
                 "tension_set": tension_set,
                 "tension_interpretation": tension_interpretation,

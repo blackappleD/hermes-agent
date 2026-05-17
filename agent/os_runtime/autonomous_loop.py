@@ -270,7 +270,10 @@ class AutonomousRuntimeLoop:
             intent = self.intent_generator.generate(
                 self_prompt=self_prompt,
                 action_potential=action_potential,
-                event_content=events,
+                event_content={
+                    "current_events": events,
+                    "recent_events": snapshot.recent_events,
+                },
                 tension_field={
                     "tension_set": tension_set,
                     "tension_interpretation": tension_interpretation,
@@ -612,10 +615,40 @@ def _prepare_chat_reply_intent(intent: Any, *, config: OSRuntimeConfig) -> None:
     reply = metadata.get("reply")
     if not isinstance(reply, dict):
         return
-    send_requested = bool(config.autonomous.allow_chat_reply_auto_send and str(reply.get("draft_text") or "").strip())
+    suppressed = _chat_reply_suppressed(metadata, reply)
+    send_requested = bool(
+        not suppressed
+        and config.autonomous.allow_chat_reply_auto_send
+        and str(reply.get("draft_text") or "").strip()
+    )
     reply["send_requested"] = send_requested
     metadata["chat_reply_send_requested"] = send_requested
+    metadata["should_reply"] = not suppressed
+    if suppressed:
+        reply["should_reply"] = False
+        reply["suppress_reply"] = True
+        metadata["reply_control"] = {
+            "should_reply": False,
+            "suppress_reply": True,
+            "reason": str(reply.get("suppress_reason") or "conversation_closing_context"),
+        }
     metadata["execution_permitted"] = False
+
+
+def _chat_reply_suppressed(metadata: dict[str, Any], reply: dict[str, Any]) -> bool:
+    if reply.get("should_reply") is False or metadata.get("should_reply") is False:
+        return True
+    return _truthy(reply.get("suppress_reply")) or _truthy(reply.get("conversation_end_detected")) or _truthy(
+        metadata.get("suppress_reply")
+    )
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
 
 
 def _available_tools(self_prompt: Any) -> list[str]:
