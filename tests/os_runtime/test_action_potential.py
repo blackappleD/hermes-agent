@@ -14,13 +14,14 @@ from agent.os_runtime.domain import (
 from agent.os_runtime.engine.action_potential import ActionPotentialEvaluator, ALLOWED_RECOMMENDED_DEPTHS
 
 
-def _signal(code, *, group="needs", level="medium", status="", reason="", event_ids=None):
+def _signal(code, *, group="needs", level="medium", status="", reason="", event_ids=None, metadata=None):
     return {
         "code": code,
         "level": level,
         "status": status,
         "reason": reason or code,
         "event_ids": event_ids or ["evt-1"],
+        "metadata": metadata or {},
     }, group
 
 
@@ -69,6 +70,82 @@ def test_simple_chat_does_not_trigger_self_driven_continuation():
     assert potential.recommended_depth in {RecommendedDepth.NONE, RecommendedDepth.REPORT}
     assert potential.recommended_depth != RecommendedDepth.CONTINUE_TURN
     assert potential.overall_score < 0.18
+
+
+def test_logged_in_world_chat_can_recommend_draft_when_social_values_are_ready():
+    potential = ActionPotentialEvaluator().evaluate(
+        signal_set=_signal_set(
+            _signal(
+                "world_authorization_allowed",
+                group="world_authorization",
+                status="allowed",
+                metadata={"subject": "wsp.agent-1", "event_type": "wsp.chat.message.sent"},
+            ),
+            _signal(
+                "simple_chat_message",
+                group="relationships",
+                level="low",
+                metadata={
+                    "chat_kind": "linz_world_direct",
+                    "subject": "wsp.agent-1",
+                    "event_type": "wsp.chat.message.sent",
+                },
+            ),
+        ),
+        life_state=LifeState(
+            energy=0.9,
+            health=1.0,
+            wakefulness=0.95,
+            social_hunger=0.35,
+            restraint=0.2,
+        ),
+        tension_set=TensionSet(
+            dynamic_tensions=[
+                _tension(TensionType.SOCIAL_SIGNAL, intensity=0.7, activation=0.7, tension_id="social:relationship")
+            ]
+        ),
+    )
+
+    assert potential.recommended_depth == RecommendedDepth.DRAFT
+    assert potential.risk_cost < 0.10
+
+
+def test_logged_out_world_chat_does_not_recommend_draft():
+    potential = ActionPotentialEvaluator().evaluate(
+        signal_set=_signal_set(
+            _signal(
+                "world_authorization_login_blocked",
+                group="world_authorization",
+                status="blocked",
+                metadata={"subject": "wsp.agent-1", "event_type": "wsp.chat.message.sent"},
+            ),
+            _signal(
+                "simple_chat_message",
+                group="relationships",
+                level="low",
+                metadata={
+                    "chat_kind": "linz_world_direct",
+                    "subject": "wsp.agent-1",
+                    "event_type": "wsp.chat.message.sent",
+                },
+            ),
+        ),
+        life_state=LifeState(
+            energy=0.9,
+            health=1.0,
+            wakefulness=0.95,
+            social_hunger=0.35,
+            restraint=0.2,
+        ),
+        tension_set=TensionSet(
+            dynamic_tensions=[
+                _tension(TensionType.SOCIAL_SIGNAL, intensity=0.7, activation=0.7, tension_id="social:relationship"),
+                _tension(TensionType.CONSTRAINT, intensity=0.5, activation=0.5, tension_id="constraint:risk"),
+            ]
+        ),
+    )
+
+    assert potential.recommended_depth != RecommendedDepth.DRAFT
 
 
 def test_unfinished_low_risk_goal_can_recommend_continue_turn_with_evidence():

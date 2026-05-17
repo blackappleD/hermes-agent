@@ -72,9 +72,11 @@ class ActionPotentialEvaluator:
             overall=overall,
             risk=risk,
             value=value,
+            mutual=mutual,
             learning=learning,
             signals=signals,
             signal_items=signal_items,
+            active_tensions=active_tensions,
             life=life,
             candidate=candidate_view,
         )
@@ -217,6 +219,8 @@ class ActionPotentialEvaluator:
         score = 0.0
         evidence: list[str] = []
         for item in items:
+            if _is_allowed_authorization_signal(item):
+                continue
             if _matches(item, ("risk", "authorization", "approval", "settlement", "rent", "constraint")):
                 score += 0.08 + _risk_weight(item)
                 evidence.extend(_item_evidence(item))
@@ -257,9 +261,11 @@ class ActionPotentialEvaluator:
         overall: float,
         risk: float,
         value: float,
+        mutual: float,
         learning: float,
         signals: SignalSet,
         signal_items: list[dict[str, Any]],
+        active_tensions: list[Tension],
         life: LifeState,
         candidate: dict[str, Any],
     ) -> RecommendedDepth:
@@ -268,6 +274,7 @@ class ActionPotentialEvaluator:
         is_tool = action_family == OpenActionFamily.USE_TOOL.value or bool(candidate.get("tools_needed") or candidate.get("tool_names"))
         inhibited = life.fatigue >= 0.75 or life.restraint >= 0.82 or life.life_cycle == "cooldown"
         simple_chat = _is_simple_chat(signal_items, has_goal=has_goal)
+        direct_world_chat = _is_direct_world_chat(signal_items)
 
         if risk >= self.thresholds["high_risk"]:
             if is_tool and overall >= self.thresholds["draft_at"]:
@@ -278,6 +285,17 @@ class ActionPotentialEvaluator:
                 return RecommendedDepth.SANDBOX
             return RecommendedDepth.REPORT if overall >= self.thresholds["none_below"] else RecommendedDepth.NONE
         if simple_chat and not has_goal and value < 0.20:
+            if direct_world_chat and _simple_chat_action_ready(
+                overall=overall,
+                risk=risk,
+                mutual=mutual,
+                life=life,
+                signal_items=signal_items,
+                active_tensions=active_tensions,
+                thresholds=self.thresholds,
+                inhibited=inhibited,
+            ):
+                return RecommendedDepth.DRAFT
             return RecommendedDepth.REPORT if overall >= self.thresholds["draft_at"] else RecommendedDepth.NONE
         if candidate.get("world_publish") and overall >= self.thresholds["world_publish_at"]:
             return RecommendedDepth.WORLD_PUBLISH
@@ -395,6 +413,79 @@ def _is_simple_chat(items: list[dict[str, Any]], *, has_goal: bool) -> bool:
 
 def _has_relationship_signal(items: list[dict[str, Any]]) -> bool:
     return any(_matches(item, ("relationship", "social", "chat", "message")) for item in items)
+
+
+def _is_direct_world_chat(items: list[dict[str, Any]]) -> bool:
+    for item in items:
+        metadata = item.get("metadata")
+        if not isinstance(metadata, dict):
+            continue
+        subject = str(metadata.get("subject") or "")
+        event_type = str(metadata.get("event_type") or "")
+        chat_kind = str(metadata.get("chat_kind") or "")
+        if chat_kind == "linz_world_direct":
+            return True
+        if subject == "wsp.chat.message.sent" and event_type == "message.sent":
+            return True
+        if subject.startswith("wsp.") and subject.count(".") == 1 and event_type == "wsp.chat.message.sent":
+            return True
+    return False
+
+
+def _simple_chat_action_ready(
+    *,
+    overall: float,
+    risk: float,
+    mutual: float,
+    life: LifeState,
+    signal_items: list[dict[str, Any]],
+    active_tensions: list[Tension],
+    thresholds: dict[str, float],
+    inhibited: bool,
+) -> bool:
+    if inhibited or risk >= thresholds["medium_risk"]:
+        return False
+    if not _logged_in_for_world_chat(signal_items):
+        return False
+    if _readiness(life) < 0.55 or life.energy < 0.30 or life.health < 0.55 or life.wakefulness < 0.45:
+        return False
+    if _constraint_activation(active_tensions) >= 0.55:
+        return False
+    social_activation = _social_activation(active_tensions)
+    social_pressure = max(mutual, social_activation, life.social_hunger)
+    return social_pressure >= 0.18 and (overall >= thresholds["none_below"] or social_pressure >= 0.35)
+
+
+def _logged_in_for_world_chat(items: list[dict[str, Any]]) -> bool:
+    for item in items:
+        if _is_allowed_authorization_signal(item):
+            return True
+    return False
+
+
+def _social_activation(active_tensions: list[Tension]) -> float:
+    social = [
+        tension.activation
+        for tension in active_tensions
+        if tension.tension_type == TensionType.SOCIAL_SIGNAL
+    ]
+    return max(social, default=0.0)
+
+
+def _constraint_activation(active_tensions: list[Tension]) -> float:
+    constraints = [
+        tension.activation
+        for tension in active_tensions
+        if tension.tension_type == TensionType.CONSTRAINT
+    ]
+    return max(constraints, default=0.0)
+
+
+def _is_allowed_authorization_signal(item: dict[str, Any]) -> bool:
+    group = str(item.get("_group") or "").lower()
+    code = str(item.get("code") or "").lower()
+    status = str(item.get("status") or item.get("level") or "").lower()
+    return group == "world_authorization" and code == "world_authorization_allowed" and status == "allowed"
 
 
 def _candidate_has_side_effect(candidate: dict[str, Any]) -> bool:
