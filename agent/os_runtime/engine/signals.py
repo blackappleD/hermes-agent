@@ -287,7 +287,13 @@ class SignalInterpreter:
                         {"counterparty_id": counterparty},
                     )
                 )
-            if event["event_type"] in {"human_request", "assistant_response"} and _is_simple_chat_text(event["text"]):
+            if (
+                event["event_type"] in {"human_request", "assistant_response"}
+                and _is_simple_chat_text(event["text"])
+            ) or (
+                _is_linz_world_chat_event(event)
+                and _is_low_stakes_chat_text(event["text"])
+            ):
                 signals.append(
                     _signal(
                         "simple_chat_message",
@@ -295,7 +301,11 @@ class SignalInterpreter:
                         "low",
                         "Short conversational exchange without task or side-effect intent.",
                         [event["event_id"]],
-                        {"event_type": event["event_type"]},
+                        {
+                            "event_type": event["event_type"],
+                            "subject": str(metadata.get("subject") or ""),
+                            "chat_kind": "linz_world_direct" if _is_linz_world_chat_event(event) else "conversation",
+                        },
                     )
                 )
         return signals
@@ -512,6 +522,80 @@ def _is_simple_chat_text(text: str) -> bool:
             "收到",
             "正常通信",
             "可以帮你",
+        ),
+    )
+
+
+def _is_linz_world_chat_event(event: dict[str, Any]) -> bool:
+    if event["source"] != EventSource.LINZ_WORLD.value:
+        return False
+    metadata = event["metadata"]
+    subject = str(metadata.get("subject") or "")
+    event_type = str(metadata.get("event_type") or event["event_type"] or "")
+    if subject == "wsp.chat.message.sent" and event_type == "message.sent":
+        return True
+    return _is_direct_inbox_subject(subject) and event_type == "wsp.chat.message.sent"
+
+
+def _is_direct_inbox_subject(subject: str) -> bool:
+    if not subject.startswith("wsp."):
+        return False
+    inbox_name = subject.removeprefix("wsp.")
+    return subject.count(".") == 1 and bool(inbox_name) and inbox_name not in {"chat", "sys", "task", "mrk"}
+
+
+def _is_low_stakes_chat_text(text: str) -> bool:
+    normalized = " ".join(str(text or "").strip().lower().split())
+    if not normalized:
+        return False
+    if len(normalized) > 700:
+        return False
+    return not _contains_any(
+        normalized,
+        (
+            "todo",
+            "goal",
+            "requirement",
+            "please",
+            "need",
+            "http",
+            "browser",
+            "download",
+            "upload",
+            "curl",
+            "terminal",
+            "shell",
+            "command",
+            "apply_patch",
+            "write_file",
+            "edit",
+            "code",
+            "pytest",
+            "delete",
+            "remove",
+            "commit",
+            "push",
+            "deploy",
+            "settlement",
+            "rent",
+            "approval",
+            "credential",
+            "secret",
+            "token",
+            "需求",
+            "目标",
+            "任务",
+            "代码",
+            "文件",
+            "删除",
+            "删",
+            "审批",
+            "结算",
+            "租金",
+            "凭证",
+            "密钥",
+            "令牌",
+            "外部消息",
         ),
     )
 

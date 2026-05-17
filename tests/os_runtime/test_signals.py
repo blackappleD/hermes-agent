@@ -66,6 +66,21 @@ def _empty_contexts():
     return TaskContextView(session_id="session-1"), AgentContextView()
 
 
+def _logged_in_contexts():
+    auth = {
+        "state": "current",
+        "login_state": "logged_in",
+        "allowed_publish_subjects": ["wsp.agent-1"],
+        "allowed_publish_event_types": ["wsp.chat.message.sent"],
+        "allowed_capabilities": ["publish", "relationship"],
+        "map_version": "map-v1",
+    }
+    return (
+        TaskContextView(session_id="session-1", metadata={"authorization": auth}),
+        AgentContextView(metadata={"authorization": auth}),
+    )
+
+
 def test_signal_interpreter_outputs_deterministic_full_signal_set():
     task_context, agent_context = _contexts()
     auth_map = AuthorizationMap(
@@ -163,6 +178,36 @@ def test_simple_chat_is_not_treated_as_need_or_network_risk():
     assert "network_send" not in _codes(signal_set, "risks")
     assert "informational" not in _codes(signal_set, "risks")
     assert "simple_chat_message" in _codes(signal_set, "relationships")
+
+
+def test_linz_world_direct_chat_is_simple_chat_when_low_stakes_and_logged_in():
+    task_context, agent_context = _logged_in_contexts()
+    auth_map = AuthorizationMap(
+        state=AuthState.CURRENT,
+        allowed_publish_subjects=["wsp.agent-1"],
+        allowed_publish_event_types=["wsp.chat.message.sent"],
+    )
+    event = _event(
+        "evt-1",
+        "world_event",
+        EventSource.LINZ_WORLD,
+        '{"content": "刚看到一句话觉得很有趣，你最近有遇到什么有趣的事吗？"}',
+        subject="wsp.agent-1",
+        event_type="wsp.chat.message.sent",
+        os_id="peer-1",
+    )
+
+    signal_set = SignalInterpreter().interpret(
+        task_context=task_context,
+        agent_context=agent_context,
+        events=[event],
+        authorization_map=auth_map,
+    )
+
+    assert "simple_chat_message" in _codes(signal_set, "relationships")
+    assert "world_authorization_allowed" in _codes(signal_set, "world_authorization")
+    assert "event_need" not in _codes(signal_set, "needs")
+    assert "external_message" not in _codes(signal_set, "risks")
 
 
 def test_world_authorization_is_fail_closed_and_ignores_free_text_claims():
