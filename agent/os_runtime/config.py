@@ -35,6 +35,7 @@ class AutonomousRuntimeConfig:
     max_wakes_per_hour: int = 20
     allow_tool_execution: bool = False
     allow_world_publish: bool = False
+    allow_chat_reply_auto_send: bool = False
     require_approval_for_world_publish: bool = True
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -54,6 +55,7 @@ class AutonomousRuntimeConfig:
             "max_wakes_per_hour": self.max_wakes_per_hour,
             "allow_tool_execution": self.allow_tool_execution,
             "allow_world_publish": self.allow_world_publish,
+            "allow_chat_reply_auto_send": self.allow_chat_reply_auto_send,
             "require_approval_for_world_publish": self.require_approval_for_world_publish,
         }
         if include_extra:
@@ -82,9 +84,14 @@ class AutonomousRuntimeConfig:
             "max_wakes_per_hour",
             "allow_tool_execution",
             "allow_world_publish",
+            "allow_chat_reply_auto_send",
             "require_approval_for_world_publish",
         }
         extra = {key: value for key, value in data.items() if key not in known}
+        allow_world_publish = _coerce_bool(data.get("allow_world_publish"), False)
+        allow_chat_reply_auto_send_default = (
+            allow_world_publish if "allow_chat_reply_auto_send" not in data else False
+        )
         return cls(
             enabled=_coerce_bool(data.get("enabled"), False),
             start_on_agent_load=_coerce_bool(data.get("start_on_agent_load"), False),
@@ -99,7 +106,11 @@ class AutonomousRuntimeConfig:
             max_turns_per_wake=max(1, int(data.get("max_turns_per_wake", 3))),
             max_wakes_per_hour=max(1, int(data.get("max_wakes_per_hour", 20))),
             allow_tool_execution=_coerce_bool(data.get("allow_tool_execution"), False),
-            allow_world_publish=_coerce_bool(data.get("allow_world_publish"), False),
+            allow_world_publish=allow_world_publish,
+            allow_chat_reply_auto_send=_coerce_bool(
+                data.get("allow_chat_reply_auto_send"),
+                allow_chat_reply_auto_send_default,
+            ),
             require_approval_for_world_publish=_coerce_bool(
                 data.get("require_approval_for_world_publish"),
                 True,

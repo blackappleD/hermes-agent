@@ -26,6 +26,7 @@ def test_default_os_runtime_config_is_passive_and_opt_in():
     assert config.autonomous.apply_to_all_turns is False
     assert config.autonomous.allow_tool_execution is False
     assert config.autonomous.allow_world_publish is False
+    assert config.autonomous.allow_chat_reply_auto_send is False
     assert config.autonomous.require_approval_for_world_publish is True
 
 
@@ -59,6 +60,7 @@ def test_load_os_runtime_config_from_dict_preserves_unknown_keys():
                 "apply_to_all_turns": "yes",
                 "inject_self_prompt": "false",
                 "allow_world_publish": "false",
+                "allow_chat_reply_auto_send": "true",
                 "future_autonomous": "kept",
             },
             "future_key": {"kept": True},
@@ -76,10 +78,42 @@ def test_load_os_runtime_config_from_dict_preserves_unknown_keys():
     assert config.autonomous.apply_to_all_turns is True
     assert config.autonomous.inject_self_prompt is False
     assert config.autonomous.allow_world_publish is False
+    assert config.autonomous.allow_chat_reply_auto_send is True
     assert config.autonomous.extra == {"future_autonomous": "kept"}
     assert config.extra == {"future_key": {"kept": True}}
     assert config.to_dict()["future_key"] == {"kept": True}
     assert config.to_dict()["autonomous"]["future_autonomous"] == "kept"
+
+
+def test_legacy_autonomous_publish_config_enables_chat_reply_auto_send_when_omitted():
+    config = load_os_runtime_config(
+        {
+            "enabled": True,
+            "autonomous": {
+                "enabled": True,
+                "allow_world_publish": True,
+            },
+        }
+    )
+
+    assert config.autonomous.allow_world_publish is True
+    assert config.autonomous.allow_chat_reply_auto_send is True
+
+
+def test_explicit_chat_reply_auto_send_false_overrides_legacy_publish_default():
+    config = load_os_runtime_config(
+        {
+            "enabled": True,
+            "autonomous": {
+                "enabled": True,
+                "allow_world_publish": True,
+                "allow_chat_reply_auto_send": False,
+            },
+        }
+    )
+
+    assert config.autonomous.allow_world_publish is True
+    assert config.autonomous.allow_chat_reply_auto_send is False
 
 
 def test_hermes_default_config_includes_os_runtime_without_version_bump():

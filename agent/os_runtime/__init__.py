@@ -13,6 +13,14 @@ from agent.os_runtime.autonomous_state import (
     AutonomousRuntimeStatus,
     AutonomousWakeRecord,
 )
+from agent.os_runtime.action_executor import (
+    AutonomousActionExecutor,
+    AutonomousExecutionResult,
+)
+from agent.os_runtime.approval import (
+    ApprovalRequest,
+    OSRuntimeApprovalStore,
+)
 from agent.os_runtime.domain import (
     ActionPotential,
     AgentContextView,
@@ -62,10 +70,13 @@ from agent.os_runtime.driver import (
 __all__ = [
     "ActionPotential",
     "AgentContextView",
+    "AutonomousActionExecutor",
+    "AutonomousExecutionResult",
     "AutonomousRuntimeConfig",
     "AutonomousRuntimeState",
     "AutonomousRuntimeStatus",
     "AutonomousWakeRecord",
+    "ApprovalRequest",
     "ArbitrationDecision",
     "ArbitrationResult",
     "BubbleLifecycle",
@@ -85,6 +96,7 @@ __all__ = [
     "OSRuntimeConfig",
     "OSRuntimeDecision",
     "OSRuntimeDriver",
+    "OSRuntimeApprovalStore",
     "OSRuntimeEventRef",
     "OSRuntimeRiskConfig",
     "OSRuntimeState",
