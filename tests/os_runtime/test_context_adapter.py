@@ -1,3 +1,4 @@
+import agent.os_runtime.adapters.context as context_module
 from agent.linz_world.models import AuthState, AuthorizationMap, LoginSession, LoginState, RelationshipRecord, RegistrationStatus, WorldIdentity
 from agent.os_runtime.adapters.context import ContextAdapter
 from agent.os_runtime.adapters.session_store import OSRuntimeEvent
@@ -184,3 +185,20 @@ def test_context_adapter_records_failed_and_stale_authorization_constraints():
 
         assert f"world_authorization_{state.value}" in snapshot.constraints
         assert "world_login_not_active" not in snapshot.constraints
+
+
+def test_context_adapter_uses_default_linz_repository(monkeypatch):
+    repo = FakeRepo(
+        identity=_complete_identity(),
+        login=LoginSession(state=LoginState.LOGGED_IN, token_ref="token-ref"),
+        auth_map=AuthorizationMap(state=AuthState.CURRENT, allowed_capabilities=["publish"]),
+        relationships=[],
+    )
+    monkeypatch.setattr(context_module, "_default_linz_repository", lambda: repo)
+
+    snapshot = ContextAdapter(tool_registry=FakeRegistry()).build_context(session_id="session-1")
+
+    assert snapshot.constraints == []
+    assert snapshot.task_context.metadata["authorization"]["login_state"] == "logged_in"
+    assert snapshot.task_context.metadata["authorization"]["state"] == "current"
+    assert snapshot.agent_context.capabilities == ["publish"]

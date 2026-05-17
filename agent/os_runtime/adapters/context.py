@@ -38,7 +38,9 @@ class ContextAdapter:
         config: OSRuntimeConfig | dict[str, Any] | None = None,
         recent_limit: int = 20,
     ):
-        self.linz_state_repository = linz_state_repository
+        self.linz_state_repository = (
+            linz_state_repository if linz_state_repository is not None else _default_linz_repository()
+        )
         self.event_repository = event_repository
         self.memory_manager = memory_manager
         self.context_engine = context_engine
@@ -362,6 +364,15 @@ def _plain_value(value: Any) -> Any:
     if isinstance(value, list):
         return [_plain_value(item) for item in value]
     return value
+
+
+def _default_linz_repository() -> Any:
+    try:
+        from agent.linz_world.event_state import LinzStateRepository
+
+        return LinzStateRepository()
+    except Exception:
+        return None
 
 
 def _enum_value(value: Any) -> str:
