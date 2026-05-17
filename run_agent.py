@@ -15381,6 +15381,32 @@ class AIAgent:
             except Exception as exc:
                 logger.debug("os_runtime post_llm projection failed: %s", exc)
             try:
+                from agent.os_runtime.adapters.tools import project_final_response_receipt
+                project_final_response_receipt(
+                    assistant_response=final_response or "",
+                    session_id=self.session_id or "",
+                    model=self.model,
+                    platform=getattr(self, "provider", None) or getattr(self, "platform", None) or "",
+                    turn_exit_reason=_turn_exit_reason,
+                    token_usage={
+                        "input_tokens": self.session_input_tokens,
+                        "output_tokens": self.session_output_tokens,
+                        "cache_read_tokens": self.session_cache_read_tokens,
+                        "cache_write_tokens": self.session_cache_write_tokens,
+                        "reasoning_tokens": self.session_reasoning_tokens,
+                        "prompt_tokens": self.session_prompt_tokens,
+                        "completion_tokens": self.session_completion_tokens,
+                        "total_tokens": self.session_total_tokens,
+                    },
+                    cost={
+                        "estimated_cost_usd": self.session_estimated_cost_usd,
+                        "cost_status": self.session_cost_status,
+                        "cost_source": self.session_cost_source,
+                    },
+                )
+            except Exception as exc:
+                logger.debug("os_runtime final response receipt failed: %s", exc)
+            try:
                 from hermes_cli.os_runtime import load_runtime_config as _load_os_runtime_config
 
                 _os_runtime_cfg = _load_os_runtime_config()

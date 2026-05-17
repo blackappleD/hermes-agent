@@ -349,3 +349,90 @@ def test_all_core_objects_round_trip_json():
 
     for instance in instances:
         _round_trip(instance)
+
+
+def test_permission_ticket_extended_fields_round_trip_json():
+    ticket = PermissionTicket(
+        ticket_id="ticket-7",
+        intent_id="intent-7",
+        arbitration_id="arb-7",
+        decision=ArbitrationDecision.AUTO_EXECUTE,
+        issued_at="2026-05-17T00:00:00Z",
+        expires_at="2026-05-17T01:00:00Z",
+        allowed_tools=["read_file"],
+        constraints=["readonly"],
+        issuer="bo-yue-arbiter",
+        approval_ref="approval-1",
+        policy_version="policy-v2",
+        metadata={"unknown_future_key": "保留"},
+    )
+
+    restored = _round_trip(ticket)
+
+    assert restored.arbitration_id == "arb-7"
+    assert restored.issuer == "bo-yue-arbiter"
+    assert restored.metadata["unknown_future_key"] == "保留"
+
+
+def test_execution_receipt_types_round_trip_json():
+    receipts = [
+        ExecutionReceipt(
+            receipt_id=f"receipt-{receipt_type}",
+            receipt_type=receipt_type,
+            ticket_id="ticket-7",
+            intent_id="intent-7",
+            event_id="event-7",
+            arbitration_id="arb-7",
+            session_id="session-7",
+            task_id="task-7",
+            tool_call_id="call-7" if receipt_type == "tool" else "",
+            status="succeeded",
+            duration_ms=42,
+            input_summary="输入摘要",
+            output_summary="输出摘要",
+            payload_hash="hash-7",
+            content_ref="content:7",
+            metadata={"kind": receipt_type},
+        )
+        for receipt_type in ["tool", "final_response", "world_publish", "command"]
+    ]
+
+    for receipt in receipts:
+        restored = _round_trip(receipt)
+        assert restored.receipt_type == receipt.receipt_type
+        assert restored.event_id == "event-7"
+        assert restored.arbitration_id == "arb-7"
+
+
+def test_evidence_package_extended_fields_round_trip_json():
+    receipt = ExecutionReceipt(
+        receipt_id="receipt-7",
+        receipt_type="tool",
+        ticket_id="ticket-7",
+        intent_id="intent-7",
+        event_id="event-7",
+        arbitration_id="arb-7",
+        status="succeeded",
+    )
+    package = EvidencePackage(
+        evidence_id="evidence-7",
+        trace_id="trace-中文",
+        session_id="session-7",
+        intent_id="intent-7",
+        arbitration_id="arb-7",
+        event_ids=["event-7"],
+        receipt_ids=["receipt-7"],
+        summary="证据包",
+        evidence=[{"kind": "receipt", "value": receipt.to_dict()}],
+        receipts=[receipt],
+        commands=[{"command": "pytest", "exit_status": 0}],
+        known_risks=["人工关注"],
+        diagnostics=["diagnostic"],
+        complete=False,
+    )
+
+    restored = _round_trip(package)
+
+    assert restored.receipts[0].receipt_id == "receipt-7"
+    assert restored.commands[0]["command"] == "pytest"
+    assert restored.known_risks == ["人工关注"]
