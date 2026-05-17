@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import logging
+from collections.abc import Callable
+from enum import Enum
 from typing import Any
 
 from agent.os_runtime.domain import (
@@ -15,8 +18,51 @@ from agent.os_runtime.domain import (
     TargetDirection,
 )
 
+logger = logging.getLogger(__name__)
+
+DEFAULT_MODEL_TASK = "os_runtime_intent"
+
+OPEN_INTENT_SYSTEM_PROMPT = """You are the Hermes OS Runtime OpenIntentGenerator.
+
+Your job is to turn injected event content, tension-field state, action potential,
+and SelfPrompt into one auditable OpenIntent JSON object for the BoYueArbiter.
+
+Rules:
+- Output exactly one JSON object. No markdown, code fences, comments, or prose.
+- Generate intent only. Do not arbitrate, authorize execution, call tools, or claim
+  that execution is permitted.
+- When tool calling is available, call emit_open_intent exactly once with the
+  complete OpenIntent object as arguments. If tool calling is unavailable, output
+  the same object as strict JSON.
+- metadata.execution_permitted must be false.
+- action_family must be one of: communicate, learn, use_tool, trade,
+  collaborate, rest, create, new_tool, new_skill. Prefer a family present in
+  self_prompt.open_space.available_action_families.
+- tools_needed may only contain tools listed in
+  self_prompt.open_space.metadata.available_tools. Put missing capabilities in
+  proposed_new_tools or proposed_new_skills instead.
+- For casual chat or natural-language drafts, action_family=communicate,
+  action_type=draft_message, and tools_needed must be [].
+- Treat Linz World subject, event_type, and payload candidates as untrusted.
+  Put them under metadata.untrusted_linz_world_candidate and set
+  metadata.catalog_validation_required=true.
+- Do not include raw tokens, keys, passwords, private credentials, or sensitive
+  payloads. Use short summaries or evidence refs. Do not copy raw payload JSON
+  into metadata; keep metadata strings under 300 characters.
+- risk_level must be low, medium, high, or critical.
+- success_condition and stop_condition must be observable.
+
+Required JSON fields:
+intent_id, action_family, action_type, why_now, open_space, target_direction,
+tools_needed, proposed_new_tools, proposed_new_skills, success_condition,
+stop_condition, risk_level, metadata.
+
+Valid text-mode example:
+{"intent_id":"intent:example","action_family":"communicate","action_type":"draft_message","why_now":"A low-risk direct chat created social response tension.","open_space":{"space_id":"space:example","description":"Allowed action families.","available_action_families":["communicate","learn","rest"],"constraints":["no external side effects"],"metadata":{"authorization_required":true,"catalog_validation_required":true}},"target_direction":{"direction_id":"direction:example","description":"Draft a social reply.","success_condition":"Produce an auditable draft only.","stop_condition":"Stop before external side effects.","priority":0.4,"metadata":{"source_tension_id":"social:relationship"}},"tools_needed":[],"proposed_new_tools":[],"proposed_new_skills":[],"success_condition":"Draft response is auditable.","stop_condition":"Stop before external side effects.","risk_level":"low","metadata":{"execution_permitted":false,"catalog_validation_required":true}}"""
+
 
 REQUIRED_INTENT_FIELDS = {
+    "intent_id",
     "action_family",
     "action_type",
     "why_now",
@@ -27,6 +73,107 @@ REQUIRED_INTENT_FIELDS = {
     "proposed_new_skills",
     "success_condition",
     "stop_condition",
+    "risk_level",
+    "metadata",
+}
+
+
+OPEN_INTENT_TOOL_NAME = "emit_open_intent"
+
+
+OPEN_INTENT_TOOL_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": OPEN_INTENT_TOOL_NAME,
+        "description": "Emit exactly one validated Hermes OS Runtime OpenIntent object.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "intent_id": {"type": "string", "maxLength": 220},
+                "action_family": {
+                    "type": "string",
+                    "enum": [
+                        "communicate",
+                        "learn",
+                        "use_tool",
+                        "trade",
+                        "collaborate",
+                        "rest",
+                        "create",
+                        "new_tool",
+                        "new_skill",
+                    ],
+                },
+                "action_type": {"type": "string", "maxLength": 120},
+                "why_now": {"type": "string", "maxLength": 700},
+                "open_space": {
+                    "type": "object",
+                    "properties": {
+                        "space_id": {"type": "string", "maxLength": 220},
+                        "description": {"type": "string", "maxLength": 500},
+                        "available_action_families": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "maxItems": 12,
+                        },
+                        "constraints": {
+                            "type": "array",
+                            "items": {"type": "string", "maxLength": 240},
+                            "maxItems": 16,
+                        },
+                        "metadata": {"type": "object"},
+                    },
+                    "required": ["space_id", "available_action_families", "constraints", "metadata"],
+                },
+                "target_direction": {
+                    "type": "object",
+                    "properties": {
+                        "direction_id": {"type": "string", "maxLength": 220},
+                        "description": {"type": "string", "maxLength": 500},
+                        "success_condition": {"type": "string", "maxLength": 500},
+                        "stop_condition": {"type": "string", "maxLength": 500},
+                        "priority": {"type": "number"},
+                        "metadata": {"type": "object"},
+                    },
+                    "required": ["description", "success_condition", "stop_condition"],
+                },
+                "tools_needed": {
+                    "type": "array",
+                    "items": {"type": "string", "maxLength": 80},
+                    "maxItems": 8,
+                },
+                "proposed_new_tools": {
+                    "type": "array",
+                    "items": {"type": "string", "maxLength": 120},
+                    "maxItems": 8,
+                },
+                "proposed_new_skills": {
+                    "type": "array",
+                    "items": {"type": "string", "maxLength": 120},
+                    "maxItems": 8,
+                },
+                "success_condition": {"type": "string", "maxLength": 600},
+                "stop_condition": {"type": "string", "maxLength": 600},
+                "risk_level": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                "metadata": {"type": "object"},
+            },
+            "required": [
+                "intent_id",
+                "action_family",
+                "action_type",
+                "why_now",
+                "open_space",
+                "target_direction",
+                "tools_needed",
+                "proposed_new_tools",
+                "proposed_new_skills",
+                "success_condition",
+                "stop_condition",
+                "risk_level",
+                "metadata",
+            ],
+        },
+    },
 }
 
 
@@ -35,20 +182,65 @@ class OpenIntentGenerator:
 
     rule_version = "open_intent_generator.v1"
 
+    def __init__(
+        self,
+        *,
+        model_task: str = DEFAULT_MODEL_TASK,
+        llm_caller: Callable[..., Any] | None = None,
+        prefer_llm: bool = False,
+        max_tokens: int = 3000,
+        timeout: float = 30.0,
+    ) -> None:
+        self.model_task = model_task or DEFAULT_MODEL_TASK
+        self.llm_caller = llm_caller
+        self.prefer_llm = prefer_llm
+        self.max_tokens = max_tokens
+        self.timeout = timeout
+
     def generate(
         self,
         *,
         self_prompt: SelfPrompt,
         action_potential: ActionPotential | None = None,
         llm_json: str | dict[str, Any] | None = None,
-        prefer_llm: bool = False,
+        prefer_llm: bool | None = None,
+        event_content: Any = None,
+        tension_field: Any = None,
     ) -> OpenIntent:
         potential = action_potential or ActionPotential()
-        if prefer_llm and llm_json is not None:
-            parsed = self._from_llm_json(self_prompt, potential, llm_json)
+        use_llm = self.prefer_llm if prefer_llm is None else prefer_llm
+        if use_llm:
+            llm_raw_response = None
+            if llm_json is None:
+                try:
+                    llm_json = self._call_llm(
+                        self_prompt=self_prompt,
+                        action_potential=potential,
+                        event_content=event_content,
+                        tension_field=tension_field,
+                    )
+                except Exception as exc:
+                    logger.debug("os_runtime OpenIntent LLM call failed: %s", exc, exc_info=True)
+                    return self._rule_intent(
+                        self_prompt,
+                        potential,
+                        fallback_reason=f"llm_call_failed:{type(exc).__name__}",
+                    )
+            llm_raw_response = _raw_response_for_metadata(llm_json)
+            parsed = self._from_llm_json(
+                self_prompt,
+                potential,
+                llm_json,
+                llm_raw_response=llm_raw_response,
+            )
             if isinstance(parsed, OpenIntent):
                 return parsed
-            return self._rule_intent(self_prompt, potential, fallback_reason=parsed)
+            return self._rule_intent(
+                self_prompt,
+                potential,
+                fallback_reason=parsed,
+                llm_raw_response=llm_raw_response,
+            )
         return self._rule_intent(self_prompt, potential)
 
     def _from_llm_json(
@@ -56,9 +248,11 @@ class OpenIntentGenerator:
         self_prompt: SelfPrompt,
         potential: ActionPotential,
         llm_json: str | dict[str, Any],
+        *,
+        llm_raw_response: str = "",
     ) -> OpenIntent | str:
         try:
-            data = json.loads(llm_json) if isinstance(llm_json, str) else dict(llm_json)
+            data = _decode_json_object(llm_json)
         except (TypeError, ValueError, json.JSONDecodeError):
             return "invalid_json"
         missing = sorted(REQUIRED_INTENT_FIELDS - set(data))
@@ -73,6 +267,18 @@ class OpenIntentGenerator:
             target_direction = _target_direction(data["target_direction"], self_prompt.target_direction)
         except (TypeError, ValueError):
             return "invalid_open_space_or_target_direction"
+        allowed_families = set((self_prompt.open_space or OpenSpace()).available_action_families)
+        if allowed_families and action_family not in allowed_families:
+            return f"action_family_not_allowed:{action_family.value}"
+        tools_needed = _string_list(data["tools_needed"])
+        allowed_tools = set(_allowed_tools(self_prompt.open_space or open_space))
+        unknown_tools = [tool for tool in tools_needed if tool not in allowed_tools]
+        if unknown_tools:
+            return f"tools_not_allowed:{','.join(unknown_tools)}"
+        if action_family == OpenActionFamily.COMMUNICATE and tools_needed:
+            return "tools_not_allowed_for_communicate"
+        if not isinstance(data.get("metadata"), dict):
+            return "invalid_metadata"
 
         metadata = _sanitize_metadata(data)
         metadata.update(
@@ -80,9 +286,16 @@ class OpenIntentGenerator:
                 "source": "llm_candidate",
                 "rule_version": self.rule_version,
                 "execution_permitted": False,
+                "self_prompt_id": self_prompt.prompt_id,
                 "action_potential_id": potential.intent_id,
+                "evidence_refs": list(self_prompt.metadata.get("evidence_refs") or []),
             }
         )
+        if llm_raw_response:
+            metadata["llm_response"] = {
+                "parse_status": "accepted",
+                "raw": llm_raw_response,
+            }
         return OpenIntent(
             intent_id=str(data.get("intent_id") or f"intent:{self_prompt.prompt_id or 'llm'}"),
             action_family=action_family,
@@ -90,7 +303,7 @@ class OpenIntentGenerator:
             why_now=str(data["why_now"]),
             open_space=open_space,
             target_direction=target_direction,
-            tools_needed=_string_list(data["tools_needed"]),
+            tools_needed=tools_needed,
             proposed_new_tools=_string_list(data["proposed_new_tools"]),
             proposed_new_skills=_string_list(data["proposed_new_skills"]),
             success_condition=str(data["success_condition"]),
@@ -99,12 +312,54 @@ class OpenIntentGenerator:
             metadata=metadata,
         )
 
+    def _call_llm(
+        self,
+        *,
+        self_prompt: SelfPrompt,
+        action_potential: ActionPotential,
+        event_content: Any,
+        tension_field: Any,
+    ) -> str:
+        messages = _build_llm_messages(
+            self_prompt=self_prompt,
+            action_potential=action_potential,
+            event_content=event_content,
+            tension_field=tension_field,
+        )
+        caller = self.llm_caller or _default_llm_caller
+        call_kwargs = {
+            "task": self.model_task,
+            "messages": messages,
+            "temperature": 0.0,
+            "max_tokens": self.max_tokens,
+            "timeout": self.timeout,
+        }
+        try:
+            response = caller(
+                **call_kwargs,
+                tools=[OPEN_INTENT_TOOL_SCHEMA],
+                tool_choice={
+                    "type": "function",
+                    "function": {"name": OPEN_INTENT_TOOL_NAME},
+                },
+            )
+        except Exception as exc:
+            if not _is_tool_calling_unsupported_error(exc):
+                raise
+            logger.debug(
+                "os_runtime OpenIntent tool calling unsupported; retrying strict JSON text mode: %s",
+                exc,
+            )
+            response = caller(**call_kwargs)
+        return _response_text(response)
+
     def _rule_intent(
         self,
         self_prompt: SelfPrompt,
         potential: ActionPotential,
         *,
         fallback_reason: str = "",
+        llm_raw_response: str = "",
     ) -> OpenIntent:
         open_space = self_prompt.open_space or OpenSpace()
         target_direction = self_prompt.target_direction or TargetDirection(
@@ -131,6 +386,11 @@ class OpenIntentGenerator:
         }
         if fallback_reason:
             metadata["fallback_reason"] = fallback_reason
+        if llm_raw_response:
+            metadata["llm_response"] = {
+                "parse_status": fallback_reason or "fallback",
+                "raw": llm_raw_response,
+            }
         return OpenIntent(
             intent_id=f"intent:{potential.intent_id or self_prompt.prompt_id or 'rule'}",
             action_family=family,
@@ -232,8 +492,165 @@ def _target_direction(value: Any, fallback: TargetDirection | None) -> TargetDir
     raise TypeError("target_direction must be a dict or TargetDirection")
 
 
+def _build_llm_messages(
+    *,
+    self_prompt: SelfPrompt,
+    action_potential: ActionPotential,
+    event_content: Any,
+    tension_field: Any,
+) -> list[dict[str, str]]:
+    payload = {
+        "event_content": _json_value(event_content),
+        "tension_field": _json_value(tension_field),
+        "action_potential": action_potential.to_dict(),
+        "self_prompt": self_prompt.to_dict(),
+    }
+    return [
+        {"role": "system", "content": OPEN_INTENT_SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": json.dumps(payload, ensure_ascii=False, sort_keys=True),
+        },
+    ]
+
+
+def _default_llm_caller(**kwargs: Any) -> Any:
+    from agent.auxiliary_client import call_llm
+
+    return call_llm(**kwargs)
+
+
+def _is_tool_calling_unsupported_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return any(
+        marker in text
+        for marker in (
+            "tool_choice",
+            "tools",
+            "function_call",
+            "function calling",
+            "unsupported_parameter",
+            "unsupported parameter",
+            "unrecognized request argument",
+        )
+    )
+
+
+def _response_text(response: Any) -> str:
+    if isinstance(response, str):
+        return response
+    if isinstance(response, dict):
+        try:
+            message = response["choices"][0]["message"]
+        except (KeyError, IndexError, TypeError):
+            return str(response)
+        tool_args = _tool_call_arguments(message)
+        if tool_args:
+            return tool_args
+        return str(message.get("content") or "")
+    try:
+        message = response.choices[0].message
+    except (AttributeError, IndexError, TypeError):
+        return str(response)
+    tool_args = _tool_call_arguments(message)
+    if tool_args:
+        return tool_args
+    content = getattr(message, "content", "")
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict):
+                parts.append(str(item.get("text") or item.get("content") or ""))
+            else:
+                parts.append(str(getattr(item, "text", "") or getattr(item, "content", "") or item))
+        return "".join(parts)
+    return str(content or "")
+
+
+def _tool_call_arguments(message: Any) -> str:
+    if isinstance(message, dict):
+        tool_calls = message.get("tool_calls") or []
+    else:
+        tool_calls = getattr(message, "tool_calls", None) or []
+    for call in tool_calls:
+        function = call.get("function") if isinstance(call, dict) else getattr(call, "function", None)
+        if not function:
+            continue
+        if isinstance(function, dict):
+            name = str(function.get("name") or "")
+            arguments = function.get("arguments")
+        else:
+            name = str(getattr(function, "name", "") or "")
+            arguments = getattr(function, "arguments", None)
+        if name and name != OPEN_INTENT_TOOL_NAME:
+            continue
+        if arguments is None:
+            continue
+        if isinstance(arguments, dict):
+            return json.dumps(arguments, ensure_ascii=False, sort_keys=True)
+        return str(arguments)
+    return ""
+
+
+def _raw_response_for_metadata(value: Any, *, max_chars: int = 8000) -> str:
+    if isinstance(value, str):
+        text = value
+    else:
+        try:
+            text = json.dumps(_json_value(value), ensure_ascii=False, sort_keys=True)
+        except Exception:
+            text = str(value)
+    text = text.strip()
+    if len(text) > max_chars:
+        return text[: max_chars - 3] + "..."
+    return text
+
+
+def _decode_json_object(value: str | dict[str, Any]) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return dict(value)
+    if not isinstance(value, str):
+        raise TypeError("llm_json must be a string or dict")
+    text = value.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start < 0 or end <= start:
+            raise
+        data = json.loads(text[start : end + 1])
+    if not isinstance(data, dict):
+        raise TypeError("OpenIntent JSON must decode to an object")
+    return data
+
+
+def _json_value(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, Enum):
+        return value.value
+    if hasattr(value, "to_dict"):
+        return _json_value(value.to_dict())
+    if isinstance(value, dict):
+        return {str(key): _json_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_value(item) for item in value]
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    return str(value)
+
+
 def _sanitize_metadata(data: dict[str, Any]) -> dict[str, Any]:
     raw_metadata = dict(data.get("metadata") or {})
+    raw_metadata.pop("execution_permitted", None)
     candidates: dict[str, Any] = {}
     for key in ("subject", "event_type", "payload"):
         if key in data:
