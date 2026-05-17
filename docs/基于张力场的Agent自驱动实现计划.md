@@ -221,6 +221,7 @@ os_runtime:
   allow_tool_execution: false
   event_store: sessiondb_side_tables  # sessiondb_side_tables | jsonl_fallback
   model_task: os_runtime_intent
+  intent_generation: llm  # llm | rule
   risk:
     require_approval_at: medium
 ```
@@ -749,6 +750,8 @@ os_runtime:
 os_runtime:
   enabled: true
   mode: autonomous_low_risk
+  model_task: os_runtime_intent
+  intent_generation: llm  # llm | rule
   autonomous:
     enabled: true
     start_on_agent_load: true
