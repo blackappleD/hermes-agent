@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+import os
 import threading
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
@@ -18,7 +19,7 @@ from . import auth
 from .config import load_linz_world_config
 from .event_bus import project_to_message_event
 from .event_state import LinzStateRepository
-from .models import EventDispatchRecord
+from .models import EventDispatchRecord, ReceiptStatus, to_plain, utc_now_iso
 from .nats_transport import NatsEventListener
 
 logger = logging.getLogger(__name__)
@@ -37,14 +38,32 @@ class LinzWorldPlatformAdapter(BasePlatformAdapter):
             subjects = list(auth_map.allowed_subscribe_subjects)
             cfg = load_linz_world_config()
             self._loop = asyncio.get_running_loop()
-            if subjects:
-                self._listener = NatsEventListener(
-                    nats_url=cfg.nats_url,
-                    subjects=subjects,
-                    on_event=self._dispatch_from_listener,
+            if not subjects:
+                message = (
+                    "Linz World listener has no authorized NATS subscribe subjects; "
+                    "refresh login/authorization before starting the gateway."
                 )
-                self._listener.start()
+                logger.warning(message)
+                self._mark_listener_offline(message, only_current_pid=False)
+                self._set_fatal_error(
+                    "linz_world_listener_not_authorized",
+                    message,
+                    retryable=True,
+                )
+                return False
+            logger.info("Starting Linz World NATS listener for %d subject(s)", len(subjects))
+            self._listener = NatsEventListener(
+                nats_url=cfg.nats_url,
+                subjects=subjects,
+                on_event=self._dispatch_from_listener,
+            )
+            self._listener.start()
+            self._mark_listener_online()
         except Exception as exc:
+            if self._listener is not None:
+                self._listener.stop()
+                self._listener = None
+            self._mark_listener_offline(f"{type(exc).__name__}: {exc}", only_current_pid=False)
             self._set_fatal_error(
                 "linz_world_listener_failed",
                 f"Linz World listener failed to start: {exc}",
@@ -58,7 +77,31 @@ class LinzWorldPlatformAdapter(BasePlatformAdapter):
         if self._listener is not None:
             self._listener.stop()
             self._listener = None
+        self._mark_listener_offline()
         self._mark_disconnected()
+
+    def _mark_listener_online(self) -> None:
+        session = self._repository.get_login()
+        session.online = True
+        session.listener_pid = os.getpid()
+        session.listener_started_at = utc_now_iso()
+        session.listener_last_error = ""
+        self._repository.save_login(session)
+
+    def _mark_listener_offline(self, error: str = "", *, only_current_pid: bool = True) -> None:
+        session = self._repository.get_login()
+        current_pid = os.getpid()
+        had_current_listener = bool(session.listener_pid and session.listener_pid == current_pid)
+        if only_current_pid and session.listener_pid and session.listener_pid != current_pid:
+            return
+        session.online = False
+        session.listener_pid = 0
+        session.listener_started_at = ""
+        if error:
+            session.listener_last_error = error
+        elif had_current_listener:
+            session.listener_last_error = ""
+        self._repository.save_login(session)
 
     async def send(
         self,
@@ -67,6 +110,53 @@ class LinzWorldPlatformAdapter(BasePlatformAdapter):
         reply_to: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
     ) -> SendResult:
+        cfg = load_linz_world_config()
+        if cfg.auto_respond or cfg.auto_publish:
+            target_os_id = _linz_reply_target(metadata)
+            if target_os_id:
+                try:
+                    from .chat import send_chat_message
+
+                    receipt = send_chat_message(
+                        target_os_id,
+                        content,
+                        to_os_name=str((metadata or {}).get("linz_world_user_name") or ""),
+                        conversation_id=str((metadata or {}).get("linz_world_chat_id") or chat_id or ""),
+                        repository=self._repository,
+                    )
+                    success = receipt.status == ReceiptStatus.PUBLISHED
+                    if success:
+                        logger.info(
+                            "Published Linz World gateway response to %s (%s chars)",
+                            target_os_id,
+                            len(content or ""),
+                        )
+                    else:
+                        logger.warning(
+                            "Linz World gateway response publish rejected: target=%s status=%s code=%s message=%s",
+                            target_os_id,
+                            receipt.status.value,
+                            receipt.governance_code,
+                            receipt.message,
+                        )
+                    return SendResult(
+                        success=success,
+                        message_id=receipt.world_event_id or receipt.request_id,
+                        error="" if success else (receipt.message or receipt.governance_code or receipt.status.value),
+                        raw_response=to_plain(receipt),
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Linz World gateway response publish failed: %s",
+                        exc,
+                        exc_info=True,
+                    )
+                    return SendResult(
+                        success=False,
+                        error=f"{type(exc).__name__}: {exc}",
+                        raw_response={"reason": "linz_world_gateway_publish_failed"},
+                    )
+
         logger.info(
             "Suppressing Linz World gateway response to %s; adapter is receive-only and external publish must use linz_publish.",
             chat_id,
@@ -115,6 +205,17 @@ class LinzWorldPlatformAdapter(BasePlatformAdapter):
                 return
 
         future.add_done_callback(_consume_error)
+
+
+def _linz_reply_target(metadata: Optional[dict[str, Any]]) -> str:
+    if not isinstance(metadata, dict):
+        return ""
+    target = str(metadata.get("linz_world_user_id") or "").strip()
+    if target.lower() in {"", "linz_world", "world"}:
+        return ""
+    if target.startswith("wsp."):
+        target = target.removeprefix("wsp.")
+    return target
 
 
 @dataclass
@@ -307,6 +408,7 @@ def _start_autonomous_runtime_wake(
 
     _record_os_runtime_wake_scheduled(message, final_status=final_status, session_id=session_id)
     if inline:
+        _record_os_runtime_wake_started(message, final_status=final_status, session_id=session_id)
         wake_result = _wake_autonomous_runtime(
             persisted,
             session_id=session_id,
@@ -317,6 +419,7 @@ def _start_autonomous_runtime_wake(
         return
 
     def _run_wake() -> None:
+        _record_os_runtime_wake_started(message, final_status=final_status, session_id=session_id)
         wake_result = _wake_autonomous_runtime(
             persisted,
             session_id=session_id,
@@ -345,6 +448,32 @@ def _start_autonomous_runtime_wake(
         )
 
 
+def _record_os_runtime_wake_started(
+    message_event: MessageEvent | None,
+    *,
+    final_status: str,
+    session_id: str,
+) -> None:
+    if message_event is None:
+        return
+    store = None
+    try:
+        from gateway.event_projection_store import record_id_for_message_event
+
+        store = EventProjectionStore()
+        store.record_transition(
+            record_id_for_message_event(message_event),
+            final_status,
+            reason="os_runtime_wake_started",
+            metadata={"session_id": session_id},
+        )
+    except Exception:
+        logger.debug("Linz World os_runtime wake-start projection failed", exc_info=True)
+    finally:
+        if store is not None:
+            store.close()
+
+
 def _record_os_runtime_wake_scheduled(
     message_event: MessageEvent | None,
     *,
@@ -365,7 +494,7 @@ def _record_os_runtime_wake_scheduled(
             metadata={"session_id": session_id},
         )
     except Exception:
-        return
+        logger.debug("Linz World os_runtime wake-scheduled projection failed", exc_info=True)
     finally:
         if store is not None:
             store.close()
@@ -457,13 +586,24 @@ def _record_os_runtime_pipeline(
                     "stop_reason": evidence.get("stop_reason"),
                 },
             ),
+            (
+                "os_runtime_action_execution",
+                {
+                    "execution": evidence.get("execution"),
+                    "execution_feedback": evidence.get("execution_feedback"),
+                },
+            ),
+            (
+                "os_runtime_evidence_package",
+                {"evidence_package": _evidence_package_summary(evidence.get("evidence_package"))},
+            ),
         ]
         for reason, metadata in steps:
             compact = _compact_metadata(metadata)
             if compact:
                 store.record_transition(record_id, final_status, reason=reason, metadata=compact)
     except Exception:
-        return
+        logger.debug("Linz World os_runtime pipeline projection failed", exc_info=True)
     finally:
         if store is not None:
             store.close()
@@ -575,6 +715,32 @@ def _compact_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict):
         return {}
     return {key: value for key, value in data.items() if value not in (None, "", {}, [])}
+
+
+def _evidence_package_summary(value: Any) -> dict[str, Any]:
+    data = _jsonable(value)
+    if not isinstance(data, dict) or not data:
+        return {}
+    receipts = data.get("receipts") if isinstance(data.get("receipts"), list) else []
+    commands = data.get("commands") if isinstance(data.get("commands"), list) else []
+    evidence_items = data.get("evidence") if isinstance(data.get("evidence"), list) else []
+    return _compact_metadata(
+        {
+            "evidence_id": data.get("evidence_id"),
+            "trace_id": data.get("trace_id"),
+            "intent_id": data.get("intent_id"),
+            "arbitration_id": data.get("arbitration_id"),
+            "event_ids": data.get("event_ids"),
+            "receipt_ids": data.get("receipt_ids"),
+            "summary": data.get("summary"),
+            "known_risks": data.get("known_risks"),
+            "diagnostics": data.get("diagnostics"),
+            "complete": data.get("complete"),
+            "receipt_count": len(receipts),
+            "command_count": len(commands),
+            "evidence_count": len(evidence_items),
+        }
+    )
 
 
 def _jsonable(value: Any) -> Any:

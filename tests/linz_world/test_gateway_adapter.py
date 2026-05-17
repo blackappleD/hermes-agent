@@ -1,3 +1,6 @@
+import threading
+import time
+
 import pytest
 
 from agent.os_runtime.adapters.runtime_queue import RuntimeQueueRepository
@@ -6,7 +9,7 @@ from agent.linz_world.config import LinzWorldConfig
 from agent.linz_world.event_bus import project_to_message_event
 from agent.linz_world.event_state import LinzStateRepository
 from agent.linz_world.gateway_adapter import LinzWorldPlatformAdapter, dispatch_world_event, persist_world_event_for_gateway
-from agent.linz_world.models import AuthState, AuthorizationMap
+from agent.linz_world.models import AuthState, AuthorizationMap, PublishReceipt, ReceiptStatus
 from gateway.config import GatewayConfig, Platform, PlatformConfig
 from gateway.event_projection_store import EventProjectionStore
 from gateway.platform_registry import platform_registry
@@ -46,8 +49,67 @@ async def test_linz_world_gateway_send_is_suppressed_noop():
 
 
 @pytest.mark.asyncio
+async def test_linz_world_gateway_send_can_publish_when_auto_respond_enabled(monkeypatch):
+    adapter = LinzWorldPlatformAdapter(PlatformConfig(enabled=True))
+    sent = {}
+
+    monkeypatch.setattr(
+        "agent.linz_world.gateway_adapter.load_linz_world_config",
+        lambda: LinzWorldConfig(auto_respond=True),
+    )
+
+    def fake_send_chat_message(
+        to_os_id,
+        content,
+        *,
+        to_os_name="",
+        conversation_id="",
+        repository=None,
+        service=None,
+    ):
+        sent.update(
+            {
+                "to_os_id": to_os_id,
+                "content": content,
+                "to_os_name": to_os_name,
+                "conversation_id": conversation_id,
+                "repository": repository,
+            }
+        )
+        return PublishReceipt(
+            request_id="req_1",
+            subject=f"wsp.{to_os_id}",
+            event_type="wsp.chat.message.sent",
+            payload_summary="hello",
+            status=ReceiptStatus.PUBLISHED,
+            world_event_id="evt_reply",
+        )
+
+    monkeypatch.setattr("agent.linz_world.chat.send_chat_message", fake_send_chat_message)
+
+    result = await adapter.send(
+        "wsp.self",
+        "hello",
+        metadata={
+            "linz_world_user_id": "remote-os",
+            "linz_world_user_name": "Remote",
+            "linz_world_chat_id": "wsp.self",
+        },
+    )
+
+    assert result.success is True
+    assert result.message_id == "evt_reply"
+    assert sent["to_os_id"] == "remote-os"
+    assert sent["to_os_name"] == "Remote"
+    assert sent["conversation_id"] == "wsp.self"
+    assert sent["repository"] is adapter._repository
+
+
+@pytest.mark.asyncio
 async def test_linz_world_adapter_connect_starts_nats_listener(monkeypatch, linz_home):
     started = {}
+    monkeypatch.setattr("agent.linz_world.gateway_adapter.os.getpid", lambda: 12345)
+    monkeypatch.setattr("agent.linz_world.gateway_adapter.utc_now_iso", lambda: "2026-05-17T00:00:00Z")
 
     class _FakeListener:
         def __init__(self, *, nats_url, subjects, on_event):
@@ -77,7 +139,16 @@ async def test_linz_world_adapter_connect_starts_nats_listener(monkeypatch, linz
 
     adapter = LinzWorldPlatformAdapter(PlatformConfig(enabled=True))
     assert await adapter.connect() is True
+    login = adapter._repository.get_login()
+    assert login.online is True
+    assert login.listener_pid == 12345
+    assert login.listener_started_at == "2026-05-17T00:00:00Z"
+    assert login.listener_last_error == ""
     await adapter.disconnect()
+    login = adapter._repository.get_login()
+    assert login.online is False
+    assert login.listener_pid == 0
+    assert login.listener_started_at == ""
 
     assert started == {
         "nats_url": "nats://127.0.0.1:4222",
@@ -85,6 +156,32 @@ async def test_linz_world_adapter_connect_starts_nats_listener(monkeypatch, linz
         "started": True,
         "stopped": True,
     }
+
+
+@pytest.mark.asyncio
+async def test_linz_world_adapter_connect_without_subscribe_subjects_fails(monkeypatch, linz_home):
+    monkeypatch.setattr(
+        "agent.linz_world.gateway_adapter.auth.refresh_authorization_map",
+        lambda repo: AuthorizationMap(state=AuthState.CURRENT),
+    )
+    monkeypatch.setattr(
+        "agent.linz_world.gateway_adapter.load_linz_world_config",
+        lambda: LinzWorldConfig(nats_url="nats://127.0.0.1:4222"),
+    )
+
+    adapter = LinzWorldPlatformAdapter(PlatformConfig(enabled=True))
+    assert await adapter.connect() is False
+
+    login = adapter._repository.get_login()
+    assert login.online is False
+    assert login.listener_pid == 0
+    assert "no authorized NATS subscribe subjects" in login.listener_last_error
+    assert adapter.has_fatal_error is True
+    assert adapter.fatal_error_code == "linz_world_listener_not_authorized"
+
+    await adapter.disconnect()
+    login = adapter._repository.get_login()
+    assert "no authorized NATS subscribe subjects" in login.listener_last_error
 
 
 def test_world_event_projection_uses_redacted_summary(linz_home):
@@ -252,6 +349,7 @@ async def test_dispatch_world_event_wakes_autonomous_runtime_after_persist(monke
         assert detail is not None
         reasons = [transition["reason"] for transition in detail["transitions"]]
         assert "os_runtime_wake_scheduled" in reasons
+        assert "os_runtime_wake_started" in reasons
         assert "os_runtime_wake" in reasons
         assert "os_runtime_life_state" in reasons
         assert "os_runtime_tension_field" in reasons
@@ -259,12 +357,79 @@ async def test_dispatch_world_event_wakes_autonomous_runtime_after_persist(monke
         assert "os_runtime_self_prompt" in reasons
         assert "os_runtime_open_intent" in reasons
         assert "os_runtime_arbitration" in reasons
+        assert "os_runtime_action_execution" in reasons
+        assert "os_runtime_evidence_package" in reasons
         tension_transition = next(
             transition for transition in detail["transitions"] if transition["reason"] == "os_runtime_tension_field"
         )
         assert tension_transition["metadata"]["tension_set"]
     finally:
         queue_repo.close()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_world_event_records_async_wake_start_and_result(monkeypatch, linz_home):
+    repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
+    cfg = OSRuntimeConfig.from_dict(
+        {
+            "enabled": True,
+            "mode": "autonomous_low_risk",
+            "autonomous": {
+                "enabled": True,
+                "respond_to_world_events": True,
+                "idle_cooldown_seconds": 0,
+            },
+        }
+    )
+    monkeypatch.setattr("hermes_cli.os_runtime.load_runtime_config", lambda: cfg)
+    completed = threading.Event()
+
+    def fake_wake(*args, **kwargs):
+        completed.set()
+        return {"queued": True, "woke": False, "reason": "fake wake completed", "item_id": "item-1"}
+
+    monkeypatch.setattr("agent.linz_world.gateway_adapter._wake_autonomous_runtime", fake_wake)
+
+    class _SessionStore:
+        profile_id = "test-profile"
+
+        def get_or_create_session(self, source):
+            return type("Entry", (), {"session_id": "linz-session-async"})()
+
+    async def _handler(message):
+        return None
+
+    await dispatch_world_event(
+        {
+            "event_id": "evt_async_autonomous",
+            "subject": "wsp.chat.message.sent",
+            "event_type": "message.sent",
+            "payload": {"text": "hello"},
+            "source": {"room_id": "room_1", "actor_id": "actor_1"},
+            "sequence": {"stream": "world-events", "consumer": "hermes-profile", "nats_sequence": 43},
+        },
+        _handler,
+        repo,
+        session_store=_SessionStore(),
+    )
+
+    assert completed.wait(2)
+    detail = None
+    for _ in range(20):
+        store = EventProjectionStore(root=linz_home)
+        try:
+            detail = store.get_record("linz_world_nats:evt_async_autonomous")
+        finally:
+            store.close()
+        reasons = [transition["reason"] for transition in detail["transitions"]]
+        if "os_runtime_wake" in reasons:
+            break
+        time.sleep(0.1)
+
+    reasons = [transition["reason"] for transition in detail["transitions"]]
+    assert "os_runtime_wake_scheduled" in reasons
+    assert "os_runtime_wake_started" in reasons
+    assert "os_runtime_wake" in reasons
 
 
 @pytest.mark.asyncio
