@@ -173,6 +173,7 @@ class AutonomousActionExecutor:
             )
 
         if decision == ArbitrationDecision.REPORT_ONLY:
+            action_summary = "chat_reply_suppressed" if _chat_reply_suppressed(intent) else "report_only"
             receipt = self._record_report_receipt(
                 intent=intent,
                 arbitration=arbitration,
@@ -191,7 +192,7 @@ class AutonomousActionExecutor:
                 event_ids=event_ids,
                 session_id=session_id,
                 status="completed",
-                action_summary="report_only",
+                action_summary=action_summary,
                 executed=True,
                 receipts=[receipt],
                 output_summary=receipt.output_summary,
@@ -787,6 +788,17 @@ class AutonomousActionExecutor:
         if self.repository is not None:
             record_evidence_package(package, repository=self.repository, config=self.config)
         feedback_status = "failed" if status in {"failed", "rejected", "blocked"} else status
+        reply_control = _reply_control_status(intent)
+        feedback = {
+            "status": feedback_status,
+            "action_summary": action_summary,
+            "receipt_count": len(receipts),
+            "evidence_id": package.evidence_id,
+            "error": error,
+        }
+        if reply_control:
+            feedback["reply_control"] = reply_control
+            feedback["should_reply"] = reply_control["should_reply"]
         return AutonomousExecutionResult(
             status=status,
             action_summary=action_summary,
@@ -794,19 +806,14 @@ class AutonomousActionExecutor:
             ticket=ticket,
             receipts=receipts,
             evidence_package=package,
-            feedback={
-                "status": feedback_status,
-                "action_summary": action_summary,
-                "receipt_count": len(receipts),
-                "evidence_id": package.evidence_id,
-                "error": error,
-            },
+            feedback=feedback,
             output_summary=output_summary,
             error=error,
             metadata={
                 "arbitration_id": arbitration_id,
                 "intent_id": intent.intent_id,
                 "approval_id": approval_request.approval_id if approval_request else "",
+                "reply_control": reply_control,
             },
         )
 
@@ -884,6 +891,8 @@ def _tool_calls(intent: OpenIntent) -> list[dict[str, Any]]:
 
 def _report_text(intent: OpenIntent, arbitration: ArbitrationResult, self_prompt: SelfPrompt | None) -> str:
     reply = _reply_payload(intent)
+    if _chat_reply_suppressed(intent):
+        return "No reply sent: conversation closing context detected."
     if reply.get("draft_text"):
         return str(reply["draft_text"])
     lines = [
@@ -947,9 +956,23 @@ def _is_chat_reply_intent(intent: OpenIntent) -> bool:
 def _is_chat_reply_send_intent(intent: OpenIntent) -> bool:
     if not _is_chat_reply_intent(intent):
         return False
+    if _chat_reply_suppressed(intent):
+        return False
     metadata = intent.metadata if isinstance(intent.metadata, dict) else {}
     reply = metadata.get("reply") if isinstance(metadata.get("reply"), dict) else {}
     return bool(metadata.get("chat_reply_send_requested") or reply.get("send_requested"))
+
+
+def _chat_reply_suppressed(intent: OpenIntent) -> bool:
+    metadata = intent.metadata if isinstance(intent.metadata, dict) else {}
+    reply = metadata.get("reply") if isinstance(metadata.get("reply"), dict) else {}
+    return (
+        reply.get("should_reply") is False
+        or metadata.get("should_reply") is False
+        or _truthy(reply.get("suppress_reply"))
+        or _truthy(reply.get("conversation_end_detected"))
+        or _truthy(metadata.get("suppress_reply"))
+    )
 
 
 def is_chat_reply_intent(intent: OpenIntent) -> bool:
@@ -993,7 +1016,10 @@ def _chat_reply_publish_payload(intent: OpenIntent) -> dict[str, Any]:
 
 def _reply_status_metadata(intent: OpenIntent) -> dict[str, Any]:
     reply = _reply_payload(intent)
-    return {"reply": reply} if reply else {}
+    if not reply:
+        return {}
+    control = _reply_control_status(intent)
+    return {"reply": reply, "reply_control": control, "should_reply": control["should_reply"]}
 
 
 def _reply_payload(intent: OpenIntent) -> dict[str, Any]:
@@ -1011,8 +1037,38 @@ def _reply_payload(intent: OpenIntent) -> dict[str, Any]:
         "incoming_summary",
         "draft_text",
         "send_requested",
+        "should_reply",
+        "suppress_reply",
+        "suppress_reason",
+        "conversation_end_detected",
+        "conversation_stage",
+        "detected_cues",
+        "confidence",
     }
     return {key: value for key, value in reply.items() if key in allowed}
+
+
+def _reply_control_status(intent: OpenIntent) -> dict[str, Any]:
+    if not _is_chat_reply_intent(intent):
+        return {}
+    reply = _reply_payload(intent)
+    suppressed = _chat_reply_suppressed(intent)
+    return {
+        "should_reply": not suppressed,
+        "suppress_reply": suppressed,
+        "conversation_stage": str(reply.get("conversation_stage") or ("closing" if suppressed else "open")),
+        "reason": str(reply.get("suppress_reason") or ("conversation_closing_context" if suppressed else "")),
+        "confidence": reply.get("confidence", 0.0),
+        "detected_cues": list(reply.get("detected_cues") or []),
+    }
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
 
 
 def _default_world_publisher(**kwargs: Any) -> Any:

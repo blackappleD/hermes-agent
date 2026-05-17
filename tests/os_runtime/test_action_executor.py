@@ -115,6 +115,55 @@ def test_report_only_chat_reply_records_draft_text_and_reply_metadata(tmp_path):
         repo.close()
 
 
+def test_suppressed_chat_reply_records_no_reply_feedback(tmp_path):
+    repo = OSRuntimeEventRepository(root=tmp_path)
+    executor = AutonomousActionExecutor(config=_config(), repository=repo)
+    intent = OpenIntent(
+        intent_id="intent-chat-close",
+        action_family=OpenActionFamily.COMMUNICATE,
+        action_type="close_chat_no_reply",
+        why_now="politeness loop is closing",
+        success_condition="avoid redundant reply",
+        stop_condition="no external side effects",
+        risk_level=RiskLevel.LOW,
+        metadata={
+            "reply": {
+                "target_os_id": "peer-os",
+                "conversation_id": "chat-1",
+                "source_event_id": "event-chat",
+                "should_reply": False,
+                "suppress_reply": True,
+                "suppress_reason": "conversation_closing_context",
+                "detected_cues": ["gratitude_ack"],
+                "send_requested": True,
+            }
+        },
+    )
+    arbitration = ArbitrationResult(
+        intent_id="intent-chat-close",
+        decision=ArbitrationDecision.REPORT_ONLY,
+        rationale="chat reply suppressed because the conversation appears to be closing",
+        metadata={"arbitration_id": "arb-chat-close"},
+    )
+
+    try:
+        result = executor.execute(
+            intent=intent,
+            arbitration=arbitration,
+            event_ids=["event-chat"],
+            session_id="session-chat",
+        )
+
+        assert result.status == "completed"
+        assert result.action_summary == "chat_reply_suppressed"
+        assert result.feedback["should_reply"] is False
+        assert result.feedback["reply_control"]["suppress_reply"] is True
+        assert result.receipts[0].output_summary == "No reply sent: conversation closing context detected."
+        assert result.receipts[0].metadata["should_reply"] is False
+    finally:
+        repo.close()
+
+
 def test_untrusted_linz_candidate_does_not_make_draft_a_world_publish():
     intent = OpenIntent(
         intent_id="intent-chat-draft",
