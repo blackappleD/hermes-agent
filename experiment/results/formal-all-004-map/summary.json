@@ -1,0 +1,18 @@
+{
+  "anomaly": 99,
+  "blocked": 0,
+  "counts": {
+    "anomalies": 99,
+    "events": 15,
+    "transitions": 99
+  },
+  "phases": [
+    "P0",
+    "P1",
+    "P2",
+    "P4",
+    "P5"
+  ],
+  "published": 15,
+  "run_id": "formal-all-004-map"
+}

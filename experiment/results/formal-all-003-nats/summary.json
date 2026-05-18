@@ -1,0 +1,19 @@
+{
+  "anomaly": 85,
+  "blocked": 0,
+  "counts": {
+    "anomalies": 85,
+    "events": 14,
+    "transitions": 85
+  },
+  "phases": [
+    "P0",
+    "P1",
+    "P2",
+    "P3",
+    "P4",
+    "P5"
+  ],
+  "published": 14,
+  "run_id": "formal-all-003-nats"
+}

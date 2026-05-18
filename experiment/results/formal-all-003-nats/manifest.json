@@ -1,0 +1,19 @@
+{
+  "counts": {
+    "anomalies": 85,
+    "events": 14,
+    "transitions": 85
+  },
+  "exported_at": "2026-05-18T09:31:36Z",
+  "hermes_home": "/root/.hermes",
+  "profile": "default",
+  "run_id": "formal-all-003-nats",
+  "since": null,
+  "source_paths": {
+    "gateway": "/root/.hermes/gateway/message_events.db",
+    "linz_state": "/root/.hermes/linz_world/state.json",
+    "os_runtime_logs": "/root/.hermes/logs/os_runtime_*.log",
+    "state_db": "/root/.hermes/state.db"
+  },
+  "until": null
+}

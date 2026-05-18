@@ -1,0 +1,717 @@
+[
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-004-map:P0-system-broadcast-smoke:8147553a",
+    "message": "Runtime event formal:formal-all-004-map:P0-system-broadcast-smoke:8147553a missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-004-map:P1-low-risk-requirement-02:7f49751c",
+    "message": "Runtime event formal:formal-all-004-map:P1-low-risk-requirement-02:7f49751c missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-004-map:P1-low-risk-requirement-01:7238835a",
+    "message": "Runtime event formal:formal-all-004-map:P1-low-risk-requirement-01:7238835a missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-004-map:P1-high-risk-requirement-02:f9927c59",
+    "message": "Runtime event formal:formal-all-004-map:P1-high-risk-requirement-02:f9927c59 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-004-map:P1-high-risk-requirement-01:5948d647",
+    "message": "Runtime event formal:formal-all-004-map:P1-high-risk-requirement-01:5948d647 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-004-map:P1-chat-pressure-01:5dba80bf",
+    "message": "Runtime event formal:formal-all-004-map:P1-chat-pressure-01:5dba80bf missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-004-map:P1-chat-pressure-02:f89c8357",
+    "message": "Runtime event formal:formal-all-004-map:P1-chat-pressure-02:f89c8357 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-004-map:P2-opportunity-risk-requirement:57d8f78d",
+    "message": "Runtime event formal:formal-all-004-map:P2-opportunity-risk-requirement:57d8f78d missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-004-map:P2-pressure-chat:a47ddc73",
+    "message": "Runtime event formal:formal-all-004-map:P2-pressure-chat:a47ddc73 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-004-map:P4-positive-requirement-01:dd90c1a8",
+    "message": "Runtime event formal:formal-all-004-map:P4-positive-requirement-01:dd90c1a8 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-004-map:P4-positive-requirement-02:6d8a3261",
+    "message": "Runtime event formal:formal-all-004-map:P4-positive-requirement-02:6d8a3261 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_328d836551794d0097c1e118bb0571db",
+    "message": "Runtime event osr_328d836551794d0097c1e118bb0571db missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_4380d6d452fb4892b2aa82456578d3d4",
+    "message": "Runtime event osr_4380d6d452fb4892b2aa82456578d3d4 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_bdc1ff59f9b641eba1df055cd50f40ef",
+    "message": "Runtime event osr_bdc1ff59f9b641eba1df055cd50f40ef missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_3dab7ddf35c645268100a14d9346bd61",
+    "message": "Runtime event osr_3dab7ddf35c645268100a14d9346bd61 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-004-map:P5-direct-inbox-interaction-01:af6bfb7b",
+    "message": "Runtime event formal:formal-all-004-map:P5-direct-inbox-interaction-01:af6bfb7b missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_82649b3f9956483a8fdb8a26c900beb3",
+    "message": "Runtime event osr_82649b3f9956483a8fdb8a26c900beb3 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-004-map:P5-direct-inbox-interaction-02:03ddd00d",
+    "message": "Runtime event formal:formal-all-004-map:P5-direct-inbox-interaction-02:03ddd00d missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_953354c6bfd74ca1a13f54276b2ecd53",
+    "message": "Runtime event osr_953354c6bfd74ca1a13f54276b2ecd53 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-004-map:P5-market-broadcast-02:0c2669f3",
+    "message": "Runtime event formal:formal-all-004-map:P5-market-broadcast-02:0c2669f3 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_470ce0e4c39f47659a5f1d1a034312b7",
+    "message": "Runtime event osr_470ce0e4c39f47659a5f1d1a034312b7 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-004-map:P5-market-broadcast-01:ab6aa7e5",
+    "message": "Runtime event formal:formal-all-004-map:P5-market-broadcast-01:ab6aa7e5 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_e78d74b2ab5516219d1d64e8",
+    "message": "Runtime event osr_evidence_evidence_e78d74b2ab5516219d1d64e8 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_74fa394d26932104fb45a50b",
+    "message": "Runtime event osr_receipt_receipt_final_74fa394d26932104fb45a50b missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_88a15d0f47a49ddd4e022f94",
+    "message": "Runtime event osr_approval_88a15d0f47a49ddd4e022f94 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_2be4dd57d5dd7136b176817d",
+    "message": "Runtime event osr_evidence_evidence_2be4dd57d5dd7136b176817d missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_f5a210af4bac78ce77e9ce4c",
+    "message": "Runtime event osr_receipt_receipt_final_f5a210af4bac78ce77e9ce4c missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_0803f8e4bb0af2440e6cca81",
+    "message": "Runtime event osr_approval_0803f8e4bb0af2440e6cca81 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_630662108aa4bf6614e4ea74",
+    "message": "Runtime event osr_evidence_evidence_630662108aa4bf6614e4ea74 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_cfb5c2bd3c977b3e55f35702",
+    "message": "Runtime event osr_receipt_receipt_final_cfb5c2bd3c977b3e55f35702 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_ac6c7e6de79e118f099bbb8c",
+    "message": "Runtime event osr_approval_ac6c7e6de79e118f099bbb8c missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_7e870b32ad53f6b27f52c63b",
+    "message": "Runtime event osr_evidence_evidence_7e870b32ad53f6b27f52c63b missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_f6175ff799f7d6b82e80ded5",
+    "message": "Runtime event osr_receipt_receipt_final_f6175ff799f7d6b82e80ded5 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_c96b7e725db0ab8c9c129219",
+    "message": "Runtime event osr_approval_c96b7e725db0ab8c9c129219 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_e49a9aab15d20ba19dfdeb61",
+    "message": "Runtime event osr_evidence_evidence_e49a9aab15d20ba19dfdeb61 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_613b8413d444c40090912447",
+    "message": "Runtime event osr_receipt_receipt_final_613b8413d444c40090912447 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_d834ee227ac58960402290b3",
+    "message": "Runtime event osr_evidence_evidence_d834ee227ac58960402290b3 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_c33757698aef1df5d73b9f29",
+    "message": "Runtime event osr_receipt_receipt_final_c33757698aef1df5d73b9f29 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_a8bb9ac01a40ff0c0c5c1b62",
+    "message": "Runtime event osr_evidence_evidence_a8bb9ac01a40ff0c0c5c1b62 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_world_2082c9aae1d0f9eb2dbb3d42",
+    "message": "Runtime event osr_receipt_receipt_world_2082c9aae1d0f9eb2dbb3d42 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_bbe39a3289c396e6aa2c4cc1",
+    "message": "Runtime event osr_evidence_evidence_bbe39a3289c396e6aa2c4cc1 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_443d6f57ce8fea402a64006c",
+    "message": "Runtime event osr_receipt_receipt_final_443d6f57ce8fea402a64006c missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_64e674a78b2ec3ff803063fc",
+    "message": "Runtime event osr_approval_64e674a78b2ec3ff803063fc missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_d6833bd7f60e9647aba501cc",
+    "message": "Runtime event osr_evidence_evidence_d6833bd7f60e9647aba501cc missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_cdf74a2b79619dfd1ff45c51",
+    "message": "Runtime event osr_receipt_receipt_final_cdf74a2b79619dfd1ff45c51 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_5bd111312f3e441e27628229",
+    "message": "Runtime event osr_evidence_evidence_5bd111312f3e441e27628229 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_faa9f226be1234b861992050",
+    "message": "Runtime event osr_receipt_receipt_final_faa9f226be1234b861992050 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_4bd7da3d8de09e7950781b4b",
+    "message": "Runtime event osr_approval_4bd7da3d8de09e7950781b4b missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_4c7e1268ec3da65bc19b1337",
+    "message": "Runtime event osr_evidence_evidence_4c7e1268ec3da65bc19b1337 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_5255ba5c1cda4d60a077d01a",
+    "message": "Runtime event osr_receipt_receipt_final_5255ba5c1cda4d60a077d01a missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_c2f26a2a1f3f80d166f531a3",
+    "message": "Runtime event osr_approval_c2f26a2a1f3f80d166f531a3 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_7ab3e3a5dfe2f6c790142f3b",
+    "message": "Runtime event osr_evidence_evidence_7ab3e3a5dfe2f6c790142f3b missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_e1248e219a09fa173435e7e3",
+    "message": "Runtime event osr_receipt_receipt_final_e1248e219a09fa173435e7e3 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_18a55438d19b9badc3112f6c",
+    "message": "Runtime event osr_evidence_evidence_18a55438d19b9badc3112f6c missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_6fd1b9380228697a245e51da",
+    "message": "Runtime event osr_receipt_receipt_final_6fd1b9380228697a245e51da missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_f0c629261ec7d3870198fcdc",
+    "message": "Runtime event osr_approval_f0c629261ec7d3870198fcdc missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_407346cd1af848afa113eea2453ffbaf",
+    "message": "Runtime event osr_407346cd1af848afa113eea2453ffbaf missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_b4956dde809f37af089c0940",
+    "message": "Runtime event osr_evidence_evidence_b4956dde809f37af089c0940 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_dd4eeae7f1b363cccd4cf65e",
+    "message": "Runtime event osr_receipt_receipt_final_dd4eeae7f1b363cccd4cf65e missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_6165dd7e6f2f1659cd783a9f",
+    "message": "Runtime event osr_evidence_evidence_6165dd7e6f2f1659cd783a9f missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_dc9d17ca9db00ca5f170748e",
+    "message": "Runtime event osr_receipt_receipt_final_dc9d17ca9db00ca5f170748e missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_992ae48f3d76c00b36eca02b",
+    "message": "Runtime event osr_approval_992ae48f3d76c00b36eca02b missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_47670e363fba42998ba4748e797137d4",
+    "message": "Runtime event osr_47670e363fba42998ba4748e797137d4 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_tool_9fe537b8f0800272f892e06c",
+    "message": "Runtime event osr_receipt_receipt_tool_9fe537b8f0800272f892e06c missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_fb696ad03a1542f1bddb11a0c92ff2fd",
+    "message": "Runtime event osr_fb696ad03a1542f1bddb11a0c92ff2fd missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_800225cadbfa4d60a265dd8aa44f62cc",
+    "message": "Runtime event osr_800225cadbfa4d60a265dd8aa44f62cc missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_1105e953905327e4a3c7ee14",
+    "message": "Runtime event osr_receipt_receipt_final_1105e953905327e4a3c7ee14 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_76d061e8159b4a76a9791466484826c3",
+    "message": "Runtime event osr_76d061e8159b4a76a9791466484826c3 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_0bf8411ee7d34df987cf5bf2db130a3c",
+    "message": "Runtime event osr_0bf8411ee7d34df987cf5bf2db130a3c missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_5f9eb5ef0f0f463c92f9236195ec162d",
+    "message": "Runtime event osr_5f9eb5ef0f0f463c92f9236195ec162d missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_tool_2bc6b2b0d92b39adf06e7d8c",
+    "message": "Runtime event osr_receipt_receipt_tool_2bc6b2b0d92b39adf06e7d8c missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_c5cd697adfb644f7acfc11180c3c62b2",
+    "message": "Runtime event osr_c5cd697adfb644f7acfc11180c3c62b2 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_world_7f0764f889dd6559b97f8eeb",
+    "message": "Runtime event osr_receipt_receipt_world_7f0764f889dd6559b97f8eeb missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_bb02b2a6e5064559b6e21c8c646861bd",
+    "message": "Runtime event osr_bb02b2a6e5064559b6e21c8c646861bd missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_4db499c5efeb42e981ef9721e6b2f514",
+    "message": "Runtime event osr_4db499c5efeb42e981ef9721e6b2f514 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_b6b603e65dbc49ff841615a790ebbf9c",
+    "message": "Runtime event osr_b6b603e65dbc49ff841615a790ebbf9c missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_e3309319e0f04ec0abea295cffb9f8f4",
+    "message": "Runtime event osr_e3309319e0f04ec0abea295cffb9f8f4 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-d1dd1248dcac4294b7e8f4883da11137 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_172631_d5a8d239",
+    "status": "anomaly",
+    "trace_id": "wake-d1dd1248dcac4294b7e8f4883da11137"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-43953b5d8c864252adc546d1f00587a1 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182416_76057d93",
+    "status": "anomaly",
+    "trace_id": "wake-43953b5d8c864252adc546d1f00587a1"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-d87b67f7c70d46568a3691d6106b38cd missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182416_76057d93",
+    "status": "anomaly",
+    "trace_id": "wake-d87b67f7c70d46568a3691d6106b38cd"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-910b5efafb2e4344a6c9497f7eb5cc30 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182417_f76fb99a",
+    "status": "anomaly",
+    "trace_id": "wake-910b5efafb2e4344a6c9497f7eb5cc30"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-a55cfb0e1f994c7fa6b55af4b5b33ce9 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182417_f76fb99a",
+    "status": "anomaly",
+    "trace_id": "wake-a55cfb0e1f994c7fa6b55af4b5b33ce9"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-9f4b7c06f9254facb830cea933dbaa24 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182418_230962b4",
+    "status": "anomaly",
+    "trace_id": "wake-9f4b7c06f9254facb830cea933dbaa24"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-4b145c80b0a24863a2844dbbd6b3cdb3 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182418_230962b4",
+    "status": "anomaly",
+    "trace_id": "wake-4b145c80b0a24863a2844dbbd6b3cdb3"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-38213470911d4102aff6f61d6004e6c8 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182417_f76fb99a",
+    "status": "anomaly",
+    "trace_id": "wake-38213470911d4102aff6f61d6004e6c8"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-be15d6fd879d445483de2e73300e5ed4 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182418_230962b4",
+    "status": "anomaly",
+    "trace_id": "wake-be15d6fd879d445483de2e73300e5ed4"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-86a07d6bf9584cd6907d663f1c3cf1fb missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182416_76057d93",
+    "status": "anomaly",
+    "trace_id": "wake-86a07d6bf9584cd6907d663f1c3cf1fb"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-569c9a022f8b42e79a2fc9503f286b82 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182416_76057d93",
+    "status": "anomaly",
+    "trace_id": "wake-569c9a022f8b42e79a2fc9503f286b82"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group session:20260518_172631_d5a8d239 missing fields: life_state, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_172631_d5a8d239",
+    "status": "anomaly",
+    "trace_id": ""
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group session:20260518_182417_f76fb99a missing fields: life_state, self_prompt, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182417_f76fb99a",
+    "status": "anomaly",
+    "trace_id": ""
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group session:20260518_182416_76057d93 missing fields: life_state, self_prompt, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182416_76057d93",
+    "status": "anomaly",
+    "trace_id": ""
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group session:20260518_182418_230962b4 missing fields: life_state, tension_set, action_potential, self_prompt, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182418_230962b4",
+    "status": "anomaly",
+    "trace_id": ""
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-a18ddd4d23a54c1e941485d7427d8c9b missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182438_a7e22a73",
+    "status": "anomaly",
+    "trace_id": "wake-a18ddd4d23a54c1e941485d7427d8c9b"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group session:20260518_182438_a7e22a73 missing fields: life_state, tension_set, action_potential, self_prompt, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182438_a7e22a73",
+    "status": "anomaly",
+    "trace_id": ""
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-988caef9d1394510ad3062ad5a8e7e12 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182439_f3d106bb",
+    "status": "anomaly",
+    "trace_id": "wake-988caef9d1394510ad3062ad5a8e7e12"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group session:20260518_182439_f3d106bb missing fields: life_state, self_prompt, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182439_f3d106bb",
+    "status": "anomaly",
+    "trace_id": ""
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-868984822c7347a78b63422a08391a23 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182439_1f9377eb",
+    "status": "anomaly",
+    "trace_id": "wake-868984822c7347a78b63422a08391a23"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group session:20260518_182439_1f9377eb missing fields: life_state, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182439_1f9377eb",
+    "status": "anomaly",
+    "trace_id": ""
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-6a7098851f29484d973a5fe99de76c5b missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-004-map",
+    "session_id": "20260518_182439_1f9377eb",
+    "status": "anomaly",
+    "trace_id": "wake-6a7098851f29484d973a5fe99de76c5b"
+  }
+]

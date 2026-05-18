@@ -1,0 +1,614 @@
+[
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-003-nats:P0-governance-smoke:9c7fe2a8",
+    "message": "Runtime event formal:formal-all-003-nats:P0-governance-smoke:9c7fe2a8 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-003-nats:P1-single-requirement-perturbation-02:1143f883",
+    "message": "Runtime event formal:formal-all-003-nats:P1-single-requirement-perturbation-02:1143f883 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-003-nats:P1-single-requirement-perturbation-01:19ed375c",
+    "message": "Runtime event formal:formal-all-003-nats:P1-single-requirement-perturbation-01:19ed375c missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-003-nats:P2-task-created-context:927890e4",
+    "message": "Runtime event formal:formal-all-003-nats:P2-task-created-context:927890e4 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-003-nats:P3-task-updated-feedback:59c0030b",
+    "message": "Runtime event formal:formal-all-003-nats:P3-task-updated-feedback:59c0030b missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-003-nats:P2-order-created-collaboration:988d5795",
+    "message": "Runtime event formal:formal-all-003-nats:P2-order-created-collaboration:988d5795 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-003-nats:P3-delivery-submitted-evidence:c9d67781",
+    "message": "Runtime event formal:formal-all-003-nats:P3-delivery-submitted-evidence:c9d67781 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-003-nats:P4-order-updated-evolution-02:bc2775a2",
+    "message": "Runtime event formal:formal-all-003-nats:P4-order-updated-evolution-02:bc2775a2 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-003-nats:P4-order-updated-evolution-01:ae50cd71",
+    "message": "Runtime event formal:formal-all-003-nats:P4-order-updated-evolution-01:ae50cd71 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-003-nats:P4-order-updated-evolution-03:053114f5",
+    "message": "Runtime event formal:formal-all-003-nats:P4-order-updated-evolution-03:053114f5 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-003-nats:P5-direct-inbox-interaction-02:ca36e1ca",
+    "message": "Runtime event formal:formal-all-003-nats:P5-direct-inbox-interaction-02:ca36e1ca missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-003-nats:P5-direct-inbox-interaction-01:f03d4b30",
+    "message": "Runtime event formal:formal-all-003-nats:P5-direct-inbox-interaction-01:f03d4b30 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-003-nats:P5-direct-inbox-interaction-03:a659c2f0",
+    "message": "Runtime event formal:formal-all-003-nats:P5-direct-inbox-interaction-03:a659c2f0 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_a9645f3e04d84f458176b259d73b2067",
+    "message": "Runtime event osr_a9645f3e04d84f458176b259d73b2067 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_d8d48faec3e94cca85595d7aa1772d0b",
+    "message": "Runtime event osr_d8d48faec3e94cca85595d7aa1772d0b missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_a23bab437cee4812ba6c5463aac95d3f",
+    "message": "Runtime event osr_a23bab437cee4812ba6c5463aac95d3f missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_f20f7701f2c282d9d69c30f0",
+    "message": "Runtime event osr_evidence_evidence_f20f7701f2c282d9d69c30f0 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_0538da1dbc5d6c1a236d00c4",
+    "message": "Runtime event osr_receipt_receipt_final_0538da1dbc5d6c1a236d00c4 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_9463e6c875206557a7175b3f",
+    "message": "Runtime event osr_evidence_evidence_9463e6c875206557a7175b3f missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_b9227b27419a734e006812b7",
+    "message": "Runtime event osr_receipt_receipt_final_b9227b27419a734e006812b7 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_6c74b232ab242cc905d5c675",
+    "message": "Runtime event osr_approval_6c74b232ab242cc905d5c675 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_beea7bb6f4df3fd7132a5ff3",
+    "message": "Runtime event osr_evidence_evidence_beea7bb6f4df3fd7132a5ff3 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_4b99d13826532301138428d2",
+    "message": "Runtime event osr_receipt_receipt_final_4b99d13826532301138428d2 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_22f5c4525694a6cfb494aad8",
+    "message": "Runtime event osr_evidence_evidence_22f5c4525694a6cfb494aad8 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_c64d607174d58bdad8e4280d",
+    "message": "Runtime event osr_receipt_receipt_final_c64d607174d58bdad8e4280d missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_d5e3efa50c0acb3bb93bf488",
+    "message": "Runtime event osr_evidence_evidence_d5e3efa50c0acb3bb93bf488 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_80e5f95a4ce3dc61437722cc",
+    "message": "Runtime event osr_receipt_receipt_final_80e5f95a4ce3dc61437722cc missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_8ae74696a5e4ec7d4d7432e3",
+    "message": "Runtime event osr_approval_8ae74696a5e4ec7d4d7432e3 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_8fa6494de03a327fd8eaace1",
+    "message": "Runtime event osr_evidence_evidence_8fa6494de03a327fd8eaace1 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_1c07e953b0856e13d78ba4da",
+    "message": "Runtime event osr_receipt_receipt_final_1c07e953b0856e13d78ba4da missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_c33308fa023ca48e27dfb841",
+    "message": "Runtime event osr_approval_c33308fa023ca48e27dfb841 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_c5f8e344d695eb05935a2056",
+    "message": "Runtime event osr_evidence_evidence_c5f8e344d695eb05935a2056 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_181efb2b281f483fa9a45681c1d16b8d",
+    "message": "Runtime event osr_181efb2b281f483fa9a45681c1d16b8d missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_a8b97d4ded1d5a31099acf72",
+    "message": "Runtime event osr_receipt_receipt_final_a8b97d4ded1d5a31099acf72 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_3c57f9c9a338479ea07dd9973d712ad7",
+    "message": "Runtime event osr_3c57f9c9a338479ea07dd9973d712ad7 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_5f32f46c32fb4c51b87e3e0e043c1dd1",
+    "message": "Runtime event osr_5f32f46c32fb4c51b87e3e0e043c1dd1 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_102eb5ce519de4abcaabdece",
+    "message": "Runtime event osr_evidence_evidence_102eb5ce519de4abcaabdece missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_6fdb4caf8d9cc7cb5852f35f",
+    "message": "Runtime event osr_receipt_receipt_final_6fdb4caf8d9cc7cb5852f35f missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_9fa6a6e05674c9ba7cb5bc6c",
+    "message": "Runtime event osr_approval_9fa6a6e05674c9ba7cb5bc6c missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_e26d23c1dce44989af118effbc42a96d",
+    "message": "Runtime event osr_e26d23c1dce44989af118effbc42a96d missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_157a8a8d48cb3f9fc277e141",
+    "message": "Runtime event osr_receipt_receipt_final_157a8a8d48cb3f9fc277e141 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_42d1355093e44cab961a05c50252f757",
+    "message": "Runtime event osr_42d1355093e44cab961a05c50252f757 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_d89df098be0a42388ea126ecfdfbe0aa",
+    "message": "Runtime event osr_d89df098be0a42388ea126ecfdfbe0aa missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_b00bace7a566435ca75713e72fd91b2b",
+    "message": "Runtime event osr_b00bace7a566435ca75713e72fd91b2b missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_19d7b927489dff14feacf2f2",
+    "message": "Runtime event osr_receipt_receipt_final_19d7b927489dff14feacf2f2 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_9800a0a5abf845ef86ad6d13420d2280",
+    "message": "Runtime event osr_9800a0a5abf845ef86ad6d13420d2280 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_bcfc506dae8947ffae47b0655fa7d4d1",
+    "message": "Runtime event osr_bcfc506dae8947ffae47b0655fa7d4d1 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_9cdeb9a7df0847c71129a32f",
+    "message": "Runtime event osr_evidence_evidence_9cdeb9a7df0847c71129a32f missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_c0184b86908ed2bf1fe3eec0",
+    "message": "Runtime event osr_receipt_receipt_final_c0184b86908ed2bf1fe3eec0 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_c9b7b6240e5ee7939d24f9b1",
+    "message": "Runtime event osr_approval_c9b7b6240e5ee7939d24f9b1 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_97207ad1658e44f78e0c24605d420223",
+    "message": "Runtime event osr_97207ad1658e44f78e0c24605d420223 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_dd61762ccb3948adad8ae938594a40e0",
+    "message": "Runtime event osr_dd61762ccb3948adad8ae938594a40e0 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_bdbbcf5f730056c305b24e58",
+    "message": "Runtime event osr_evidence_evidence_bdbbcf5f730056c305b24e58 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_258ed677c23a4cc1b3d3116f",
+    "message": "Runtime event osr_receipt_receipt_final_258ed677c23a4cc1b3d3116f missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_c8f43063466c5f25c4375b72",
+    "message": "Runtime event osr_approval_c8f43063466c5f25c4375b72 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_evidence_evidence_f09ddaae17e8bd54719117b4",
+    "message": "Runtime event osr_evidence_evidence_f09ddaae17e8bd54719117b4 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_40b024f648556a6ce9d9f75e",
+    "message": "Runtime event osr_receipt_receipt_final_40b024f648556a6ce9d9f75e missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_approval_8a02162defe30eaf760c1f3e",
+    "message": "Runtime event osr_approval_8a02162defe30eaf760c1f3e missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_043740f9ca3445ff8435a96d100a3502",
+    "message": "Runtime event osr_043740f9ca3445ff8435a96d100a3502 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_bb2b182a82b369ec93244b84",
+    "message": "Runtime event osr_receipt_receipt_final_bb2b182a82b369ec93244b84 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_543456c929d04f009b14c1ac069a600b",
+    "message": "Runtime event osr_543456c929d04f009b14c1ac069a600b missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_64786226cce14475a7b008d32b1f1ff9",
+    "message": "Runtime event osr_64786226cce14475a7b008d32b1f1ff9 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_b61b437f5a11438eaf8f6c33364069f4",
+    "message": "Runtime event osr_b61b437f5a11438eaf8f6c33364069f4 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_receipt_receipt_final_d146be4c163eb650990d6184",
+    "message": "Runtime event osr_receipt_receipt_final_d146be4c163eb650990d6184 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_456a114c3a3e4e0e93ec3c2dc575330a",
+    "message": "Runtime event osr_456a114c3a3e4e0e93ec3c2dc575330a missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_e357037f9cca41cb9f6c70c722857c36",
+    "message": "Runtime event osr_e357037f9cca41cb9f6c70c722857c36 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "formal:formal-all-003-nats:P1-single-requirement-perturbation-03:retry1",
+    "message": "Runtime event formal:formal-all-003-nats:P1-single-requirement-perturbation-03:retry1 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "event_id": "osr_33b0b18888764d039889fc0d56e592c9",
+    "message": "Runtime event osr_33b0b18888764d039889fc0d56e592c9 missing fields: life_state, tension_field, tension_set, action_potential, self_prompt, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "status": "anomaly"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-97b39c501d0c465794e9cc9d65bcf71d missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172631_d5a8d239",
+    "status": "anomaly",
+    "trace_id": "wake-97b39c501d0c465794e9cc9d65bcf71d"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-ab63570f981f469998b4469a460ecd38 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172633_6a029da1",
+    "status": "anomaly",
+    "trace_id": "wake-ab63570f981f469998b4469a460ecd38"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-22c23cc90040490f83ab8292fc7044fe missing fields: life_state, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172633_6a029da1",
+    "status": "anomaly",
+    "trace_id": "wake-22c23cc90040490f83ab8292fc7044fe"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-a2b5625a8b124203bccb96ff08345bef missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172633_6a029da1",
+    "status": "anomaly",
+    "trace_id": "wake-a2b5625a8b124203bccb96ff08345bef"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-614508e64ae846e184f51b4825aa35ca missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172633_6a029da1",
+    "status": "anomaly",
+    "trace_id": "wake-614508e64ae846e184f51b4825aa35ca"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-cf0d3b5bac214400b794af2f94c73ce3 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172633_6a029da1",
+    "status": "anomaly",
+    "trace_id": "wake-cf0d3b5bac214400b794af2f94c73ce3"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-e67c78ad303341d59ef7d3d6b1ea76a7 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172633_6a029da1",
+    "status": "anomaly",
+    "trace_id": "wake-e67c78ad303341d59ef7d3d6b1ea76a7"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-3077e8094ab34b2bab6c288a0d5ced6c missing fields: life_state, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172633_6a029da1",
+    "status": "anomaly",
+    "trace_id": "wake-3077e8094ab34b2bab6c288a0d5ced6c"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-5bdfe0107350439c83e5675025b3af75 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172633_6a029da1",
+    "status": "anomaly",
+    "trace_id": "wake-5bdfe0107350439c83e5675025b3af75"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-32ba166adb0f43a18a9ddb97985166a0 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172633_6a029da1",
+    "status": "anomaly",
+    "trace_id": "wake-32ba166adb0f43a18a9ddb97985166a0"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-4ada9ce10ff8452b8315936c86772a1c missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172639_f3a07190",
+    "status": "anomaly",
+    "trace_id": "wake-4ada9ce10ff8452b8315936c86772a1c"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-86b157b3228a4b48aff4f7cc4c3ff339 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172639_f3a07190",
+    "status": "anomaly",
+    "trace_id": "wake-86b157b3228a4b48aff4f7cc4c3ff339"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-a042e0d3d2ef4a7893c4d08d74ba1ae6 missing fields: life_state, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172639_f3a07190",
+    "status": "anomaly",
+    "trace_id": "wake-a042e0d3d2ef4a7893c4d08d74ba1ae6"
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group session:20260518_172631_d5a8d239 missing fields: life_state, tension_set, action_potential, self_prompt, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172631_d5a8d239",
+    "status": "anomaly",
+    "trace_id": ""
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group session:20260518_172633_6a029da1 missing fields: life_state, self_prompt, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172633_6a029da1",
+    "status": "anomaly",
+    "trace_id": ""
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group session:20260518_172639_f3a07190 missing fields: life_state, tension_set, action_potential, self_prompt, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172639_f3a07190",
+    "status": "anomaly",
+    "trace_id": ""
+  },
+  {
+    "code": "transition_fields_missing",
+    "message": "os_runtime raw log group trace:wake-ed03b4001f0d46b7bb369f9d5eacfa25 missing fields: life_state, open_intent, arbitration, actual_action, evidence_refs",
+    "run_id": "formal-all-003-nats",
+    "session_id": "20260518_172633_6a029da1",
+    "status": "anomaly",
+    "trace_id": "wake-ed03b4001f0d46b7bb369f9d5eacfa25"
+  }
+]
