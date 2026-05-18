@@ -723,3 +723,165 @@ hermes-agent
 - evidence package 能汇总各 slot 输出。
 - 世界市场事件必须由 bubble/evidence 驱动生成，不能由 LLM 直接拼 payload 发布。
 - 泡泡生命周期至少覆盖 `created`、`seeking`、`assembled`、`executing`、`validating`、`dissolved`、`crystallized`。
+
+## [Feature]正式框架实验脚本：基于已运行 Hermes/os_runtime 的阶段实验与数据导出
+
+### 仓库
+
+hermes-agent
+
+### 参考文档
+
+`/docs/共博自制框架实验准备.md`
+
+### 背景
+
+当前实验准备文档定义了 P0-P5 阶段实验、人格种子、事件脚本库、观察变量和验收口径。实际需要的是在 Hermes 框架已经安装、Linz World 身份已登录、gateway/os_runtime 已运行的前提下，通过 `scripts/` 下的一个或多个正式实验脚本驱动实验阶段，并在流程结束后导出真实运行数据。
+
+该需求不是 mock 结构验证，也不是离线伪造 transition。脚本必须基于已运行的正式框架，读取/触发 Linz World、gateway、os_runtime、evidence 产生的真实数据。
+
+### 目标
+
+提供一套可复现的正式实验脚本，帮助实验人员按 `docs/共博自制框架实验准备.md` 执行 P0-P5 中的一个或多个阶段，并导出可分析的实验数据。脚本必须清楚说明使用方法、使用顺序和参数含义。
+
+### 范围
+
+- 新增 `scripts/` 下的正式实验脚本，至少覆盖：
+    - 运行前检查：确认 Hermes 安装、profile、Linz World 登录/授权、gateway 运行状态、os_runtime 配置和日志/数据库路径。
+    - 阶段执行：按 P0、P1、P2、P3、P4、P5 或 `all` 执行实验事件流程。
+    - 数据导出：从正式运行产物导出实验数据，不从 mock backend 生成。
+- 新增或完善实验数据目录，例如 `experiment/results/<run_id>/` 或 `formal-results/<run_id>/`。
+- 新增脚本文档，必须包含脚本使用方法、使用顺序、参数说明和示例命令。
+- 必须使用正式 Linz World event catalog 允许的 subject/event_type；不得使用仅供 mock 的 `linz.*` 事件类型伪造正式数据。
+- 必须从真实数据源导出：
+    - `~/.hermes/gateway/message_events.db`
+    - `~/.hermes/logs/os_runtime_YYYYMMDD.log`
+    - `~/.hermes/linz_world/state.json`
+    - 如需要，可补充读取 `~/.hermes/state.db` 中 os_runtime side table/evidence 记录。
+
+### 建议脚本形态
+
+可以实现为一个带子命令的脚本，也可以拆成多个脚本。建议形态如下：
+
+```bash
+scripts/formal_experiment_prepare.sh
+scripts/formal_experiment_run.sh
+scripts/formal_experiment_export.py
+```
+
+或：
+
+```bash
+scripts/formal_experiment.sh prepare
+scripts/formal_experiment.sh run
+scripts/formal_experiment.sh export
+```
+
+### 使用顺序要求
+
+文档必须明确以下顺序：
+
+```bash
+# 1. 安装并进入 WSL 原生安装目录
+bash scripts/install-wsl-test.sh -- --skip-setup
+cd /src/hermes-agent
+source venv/bin/activate
+
+# 2. 配置并确认正式框架状态
+hermes setup linz
+hermes linz login
+hermes linz map
+hermes linz status
+
+# 3. 启动正式 gateway/os_runtime
+hermes gateway
+
+# 4. 另开 shell，执行实验前检查
+bash scripts/formal_experiment_prepare.sh --profile default --phase all
+
+# 5. 执行实验阶段
+bash scripts/formal_experiment_run.sh --profile default --phase P1 --repeat 3 --run-id formal-p1-001
+bash scripts/formal_experiment_run.sh --profile default --phase all --run-id formal-all-001
+
+# 6. 导出实验数据
+python scripts/formal_experiment_export.py --profile default --run-id formal-all-001 --output-root experiment/results
+```
+
+如果 gateway/os_runtime 未运行、Linz World 未登录、授权 map 不可用、正式事件不在 catalog 内、或没有任何真实 runtime transition，脚本必须 fail closed，并输出可诊断原因。
+
+### 参数说明要求
+
+脚本文档必须解释以下参数，实际实现可合并或扩展：
+
+- `--profile`：Hermes profile 名称；默认 `default`。
+- `--phase`：实验阶段，允许 `P0|P1|P2|P3|P4|P5|all`。
+- `--run-id`：本次实验运行编号；用于关联发布事件、runtime 日志和导出目录。
+- `--repeat`：阶段内事件重复次数；P1 默认应支持 3 次单事件扰动。
+- `--output-root`：导出目录根路径。
+- `--hermes-home`：显式指定 Hermes 数据目录；默认当前 profile 对应的 `~/.hermes`。
+- `--target-os-id`：直接 inbox 事件目标元神 ID，用于 `wsp.<os_id>` 类事件。
+- `--seed-id` / `--persona`：实验人格或元神标识；用于多元神阶段筛选和记录。
+- `--since` / `--until`：导出数据时间窗口。
+- `--dry-run`：只做检查和打印将执行的事件，不发布正式事件。
+- `--fail-on-anomaly`：发现缺失 transition、异常 judgement 或 runtime blocked 时以非零码退出。
+
+### 输出数据要求
+
+一次完整导出至少包含：
+
+```text
+experiment/results/<run_id>/
+├── manifest.json
+├── events.jsonl
+├── transitions.jsonl
+├── os_runtime_raw.jsonl
+├── summary.json
+├── summary.csv
+└── anomalies.json
+```
+
+字段至少覆盖：
+
+- `run_id`
+- `phase`
+- `scenario_id`
+- `seed_id` / `persona`
+- `event_id`
+- `subject`
+- `event_type`
+- `payload_summary`
+- `raw_payload_ref` / `audit_ref`
+- `message_event_projection`
+- `raw_transitions`
+- `life_state`
+- `tension_field` / `tension_set`
+- `action_potential`
+- `self_prompt`
+- `open_intent`
+- `arbitration`
+- `actual_action`
+- `evidence_refs`
+- `stop_reason`
+- `judgement` / `anomaly`
+
+### 关键要求
+
+- 不允许把 mock backend 的结果当正式实验数据导出。
+- 正式阶段脚本必须通过 Linz World/governance/authorization 路径发布或接收事件。
+- 所有输出必须可追溯到正式运行产物：gateway projection ledger、os_runtime 日志、Linz World state/receipt 或 evidence package。
+- 脚本必须支持只运行单阶段，也支持 `all` 全阶段。
+- P1 必须支持单事件重复与间隔，以便观察扰动方向、幅度和衰减。
+- P4/P5 必须能导出多轮演化和多元神交互摘要。
+- 敏感字段必须脱敏，普通结果文件不得包含 token、api_key、password、private_key、authorization 原值。
+- 如果正式 runtime 没有产生对应模块数据，导出必须标记为 anomaly，而不是补假值。
+
+### 验收标准
+
+- 安装后按文档顺序执行，能基于已运行 Hermes 框架完成至少 P1 阶段正式实验并导出数据。
+- `--phase all` 能按实验准备文档覆盖 P0-P5 的正式事件流程，或明确列出因权限/环境缺失而被阻断的阶段。
+- 输出目录中存在 `events.jsonl`、`transitions.jsonl`、`os_runtime_raw.jsonl`、`summary.json`、`summary.csv`、`anomalies.json`。
+- `transitions.jsonl` 中能看到 OS Runtime 正式链路数据，至少包括 life_state、tension_field/tension_set、action_potential、self_prompt、open_intent、arbitration 和 evidence/action 相关记录。
+- 关闭 gateway 或退出 Linz 登录后，prepare/run/export 脚本必须失败并给出明确诊断。
+- 文档中必须包含完整脚本使用方法、使用顺序、参数说明和最小可运行示例。
+
+---
