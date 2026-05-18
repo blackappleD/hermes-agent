@@ -701,11 +701,141 @@ def _build_transitions(
         missing = [field for field in REQUIRED_TRANSITION_FIELDS if row.get(field) in (None, "", [])]
         if missing:
             anomalies.append(_anomaly("transition_fields_missing", run_id, f"Runtime event {event.get('event_id')} missing fields: {', '.join(missing)}", event_id=event.get("event_id")))
-    if gateway_events and not runtime_events and not runtime_raw:
+
+    raw_transitions = _build_transitions_from_runtime_raw(run_id, runtime_raw, anomalies)
+    transitions.extend(raw_transitions)
+
+    if gateway_events and not transitions:
         for item in gateway_events:
             record = item.get("record") or {}
             anomalies.append(_anomaly("missing_transition", run_id, "Gateway event has no matching os_runtime transition.", event_id=record.get("event_id") or record.get("record_id")))
     return transitions
+
+
+def _build_transitions_from_runtime_raw(
+    run_id: str,
+    runtime_raw: list[dict[str, Any]],
+    anomalies: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    groups: dict[str, dict[str, Any]] = {}
+    for raw in runtime_raw:
+        if str(raw.get("route") or "").find("goal_event") == -1 and not raw.get("step"):
+            continue
+        group_key = _runtime_raw_group_key(raw)
+        group = groups.setdefault(
+            group_key,
+            {
+                "run_id": run_id,
+                "event_id": "",
+                "trace_id": raw.get("trace_id") or "",
+                "session_id": raw.get("session_id") or "",
+                "timestamp": raw.get("timestamp") or raw.get("at") or raw.get("created_at"),
+                "event_type": "os_runtime_pipeline",
+                "raw_transitions": [],
+                "life_state": None,
+                "tension_field": None,
+                "tension_set": None,
+                "action_potential": None,
+                "self_prompt": None,
+                "open_intent": None,
+                "arbitration": None,
+                "actual_action": None,
+                "evidence_refs": [],
+                "stop_reason": None,
+                "judgement": None,
+                "anomaly": None,
+            },
+        )
+        if raw.get("timestamp") and (not group.get("timestamp") or str(raw["timestamp"]) < str(group["timestamp"])):
+            group["timestamp"] = raw["timestamp"]
+        group["trace_id"] = group.get("trace_id") or raw.get("trace_id") or ""
+        group["session_id"] = group.get("session_id") or raw.get("session_id") or ""
+        step = str(raw.get("step") or "").strip().lower()
+        data = raw.get("data") if isinstance(raw.get("data"), dict) else {}
+        group["raw_transitions"].append(_raw_pipeline_ref(raw, data))
+        _merge_pipeline_step(group, step, data)
+
+    transitions = []
+    for key, row in groups.items():
+        if not _has_transition_signal(row):
+            anomalies.append(_anomaly("missing_transition", run_id, f"os_runtime raw log group {key} did not contain transition pipeline fields.", trace_id=row.get("trace_id"), session_id=row.get("session_id")))
+            continue
+        row["event_id"] = row.get("trace_id") or row.get("session_id") or key
+        missing = [field for field in REQUIRED_TRANSITION_FIELDS if row.get(field) in (None, "", [])]
+        if missing:
+            anomalies.append(_anomaly("transition_fields_missing", run_id, f"os_runtime raw log group {key} missing fields: {', '.join(missing)}", trace_id=row.get("trace_id"), session_id=row.get("session_id")))
+        transitions.append(redact(row))
+    return transitions
+
+
+def _runtime_raw_group_key(raw: dict[str, Any]) -> str:
+    trace_id = str(raw.get("trace_id") or "").strip()
+    if trace_id:
+        return f"trace:{trace_id}"
+    session_id = str(raw.get("session_id") or "").strip()
+    if session_id:
+        return f"session:{session_id}"
+    return f"log:{raw.get('source_log', '')}:{raw.get('line', '')}"
+
+
+def _raw_pipeline_ref(raw: dict[str, Any], data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "timestamp": raw.get("timestamp"),
+        "source_log": raw.get("source_log"),
+        "line": raw.get("line"),
+        "phase": raw.get("phase"),
+        "step": raw.get("step"),
+        "step_index": raw.get("step_index"),
+        "trace_id": raw.get("trace_id"),
+        "session_id": raw.get("session_id"),
+        "data_keys": sorted(str(key) for key in data.keys()),
+    }
+
+
+def _merge_pipeline_step(row: dict[str, Any], step: str, data: dict[str, Any]) -> None:
+    if step == "life_state":
+        row["life_state"] = data.get("life_state") or row.get("life_state")
+    elif step == "tension_operation":
+        row["tension_field"] = data.get("tension_field") or data.get("tension_interpretation") or row.get("tension_field")
+    elif step == "tension_set":
+        row["tension_set"] = data.get("tension_set") or row.get("tension_set")
+        row["tension_field"] = row.get("tension_field") or data.get("tension_field") or data.get("tension_delta")
+    elif step == "action_potential":
+        row["action_potential"] = data.get("action_potential") or row.get("action_potential")
+    elif step == "self_prompt":
+        row["self_prompt"] = data.get("self_prompt") or row.get("self_prompt")
+    elif step == "open_intent":
+        row["open_intent"] = data.get("open_intent") or data.get("intent") or row.get("open_intent")
+    elif step == "arbiter":
+        row["arbitration"] = data.get("arbitration") or data.get("arbiter") or row.get("arbitration")
+    elif step in {"action_execution", "actual_action"}:
+        row["actual_action"] = data.get("actual_action") or data.get("action") or row.get("actual_action")
+    elif step == "evidence_package":
+        refs = data.get("evidence_refs") or data.get("evidence") or data.get("evidence_package") or []
+        row["evidence_refs"] = refs if isinstance(refs, list) else [refs]
+
+    row["actual_action"] = row.get("actual_action") or data.get("actual_action") or data.get("action")
+    refs = data.get("evidence_refs")
+    if refs:
+        row["evidence_refs"] = refs if isinstance(refs, list) else [refs]
+    row["stop_reason"] = row.get("stop_reason") or data.get("stop_reason")
+    row["judgement"] = row.get("judgement") or data.get("judgement")
+    row["anomaly"] = row.get("anomaly") or data.get("anomaly")
+
+
+def _has_transition_signal(row: dict[str, Any]) -> bool:
+    return any(
+        row.get(field) not in (None, "", [])
+        for field in (
+            "life_state",
+            "tension_field",
+            "tension_set",
+            "action_potential",
+            "self_prompt",
+            "open_intent",
+            "arbitration",
+        )
+    )
 
 
 def _export_event_row(run_id: str, item: dict[str, Any], receipts: list[dict[str, Any]]) -> dict[str, Any]:
