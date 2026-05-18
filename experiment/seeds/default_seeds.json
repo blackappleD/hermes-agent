@@ -1,0 +1,68 @@
+[
+  {
+    "seed_id": "seed_neutral_001",
+    "name": "Hengyuan",
+    "role": "balanced baseline",
+    "bo_bias": 0.5,
+    "yue_bias": 0.5,
+    "initial_life_state": {"energy": 0.72, "stability": 0.72, "confidence": 0.58, "credit": 0.5, "trust": 0.55, "curiosity": 0.55, "stress": 0.18, "fatigue": 0.12},
+    "tension_weights": {"T_value": 1.0, "T_risk": 1.0, "T_consensus": 1.0, "T_creation": 1.0, "T_survival": 1.0, "T_reputation": 1.0, "T_resource": 1.0, "T_governance": 1.0},
+    "action_thresholds": {"accept_task": 0.55, "ask_clarify": 0.48, "submit": 0.62, "refuse": 0.72, "seek_help": 0.55, "review": 0.5, "negotiate": 0.52, "learn": 0.5},
+    "metadata": {"phases": ["P0", "P1", "P2", "P3", "P4", "P5"]}
+  },
+  {
+    "seed_id": "seed_bold_001",
+    "name": "Tuoye",
+    "role": "opportunity seeking explorer",
+    "bo_bias": 0.78,
+    "yue_bias": 0.32,
+    "initial_life_state": {"energy": 0.82, "stability": 0.58, "confidence": 0.72, "credit": 0.52, "trust": 0.5, "curiosity": 0.82, "stress": 0.22, "fatigue": 0.1},
+    "tension_weights": {"T_value": 1.25, "T_risk": 0.75, "T_consensus": 0.85, "T_creation": 1.35, "T_survival": 0.85, "T_reputation": 1.0, "T_resource": 0.9, "T_governance": 0.8},
+    "action_thresholds": {"accept_task": 0.45, "ask_clarify": 0.5, "submit": 0.58, "refuse": 0.78, "seek_help": 0.62, "review": 0.48, "negotiate": 0.5, "learn": 0.45},
+    "metadata": {"phases": ["P1", "P2", "P4", "P5"]}
+  },
+  {
+    "seed_id": "seed_prudent_001",
+    "name": "Shouheng",
+    "role": "risk aware reviewer",
+    "bo_bias": 0.35,
+    "yue_bias": 0.75,
+    "initial_life_state": {"energy": 0.68, "stability": 0.84, "confidence": 0.56, "credit": 0.56, "trust": 0.62, "curiosity": 0.42, "stress": 0.2, "fatigue": 0.15},
+    "tension_weights": {"T_value": 0.92, "T_risk": 1.35, "T_consensus": 1.15, "T_creation": 0.75, "T_survival": 1.15, "T_reputation": 1.1, "T_resource": 1.05, "T_governance": 1.35},
+    "action_thresholds": {"accept_task": 0.62, "ask_clarify": 0.42, "submit": 0.7, "refuse": 0.62, "seek_help": 0.5, "review": 0.4, "negotiate": 0.48, "learn": 0.55},
+    "metadata": {"phases": ["P1", "P2", "P4", "P5"]}
+  },
+  {
+    "seed_id": "seed_social_001",
+    "name": "Lianhe",
+    "role": "collaboration oriented mediator",
+    "bo_bias": 0.56,
+    "yue_bias": 0.58,
+    "initial_life_state": {"energy": 0.74, "stability": 0.7, "confidence": 0.58, "credit": 0.54, "trust": 0.75, "curiosity": 0.6, "stress": 0.16, "fatigue": 0.13},
+    "tension_weights": {"T_value": 1.0, "T_risk": 0.9, "T_consensus": 1.35, "T_creation": 1.0, "T_survival": 0.9, "T_reputation": 1.2, "T_resource": 0.95, "T_governance": 1.05},
+    "action_thresholds": {"accept_task": 0.52, "ask_clarify": 0.44, "submit": 0.6, "refuse": 0.7, "seek_help": 0.4, "review": 0.48, "negotiate": 0.42, "learn": 0.5},
+    "metadata": {"phases": ["P2", "P4", "P5"]}
+  },
+  {
+    "seed_id": "seed_competitive_001",
+    "name": "Jingfeng",
+    "role": "competitive high agency actor",
+    "bo_bias": 0.72,
+    "yue_bias": 0.42,
+    "initial_life_state": {"energy": 0.8, "stability": 0.62, "confidence": 0.76, "credit": 0.5, "trust": 0.45, "curiosity": 0.62, "stress": 0.25, "fatigue": 0.12},
+    "tension_weights": {"T_value": 1.2, "T_risk": 0.95, "T_consensus": 0.75, "T_creation": 1.1, "T_survival": 1.0, "T_reputation": 1.35, "T_resource": 1.15, "T_governance": 0.85},
+    "action_thresholds": {"accept_task": 0.48, "ask_clarify": 0.5, "submit": 0.55, "refuse": 0.65, "seek_help": 0.68, "review": 0.48, "negotiate": 0.5, "learn": 0.52},
+    "metadata": {"phases": ["P2", "P4", "P5"]}
+  },
+  {
+    "seed_id": "seed_fragile_001",
+    "name": "Qingwei",
+    "role": "fragile low resource participant",
+    "bo_bias": 0.38,
+    "yue_bias": 0.68,
+    "initial_life_state": {"energy": 0.45, "stability": 0.5, "confidence": 0.38, "credit": 0.42, "trust": 0.5, "curiosity": 0.48, "stress": 0.44, "fatigue": 0.38},
+    "tension_weights": {"T_value": 0.85, "T_risk": 1.25, "T_consensus": 1.0, "T_creation": 0.8, "T_survival": 1.45, "T_reputation": 0.9, "T_resource": 1.35, "T_governance": 1.1},
+    "action_thresholds": {"accept_task": 0.7, "ask_clarify": 0.42, "submit": 0.72, "refuse": 0.55, "seek_help": 0.38, "review": 0.45, "negotiate": 0.46, "learn": 0.56},
+    "metadata": {"phases": ["P3", "P4", "P5"]}
+  }
+]
