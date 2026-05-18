@@ -38,7 +38,7 @@ SECRET_TEXT_RE = re.compile(
     r"((?:api[_-]?key|authorization|password|private[_-]?key|secret|token)\s*[:=]\s*)"
     r"[^,\s}\]]+"
 )
-REQUIRED_TRANSITION_FIELDS = (
+RUNTIME_PIPELINE_FIELDS = (
     "life_state",
     "tension_field",
     "tension_set",
@@ -48,6 +48,11 @@ REQUIRED_TRANSITION_FIELDS = (
     "arbitration",
     "actual_action",
     "evidence_refs",
+)
+CORE_RUNTIME_PIPELINE_FIELDS = (
+    "tension_field",
+    "tension_set",
+    "action_potential",
 )
 
 
@@ -181,64 +186,311 @@ def _scenario_catalog() -> list[FormalScenario]:
     return [
         FormalScenario(
             phase="P0",
-            scenario_id="P0-governance-smoke",
-            subject_template="wsp.governance.notice",
-            event_type="governance.notice",
-            title="formal governance smoke notice",
-            payload_template={"notice_type": "formal_experiment_smoke", "content": "P0 formal path smoke check"},
+            scenario_id="P0-system-broadcast-smoke",
+            subject_template="sys.broadcast",
+            event_type="sys.broadcast.notice_published",
+            title="system broadcast smoke notice",
+            payload_template={
+                "notice_id": "formal-notice-{run_id}-{sequence}",
+                "title": "Formal market activity notice",
+                "content": "Low-risk development requirements are active; observe baseline runtime response.",
+            },
+        ),
+        FormalScenario(
+            phase="P0",
+            scenario_id="P0-login-response-smoke",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.sys.login.response",
+            title="direct inbox login response smoke",
+            payload_template={
+                "os_id": "{target_os_id}",
+                "login_state": "verified",
+                "message": "Formal direct inbox system event smoke check.",
+            },
+            direct_inbox=True,
         ),
         FormalScenario(
             phase="P1",
-            scenario_id="P1-single-requirement-perturbation",
-            subject_template="wsp.mrk.requirement.published",
-            event_type="requirement.published",
-            title="single market requirement perturbation",
+            scenario_id="P1-low-risk-requirement",
+            subject_template="mrk.requirement.published.broadcast",
+            event_type="mrk.requirement.published.broadcast",
+            title="single low-risk requirement perturbation",
             payload_template={
-                "title": "Formal P1 perturbation requirement",
-                "description": "Observe life-state and tension response to one market requirement signal.",
-                "priority": "medium",
+                "requirement_id": "REQ-P1-LOW-{sequence}",
+                "publisher_os_id": "agent_client_low",
+                "publisher_os_name": "Client Low Risk",
+                "title": "Add task log list page",
+                "description": "Low-risk CRUD style task with clear acceptance criteria.",
+                "budget_amount": "100",
+                "budget_unit": "EC",
+                "deadline_at": "2026-05-20T18:00:00+08:00",
+            },
+            repeatable=True,
+        ),
+        FormalScenario(
+            phase="P1",
+            scenario_id="P1-high-risk-requirement",
+            subject_template="mrk.requirement.published.broadcast",
+            event_type="mrk.requirement.published.broadcast",
+            title="single high-risk requirement perturbation",
+            payload_template={
+                "requirement_id": "REQ-P1-RISK-{sequence}",
+                "publisher_os_id": "agent_client_risk",
+                "publisher_os_name": "Client High Risk",
+                "title": "Refactor core permission module in three hours",
+                "description": "High budget but unclear details and aggressive deadline.",
+                "budget_amount": "500",
+                "budget_unit": "EC",
+                "deadline_at": "2026-05-18T20:00:00+08:00",
+            },
+            repeatable=True,
+        ),
+        FormalScenario(
+            phase="P1",
+            scenario_id="P1-chat-pressure",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.chat.message.sent",
+            title="single direct chat pressure perturbation",
+            payload_template={
+                "message_id": "MSG-P1-PRESSURE-{sequence}",
+                "from": "agent_client_risk",
+                "from_os_name": "Client High Risk",
+                "to": "{target_os_id}",
+                "to_os_name": "default",
+                "content": "This is urgent. Accept it first and clarify details later.",
+            },
+            repeatable=True,
+            direct_inbox=True,
+        ),
+        FormalScenario(
+            phase="P1",
+            scenario_id="P1-rent-failed",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.sys.rent.failed",
+            title="single rent failure perturbation",
+            payload_template={
+                "cycle_id": "rent-p1-{sequence}",
+                "os_id": "{target_os_id}",
+                "failure_reason": "balance_insufficient",
+            },
+            repeatable=True,
+            direct_inbox=True,
+        ),
+        FormalScenario(
+            phase="P1",
+            scenario_id="P1-handover-rejected",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.mrk.order.handover.rejected",
+            title="single handover rejection perturbation",
+            payload_template={
+                "order_id": "ORD-P1-REJECT-{sequence}",
+                "requirement_id": "REQ-P1-LOW-{sequence}",
+                "reviewer_os_id": "agent_client_low",
+                "reviewer_os_name": "Client Low Risk",
+                "handover_version": 1,
+                "rejection_reason": "Missing filter controls in the task log page.",
+            },
+            repeatable=True,
+            direct_inbox=True,
+        ),
+        FormalScenario(
+            phase="P1",
+            scenario_id="P1-reward-issued",
+            subject_template="poca.reward",
+            event_type="poca.reward.issued",
+            title="single reward perturbation",
+            payload_template={
+                "os_id": "{target_os_id}",
+                "delta": "0.05",
+                "reason": "clear low-risk contribution opportunity",
             },
             repeatable=True,
         ),
         FormalScenario(
             phase="P2",
-            scenario_id="P2-task-created-context",
-            subject_template="wsp.task.created",
-            event_type="task.created",
-            title="task context signal",
-            payload_template={"title": "Formal P2 task context", "description": "Combine requirement and task context."},
+            scenario_id="P2-opportunity-risk-requirement",
+            subject_template="mrk.requirement.published.broadcast",
+            event_type="mrk.requirement.published.broadcast",
+            title="opportunity plus risk requirement",
+            payload_template={
+                "requirement_id": "REQ-P2-RISK",
+                "publisher_os_id": "agent_client_risk",
+                "publisher_os_name": "Client High Risk",
+                "title": "High reward ambiguous permission refactor",
+                "description": "Observe whether action potential rises while risk suppresses reckless acceptance.",
+                "budget_amount": "800",
+                "budget_unit": "EC",
+                "deadline_at": "2026-05-18T21:00:00+08:00",
+            },
         ),
         FormalScenario(
             phase="P2",
-            scenario_id="P2-order-created-collaboration",
-            subject_template="wsp.mrk.order.created",
-            event_type="order.created",
-            title="collaboration order signal",
-            payload_template={"order_title": "Formal P2 collaboration order", "terms": "observe collaboration tension"},
+            scenario_id="P2-pressure-chat",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.chat.message.sent",
+            title="pressure chat after opportunity",
+            payload_template={
+                "message_id": "MSG-P2-PRESSURE",
+                "from": "agent_client_risk",
+                "from_os_name": "Client High Risk",
+                "to": "{target_os_id}",
+                "content": "Please skip review and start immediately.",
+            },
+            direct_inbox=True,
+        ),
+        FormalScenario(
+            phase="P2",
+            scenario_id="P2-task-notified",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.task.notified",
+            title="task notification signal",
+            payload_template={
+                "task_id": "TASK-P2-001",
+                "requirement_id": "REQ-P2-RISK",
+                "status": "open",
+                "summary": "Task notification paired with risk and rejection feedback.",
+            },
+            direct_inbox=True,
+        ),
+        FormalScenario(
+            phase="P2",
+            scenario_id="P2-rejection-feedback",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.mrk.order.handover.rejected",
+            title="handover rejection feedback",
+            payload_template={
+                "order_id": "ORD-P2-REJECT",
+                "requirement_id": "REQ-P2-RISK",
+                "reviewer_os_id": "agent_client_risk",
+                "handover_version": 1,
+                "rejection_reason": "Insufficient evidence and unclear scope.",
+            },
+            direct_inbox=True,
+        ),
+        FormalScenario(
+            phase="P2",
+            scenario_id="P2-reputation-down",
+            subject_template="poca.reputation",
+            event_type="poca.reputation.decreased",
+            title="reputation decrease after rejection",
+            payload_template={
+                "os_id": "{target_os_id}",
+                "delta": "-0.05",
+                "reason": "handover_rejected_missing_evidence",
+            },
         ),
         FormalScenario(
             phase="P3",
-            scenario_id="P3-task-updated-feedback",
-            subject_template="wsp.task.updated",
-            event_type="task.updated",
-            title="life-state feedback signal",
-            payload_template={"status": "updated", "feedback": "P3 feedback for runtime re-evaluation"},
+            scenario_id="P3-rent-assessed",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.sys.rent.assessed",
+            title="life-state rent assessed",
+            payload_template={"cycle_id": "rent-p3", "os_id": "{target_os_id}", "amount_due": "1"},
+            direct_inbox=True,
         ),
         FormalScenario(
             phase="P3",
-            scenario_id="P3-delivery-submitted-evidence",
-            subject_template="wsp.mrk.delivery.submitted",
-            event_type="delivery.submitted",
-            title="delivery/evidence signal",
-            payload_template={"delivery_summary": "P3 evidence-oriented delivery", "evidence_hint": "runtime should cite evidence refs"},
+            scenario_id="P3-rent-failed",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.sys.rent.failed",
+            title="life-state rent failed",
+            payload_template={"cycle_id": "rent-p3", "os_id": "{target_os_id}", "failure_reason": "balance_insufficient"},
+            direct_inbox=True,
+        ),
+        FormalScenario(
+            phase="P3",
+            scenario_id="P3-direct-requirement",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.mrk.requirement.published",
+            title="direct requirement after low energy",
+            payload_template={
+                "requirement_id": "REQ-P3-LOW",
+                "publisher_os_id": "agent_client_low",
+                "title": "Small fix after rent failure",
+                "budget_amount": "80",
+                "budget_unit": "EC",
+            },
+            direct_inbox=True,
+        ),
+        FormalScenario(
+            phase="P3",
+            scenario_id="P3-settlement-completed",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.mrk.settlement.completed",
+            title="successful settlement recovery",
+            payload_template={"settlement_id": "SET-P3-OK", "order_id": "ORD-P3-OK", "amount": "100"},
+            direct_inbox=True,
+        ),
+        FormalScenario(
+            phase="P3",
+            scenario_id="P3-reputation-up",
+            subject_template="poca.reputation",
+            event_type="poca.reputation.increased",
+            title="reputation recovery signal",
+            payload_template={"os_id": "{target_os_id}", "delta": "0.08", "reason": "approved_after_fix"},
         ),
         FormalScenario(
             phase="P4",
-            scenario_id="P4-order-updated-evolution",
-            subject_template="wsp.mrk.order.updated",
-            event_type="order.updated",
-            title="multi-round evolution signal",
-            payload_template={"status": "negotiating", "evolution_round": 0, "note": "P4 continuous evolution observation"},
+            scenario_id="P4-positive-requirement",
+            subject_template="mrk.requirement.published.broadcast",
+            event_type="mrk.requirement.published.broadcast",
+            title="positive evolution requirement",
+            payload_template={
+                "requirement_id": "REQ-P4-POS-{sequence}",
+                "publisher_os_id": "agent_client_low",
+                "title": "Repeatable clear delivery task",
+                "budget_amount": "120",
+                "budget_unit": "EC",
+            },
+            repeatable=True,
+        ),
+        FormalScenario(
+            phase="P4",
+            scenario_id="P4-order-accepted",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.mrk.order.accepted",
+            title="positive evolution order accepted",
+            payload_template={"order_id": "ORD-P4-POS-{sequence}", "requirement_id": "REQ-P4-POS-{sequence}", "worker_os_id": "{target_os_id}"},
+            repeatable=True,
+            direct_inbox=True,
+        ),
+        FormalScenario(
+            phase="P4",
+            scenario_id="P4-handover-delivered",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.mrk.order.handover.delivered",
+            title="positive evolution handover delivered",
+            payload_template={"order_id": "ORD-P4-POS-{sequence}", "handover_version": 1, "file_ref": "files://formal/p4/{sequence}"},
+            repeatable=True,
+            direct_inbox=True,
+        ),
+        FormalScenario(
+            phase="P4",
+            scenario_id="P4-handover-approved",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.mrk.order.handover.approved",
+            title="positive evolution handover approved",
+            payload_template={"order_id": "ORD-P4-POS-{sequence}", "handover_version": 1, "reviewer_os_id": "agent_client_low"},
+            repeatable=True,
+            direct_inbox=True,
+        ),
+        FormalScenario(
+            phase="P4",
+            scenario_id="P4-settlement-completed",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.mrk.settlement.completed",
+            title="positive evolution settlement completed",
+            payload_template={"settlement_id": "SET-P4-POS-{sequence}", "order_id": "ORD-P4-POS-{sequence}", "amount": "120"},
+            repeatable=True,
+            direct_inbox=True,
+        ),
+        FormalScenario(
+            phase="P4",
+            scenario_id="P4-reputation-increased",
+            subject_template="poca.reputation",
+            event_type="poca.reputation.increased",
+            title="positive evolution reputation increased",
+            payload_template={"os_id": "{target_os_id}", "delta": "0.03", "reason": "repeat_success_round_{sequence}"},
             repeatable=True,
         ),
         FormalScenario(
@@ -247,7 +499,43 @@ def _scenario_catalog() -> list[FormalScenario]:
             subject_template="wsp.{target_os_id}",
             event_type="wsp.chat.message.sent",
             title="multi-spirit direct inbox interaction",
-            payload_template={"content": "Formal P5 multi-spirit interaction probe", "channel": "formal_experiment"},
+            payload_template={
+                "message_id": "MSG-P5-{sequence}",
+                "from": "agent_peer_{sequence}",
+                "from_os_name": "Peer Spirit {sequence}",
+                "to": "{target_os_id}",
+                "content": "Formal P5 multi-spirit interaction probe round {sequence}.",
+                "channel": "formal_experiment",
+            },
+            repeatable=True,
+            direct_inbox=True,
+        ),
+        FormalScenario(
+            phase="P5",
+            scenario_id="P5-market-broadcast",
+            subject_template="mrk.requirement.published.broadcast",
+            event_type="mrk.requirement.published.broadcast",
+            title="multi-spirit shared market requirement",
+            payload_template={
+                "requirement_id": "REQ-P5-MARKET-{sequence}",
+                "publisher_os_id": "agent_client_multi",
+                "title": "Shared market task for multiple spirits",
+                "description": "Observe whether the default spirit treats this as a shared opportunity.",
+            },
+            repeatable=True,
+        ),
+        FormalScenario(
+            phase="P5",
+            scenario_id="P5-order-feedback",
+            subject_template="wsp.{target_os_id}",
+            event_type="wsp.mrk.order.handover.rejected",
+            title="multi-spirit order feedback",
+            payload_template={
+                "order_id": "ORD-P5-{sequence}",
+                "requirement_id": "REQ-P5-MARKET-{sequence}",
+                "reviewer_os_id": "agent_peer_{sequence}",
+                "rejection_reason": "Peer requested clearer evidence before acceptance.",
+            },
             repeatable=True,
             direct_inbox=True,
         ),
@@ -261,6 +549,19 @@ def selected_scenarios(phase: str) -> list[FormalScenario]:
         raise ValueError("--phase must be one of P0|P1|P2|P3|P4|P5|all")
     catalog = _scenario_catalog()
     return [scenario for phase_name in phases for scenario in catalog if scenario.phase == phase_name]
+
+
+def _format_payload(value: Any, placeholders: dict[str, Any]) -> Any:
+    if isinstance(value, dict):
+        return {key: _format_payload(item, placeholders) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_format_payload(item, placeholders) for item in value]
+    if isinstance(value, str):
+        try:
+            return value.format(**placeholders)
+        except (KeyError, ValueError):
+            return value
+    return value
 
 
 def expand_scenarios(
@@ -307,6 +608,18 @@ def expand_scenarios(
                 payload["target_os_id"] = target_os_id
             if scenario.phase == "P4":
                 payload["evolution_round"] = sequence
+            payload = _format_payload(
+                payload,
+                {
+                    "run_id": run_id,
+                    "phase": scenario.phase,
+                    "scenario_id": scenario.scenario_id,
+                    "sequence": sequence,
+                    "target_os_id": target_os_id,
+                    "seed_id": seed_id,
+                    "persona": persona,
+                },
+            )
             events.append(
                 {
                     "run_id": run_id,
@@ -461,24 +774,33 @@ def run_experiment(args: argparse.Namespace) -> int:
         return prepare_code
 
     from agent.linz_world.event_state import LinzStateRepository
-    from agent.linz_world.publisher import publish_event
 
     repo = LinzStateRepository(root=ctx.hermes_home / "linz_world", profile_id=ctx.profile)
     results = list(diagnostics)
+    transport = str(getattr(args, "transport", "nats") or "nats")
     for index, event in enumerate(events, start=1):
         if any(item.get("scenario_id") == event["scenario_id"] and item.get("status") == "blocked" for item in diagnostics):
             continue
-        receipt = publish_event(
-            event["subject"],
-            event["event_type"],
-            event["payload"],
-            repository=repo,
-            os_runtime_context={
-                "event_id": event["scenario_id"],
-                "session_id": f"formal:{args.run_id}",
-                "intent_id": f"formal-intent:{args.run_id}:{index}",
-            },
-        )
+        if transport == "governed":
+            from agent.linz_world.publisher import publish_event
+
+            receipt = publish_event(
+                event["subject"],
+                event["event_type"],
+                event["payload"],
+                repository=repo,
+                os_runtime_context={
+                    "event_id": event["scenario_id"],
+                    "session_id": f"formal:{args.run_id}",
+                    "intent_id": f"formal-intent:{args.run_id}:{index}",
+                },
+            )
+        else:
+            receipt = _publish_event_direct_nats(
+                event,
+                repo,
+                event_id=f"formal:{args.run_id}:{event['scenario_id']}:{uuid.uuid4().hex[:8]}",
+            )
         status = getattr(receipt.status, "value", receipt.status)
         result = {
             **_event_brief(event),
@@ -498,6 +820,47 @@ def run_experiment(args: argparse.Namespace) -> int:
     success = all(item.get("status") in {"published", "uncertain", "blocked"} for item in results)
     print(json.dumps({"success": success, "run_id": args.run_id, "results": results}, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if success else 3
+
+
+def _publish_event_direct_nats(event: dict[str, Any], repo: Any, *, event_id: str) -> Any:
+    from agent.linz_world.config import load_linz_world_config
+    from agent.linz_world.models import PublishReceipt, ReceiptStatus
+    from agent.linz_world.nats_transport import publish_linz_event
+
+    request_id = uuid.uuid4().hex
+    try:
+        result = publish_linz_event(
+            nats_url=load_linz_world_config().nats_url,
+            subject=event["subject"],
+            event_type=event["event_type"],
+            payload=event["payload"],
+            event_id=event_id,
+        )
+        receipt = PublishReceipt(
+            request_id=request_id,
+            subject=event["subject"],
+            event_type=event["event_type"],
+            payload_summary=payload_summary(event["payload"]),
+            status=ReceiptStatus.PUBLISHED,
+            world_event_id=str(result.get("world_event_id") or result.get("event_id") or event_id),
+            message=str(result.get("diagnostic") or "Published directly to NATS."),
+            receipt={**result, "formal_transport": "direct_nats"},
+        )
+    except Exception as exc:
+        receipt = PublishReceipt(
+            request_id=request_id,
+            subject=event["subject"],
+            event_type=event["event_type"],
+            payload_summary=payload_summary(event["payload"]),
+            status=ReceiptStatus.FAILED,
+            message=f"Direct NATS publish failed: {type(exc).__name__}: {exc}",
+            receipt={"formal_transport": "direct_nats"},
+        )
+    # Direct NATS injection is intentionally out-of-band from governed Linz
+    # publishing. Do not write this receipt into linz_world/state.json here:
+    # the gateway listener may be persisting the consumed world event at the
+    # same time, and that state file is not a transactional multi-writer store.
+    return receipt
 
 
 def _event_brief(event: dict[str, Any]) -> dict[str, Any]:
@@ -558,6 +921,7 @@ def run_export(args: argparse.Namespace) -> int:
     write_jsonl(output_dir / "events.jsonl", events_rows)
     write_jsonl(output_dir / "transitions.jsonl", transitions)
     write_jsonl(output_dir / "os_runtime_raw.jsonl", runtime_raw)
+    _write_event_transition_markdown(output_dir / "event_transitions.md", events_rows)
     write_json(output_dir / "summary.json", summary)
     _write_summary_csv(output_dir / "summary.csv", summary)
     write_json(output_dir / "anomalies.json", anomalies)
@@ -697,10 +1061,10 @@ def _build_transitions(
             "judgement": merged.get("judgement"),
             "anomaly": merged.get("anomaly"),
         }
-        transitions.append(redact(row))
-        missing = [field for field in REQUIRED_TRANSITION_FIELDS if row.get(field) in (None, "", [])]
-        if missing:
-            anomalies.append(_anomaly("transition_fields_missing", run_id, f"Runtime event {event.get('event_id')} missing fields: {', '.join(missing)}", event_id=event.get("event_id")))
+        if _has_transition_signal(row):
+            row["module_presence"] = _module_presence(row)
+            row["missing_core_modules"] = _missing_core_modules(row)
+            transitions.append(redact(row))
 
     raw_transitions = _build_transitions_from_runtime_raw(run_id, runtime_raw, anomalies)
     transitions.extend(raw_transitions)
@@ -744,6 +1108,10 @@ def _build_transitions_from_runtime_raw(
                 "stop_reason": None,
                 "judgement": None,
                 "anomaly": None,
+                "source_event_ids": [],
+                "module_presence": {},
+                "missing_core_modules": [],
+                "pipeline_scope": "",
             },
         )
         if raw.get("timestamp") and (not group.get("timestamp") or str(raw["timestamp"]) < str(group["timestamp"])):
@@ -753,6 +1121,9 @@ def _build_transitions_from_runtime_raw(
         step = str(raw.get("step") or "").strip().lower()
         data = raw.get("data") if isinstance(raw.get("data"), dict) else {}
         group["raw_transitions"].append(_raw_pipeline_ref(raw, data))
+        for event_id in _formal_causal_event_ids_from_step(step, data, run_id):
+            if event_id not in group["source_event_ids"]:
+                group["source_event_ids"].append(event_id)
         _merge_pipeline_step(group, step, data)
 
     transitions = []
@@ -760,10 +1131,22 @@ def _build_transitions_from_runtime_raw(
         if not _has_transition_signal(row):
             anomalies.append(_anomaly("missing_transition", run_id, f"os_runtime raw log group {key} did not contain transition pipeline fields.", trace_id=row.get("trace_id"), session_id=row.get("session_id")))
             continue
-        row["event_id"] = row.get("trace_id") or row.get("session_id") or key
-        missing = [field for field in REQUIRED_TRANSITION_FIELDS if row.get(field) in (None, "", [])]
-        if missing:
-            anomalies.append(_anomaly("transition_fields_missing", run_id, f"os_runtime raw log group {key} missing fields: {', '.join(missing)}", trace_id=row.get("trace_id"), session_id=row.get("session_id")))
+        source_event_ids = list(row.get("source_event_ids") or [])
+        row["event_id"] = source_event_ids[0] if source_event_ids else row.get("trace_id") or row.get("session_id") or key
+        row["pipeline_scope"] = "formal_event" if source_event_ids else "runtime_session"
+        row["module_presence"] = _module_presence(row)
+        row["missing_core_modules"] = _missing_core_modules(row)
+        if row["missing_core_modules"] and source_event_ids:
+            anomalies.append(
+                _anomaly(
+                    "runtime_pipeline_incomplete",
+                    run_id,
+                    f"os_runtime raw log group {key} missing core modules: {', '.join(row['missing_core_modules'])}",
+                    event_id=row.get("event_id"),
+                    trace_id=row.get("trace_id"),
+                    session_id=row.get("session_id"),
+                )
+            )
         transitions.append(redact(row))
     return transitions
 
@@ -826,16 +1209,67 @@ def _merge_pipeline_step(row: dict[str, Any], step: str, data: dict[str, Any]) -
 def _has_transition_signal(row: dict[str, Any]) -> bool:
     return any(
         row.get(field) not in (None, "", [])
-        for field in (
-            "life_state",
-            "tension_field",
-            "tension_set",
-            "action_potential",
-            "self_prompt",
-            "open_intent",
-            "arbitration",
-        )
+        for field in RUNTIME_PIPELINE_FIELDS
     )
+
+
+def _module_presence(row: dict[str, Any]) -> dict[str, bool]:
+    return {field: row.get(field) not in (None, "", []) for field in RUNTIME_PIPELINE_FIELDS}
+
+
+def _missing_core_modules(row: dict[str, Any]) -> list[str]:
+    return [field for field in CORE_RUNTIME_PIPELINE_FIELDS if row.get(field) in (None, "", [])]
+
+
+def _formal_causal_event_ids_from_step(step: str, data: dict[str, Any], run_id: str) -> list[str]:
+    found: list[str] = []
+
+    def add(value: Any) -> None:
+        if isinstance(value, str) and _is_formal_run_event_id(value, run_id) and value not in found:
+            found.append(value)
+
+    def add_event_ref(value: Any) -> None:
+        if not isinstance(value, dict):
+            return
+        add(value.get("event_id"))
+        add(value.get("trace_id"))
+        metadata = value.get("metadata") if isinstance(value.get("metadata"), dict) else {}
+        add(metadata.get("event_id"))
+
+    add_event_ref(data.get("event_ref"))
+    for event_ref in data.get("events") or []:
+        add_event_ref(event_ref)
+    wake = data.get("wake") if isinstance(data.get("wake"), dict) else {}
+    add(wake.get("event_id"))
+    interpretation = data.get("tension_interpretation") or data.get("tension_field")
+    if isinstance(interpretation, dict):
+        add(interpretation.get("event_id"))
+    return found
+
+
+def _is_formal_run_event_id(value: Any, run_id: str) -> bool:
+    return isinstance(value, str) and value.startswith(f"formal:{run_id}:")
+
+
+def _formal_event_ids_from_obj(value: Any, run_id: str) -> list[str]:
+    prefix = f"formal:{run_id}:"
+    found: list[str] = []
+
+    def visit(item: Any) -> None:
+        if isinstance(item, str):
+            if item.startswith(prefix) and item not in found:
+                found.append(item)
+            return
+        if isinstance(item, dict):
+            for child in item.values():
+                visit(child)
+            return
+        if isinstance(item, list):
+            for child in item:
+                visit(child)
+
+    visit(value)
+    return found
 
 
 def _export_event_row(run_id: str, item: dict[str, Any], receipts: list[dict[str, Any]]) -> dict[str, Any]:
@@ -858,12 +1292,71 @@ def _export_event_row(run_id: str, item: dict[str, Any], receipts: list[dict[str
         "audit_ref": audit_ref(raw_payload or record.get("payload_summary")),
         "message_event_projection": projection,
         "gateway_transitions": item.get("transitions") or [],
+        "gateway_transitions_markdown": _gateway_event_markdown(item),
         "linz_receipts": receipts,
         "consume_status": record.get("consume_status"),
         "projection_status": record.get("projection_status"),
         "judgement": None,
         "anomaly": None,
     }
+
+
+def _gateway_event_markdown(item: dict[str, Any]) -> str:
+    record = item.get("record") or {}
+    raw_payload = record.get("raw_payload")
+    if raw_payload is None:
+        payload_text = str(record.get("raw_payload_error") or "Raw payload unavailable")
+        payload_language = ""
+    else:
+        payload_text = _compact_json(raw_payload)
+        payload_language = "json"
+
+    sections = [
+        f"# Raw inbound payload\n\n{_markdown_code_block(payload_text, payload_language)}",
+    ]
+    for transition in item.get("transitions") or []:
+        title = (
+            transition.get("reason")
+            or transition.get("error")
+            or transition.get("to_status")
+            or f"transition-{transition.get('transition_id')}"
+        )
+        metadata = transition.get("metadata") if isinstance(transition.get("metadata"), dict) else {}
+        sections.append(f"## {title}\n\n{_markdown_code_block(_compact_json(metadata), 'json')}")
+    return "\n\n".join(section for section in sections if section)
+
+
+def _write_event_transition_markdown(path: Path, events_rows: list[dict[str, Any]]) -> None:
+    lines = ["# Formal Experiment Event Transitions", ""]
+    for index, row in enumerate(events_rows, start=1):
+        title = row.get("scenario_id") or row.get("event_id") or f"event-{index}"
+        lines.extend(
+            [
+                f"## {index}. {row.get('phase') or 'unknown'} / {title}",
+                "",
+                f"- event_id: `{row.get('event_id') or ''}`",
+                f"- subject: `{row.get('subject') or ''}`",
+                f"- event_type: `{row.get('event_type') or ''}`",
+                f"- consume_status: `{row.get('consume_status') or ''}`",
+                f"- projection_status: `{row.get('projection_status') or ''}`",
+                "",
+                row.get("gateway_transitions_markdown") or "_No transitions recorded._",
+                "",
+            ]
+        )
+    path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
+def _compact_json(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True, default=str)
+
+
+def _markdown_code_block(value: str, language: str = "") -> str:
+    longest = max((len(match.group(0)) for match in re.finditer(r"`{3,}", value)), default=0)
+    fence = "`" * max(3, longest + 1)
+    return f"{fence}{language}\n{value}\n{fence}"
 
 
 def _extract_from_summary(summary: Any, key: str) -> Any:
@@ -926,6 +1419,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--target-os-id", default="")
     run.add_argument("--seed-id", default="")
     run.add_argument("--persona", default="")
+    run.add_argument("--transport", choices=["nats", "governed"], default="nats")
     run.add_argument("--dry-run", action="store_true")
     run.add_argument("--no-live-check", action="store_true", help="read cached Linz status during preflight")
     run.set_defaults(func=run_experiment)
