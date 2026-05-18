@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
+import threading
+import uuid
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -30,6 +33,9 @@ class LinzStateError(RuntimeError):
     pass
 
 
+_STATE_IO_LOCK = threading.RLock()
+
+
 class LinzStateRepository:
     def __init__(self, root: Path | None = None, profile_id: str | None = None):
         self.root = root or (get_hermes_home() / "linz_world")
@@ -51,24 +57,37 @@ class LinzStateRepository:
         }
 
     def load(self) -> dict[str, Any]:
-        if not self.path.exists():
-            return self._empty()
-        try:
-            with self.path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, json.JSONDecodeError) as exc:
-            raise LinzStateError(f"Could not read Linz World state: {exc}") from exc
-        base = self._empty()
-        if isinstance(data, dict):
-            base.update(data)
-        return base
+        with _STATE_IO_LOCK:
+            if not self.path.exists():
+                return self._empty()
+            try:
+                with self.path.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except (OSError, json.JSONDecodeError) as exc:
+                raise LinzStateError(f"Could not read Linz World state: {exc}") from exc
+            base = self._empty()
+            if isinstance(data, dict):
+                base.update(data)
+            return base
 
     def save(self, data: dict[str, Any]) -> None:
-        self.root.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".json.tmp")
-        with tmp.open("w", encoding="utf-8") as f:
-            json.dump(to_plain(data), f, ensure_ascii=False, indent=2, sort_keys=True)
-        tmp.replace(self.path)
+        with _STATE_IO_LOCK:
+            self.root.mkdir(parents=True, exist_ok=True)
+            tmp = self.path.with_name(
+                f"{self.path.name}.{os.getpid()}.{threading.get_ident()}.{uuid.uuid4().hex}.tmp"
+            )
+            try:
+                with tmp.open("w", encoding="utf-8") as f:
+                    json.dump(to_plain(data), f, ensure_ascii=False, indent=2, sort_keys=True)
+                    f.write("\n")
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(tmp, self.path)
+            finally:
+                try:
+                    tmp.unlink()
+                except FileNotFoundError:
+                    pass
 
     def get_identity(self) -> WorldIdentity | None:
         raw = self.load().get("identity") or {}
@@ -77,10 +96,11 @@ class LinzStateRepository:
         return _identity_from_dict(raw)
 
     def save_identity(self, identity: WorldIdentity) -> WorldIdentity:
-        identity.updated_at = utc_now_iso()
-        data = self.load()
-        data["identity"] = to_plain(identity)
-        self.save(data)
+        with _STATE_IO_LOCK:
+            identity.updated_at = utc_now_iso()
+            data = self.load()
+            data["identity"] = to_plain(identity)
+            self.save(data)
         return identity
 
     def save_failed_identity(self, error: str, next_action: str) -> WorldIdentity:
@@ -108,10 +128,11 @@ class LinzStateRepository:
         )
 
     def save_login(self, session: LoginSession) -> LoginSession:
-        session.updated_at = utc_now_iso()
-        data = self.load()
-        data["login"] = to_plain(session)
-        self.save(data)
+        with _STATE_IO_LOCK:
+            session.updated_at = utc_now_iso()
+            data = self.load()
+            data["login"] = to_plain(session)
+            self.save(data)
         return session
 
     def get_auth_map(self) -> AuthorizationMap:
@@ -129,81 +150,86 @@ class LinzStateRepository:
         )
 
     def save_auth_map(self, auth_map: AuthorizationMap) -> AuthorizationMap:
-        data = self.load()
-        data["authorization"] = to_plain(auth_map)
-        self.save(data)
+        with _STATE_IO_LOCK:
+            data = self.load()
+            data["authorization"] = to_plain(auth_map)
+            self.save(data)
         return auth_map
 
     def persist_world_event(self, raw_event: dict[str, Any]) -> tuple[EventDispatchRecord, bool]:
         event = normalize_world_event(raw_event)
-        data = self.load()
-        events = data.setdefault("events", {})
-        sequence_index = data.setdefault("sequence_index", {})
-        if event.event_id in events:
-            return _record_from_dict(events[event.event_id]), False
-        if event.sequence_key and event.sequence_key in sequence_index:
-            existing = sequence_index[event.sequence_key]
-            return _record_from_dict(events[existing]), False
-        record = EventDispatchRecord(
-            event_id=event.event_id,
-            subject=event.subject,
-            event_type=event.event_type,
-            payload_summary=event.payload_summary,
-            audit_ref=event.audit_ref,
-            os_id=event.os_id,
-            soul_id=event.soul_id,
-            nats_sequence=event.nats_sequence,
-            sequence_key=event.sequence_key,
-            source=event.source,
-            occurred_at=event.occurred_at,
-            last_delivery_at=utc_now_iso(),
-        )
-        events[event.event_id] = to_plain(record)
-        if event.sequence_key:
-            sequence_index[event.sequence_key] = event.event_id
-        self.save(data)
-        return record, True
+        with _STATE_IO_LOCK:
+            data = self.load()
+            events = data.setdefault("events", {})
+            sequence_index = data.setdefault("sequence_index", {})
+            if event.event_id in events:
+                return _record_from_dict(events[event.event_id]), False
+            if event.sequence_key and event.sequence_key in sequence_index:
+                existing = sequence_index[event.sequence_key]
+                return _record_from_dict(events[existing]), False
+            record = EventDispatchRecord(
+                event_id=event.event_id,
+                subject=event.subject,
+                event_type=event.event_type,
+                payload_summary=event.payload_summary,
+                audit_ref=event.audit_ref,
+                os_id=event.os_id,
+                soul_id=event.soul_id,
+                nats_sequence=event.nats_sequence,
+                sequence_key=event.sequence_key,
+                source=event.source,
+                occurred_at=event.occurred_at,
+                last_delivery_at=utc_now_iso(),
+            )
+            events[event.event_id] = to_plain(record)
+            if event.sequence_key:
+                sequence_index[event.sequence_key] = event.event_id
+            self.save(data)
+            return record, True
 
     def mark_processing(self, event_id: str) -> EventDispatchRecord:
-        data = self.load()
-        events = data.setdefault("events", {})
-        if event_id not in events:
-            raise LinzStateError(f"Unknown Linz World event: {event_id}")
-        record = _record_from_dict(events[event_id])
-        record.dispatch_status = DispatchStatus.PROCESSING
-        record.last_delivery_at = utc_now_iso()
-        events[event_id] = to_plain(record)
-        self.save(data)
-        return record
+        with _STATE_IO_LOCK:
+            data = self.load()
+            events = data.setdefault("events", {})
+            if event_id not in events:
+                raise LinzStateError(f"Unknown Linz World event: {event_id}")
+            record = _record_from_dict(events[event_id])
+            record.dispatch_status = DispatchStatus.PROCESSING
+            record.last_delivery_at = utc_now_iso()
+            events[event_id] = to_plain(record)
+            self.save(data)
+            return record
 
     def mark_processing_failure(self, event_id: str, error: str, retry_limit: int = 3) -> EventDispatchRecord:
-        data = self.load()
-        events = data.setdefault("events", {})
-        if event_id not in events:
-            raise LinzStateError(f"Unknown Linz World event: {event_id}")
-        record = _record_from_dict(events[event_id])
-        record.attempt_count += 1
-        record.last_error = error
-        record.last_delivery_at = utc_now_iso()
-        if record.attempt_count >= retry_limit:
-            record.dispatch_status = DispatchStatus.FAILED
-            record.requires_manual_handling = True
-        else:
-            record.dispatch_status = DispatchStatus.QUEUED
-        events[event_id] = to_plain(record)
-        self.save(data)
-        return record
+        with _STATE_IO_LOCK:
+            data = self.load()
+            events = data.setdefault("events", {})
+            if event_id not in events:
+                raise LinzStateError(f"Unknown Linz World event: {event_id}")
+            record = _record_from_dict(events[event_id])
+            record.attempt_count += 1
+            record.last_error = error
+            record.last_delivery_at = utc_now_iso()
+            if record.attempt_count >= retry_limit:
+                record.dispatch_status = DispatchStatus.FAILED
+                record.requires_manual_handling = True
+            else:
+                record.dispatch_status = DispatchStatus.QUEUED
+            events[event_id] = to_plain(record)
+            self.save(data)
+            return record
 
     def mark_handled(self, event_id: str) -> EventDispatchRecord:
-        data = self.load()
-        events = data.setdefault("events", {})
-        record = _record_from_dict(events[event_id])
-        record.dispatch_status = DispatchStatus.HANDLED
-        record.last_error = ""
-        record.last_delivery_at = utc_now_iso()
-        events[event_id] = to_plain(record)
-        self.save(data)
-        return record
+        with _STATE_IO_LOCK:
+            data = self.load()
+            events = data.setdefault("events", {})
+            record = _record_from_dict(events[event_id])
+            record.dispatch_status = DispatchStatus.HANDLED
+            record.last_error = ""
+            record.last_delivery_at = utc_now_iso()
+            events[event_id] = to_plain(record)
+            self.save(data)
+            return record
 
     def recent_events(self, limit: int = 20, status: str | None = None) -> list[EventDispatchRecord]:
         events = self.load().get("events") or {}
@@ -214,9 +240,10 @@ class LinzStateRepository:
         return records[: max(1, min(int(limit), 100))]
 
     def append_list(self, key: str, value: Any) -> None:
-        data = self.load()
-        data.setdefault(key, []).append(to_plain(value))
-        self.save(data)
+        with _STATE_IO_LOCK:
+            data = self.load()
+            data.setdefault(key, []).append(to_plain(value))
+            self.save(data)
 
     def relationships(self) -> list[dict[str, Any]]:
         return list(self.load().get("relationships") or [])

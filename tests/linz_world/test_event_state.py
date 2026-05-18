@@ -1,3 +1,6 @@
+import json
+from concurrent.futures import ThreadPoolExecutor
+
 from agent.linz_world.event_state import LinzStateRepository
 
 
@@ -44,3 +47,20 @@ def test_retry_stops_after_third_failure(linz_home):
     assert failed.attempt_count == 3
     assert failed.requires_manual_handling is True
     assert "secret" not in failed.payload_summary
+
+
+def test_parallel_state_updates_do_not_corrupt_json(linz_home):
+    root = linz_home / "linz_world"
+    repo = LinzStateRepository(root=root, profile_id="test-profile")
+
+    def append_compute(index):
+        LinzStateRepository(root=root, profile_id="test-profile").append_list("compute", {"index": index})
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(append_compute, range(40)))
+
+    with (root / "state.json").open("r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    assert len(data["compute"]) == 40
+    assert not list(root.glob("state.json.*.tmp"))
