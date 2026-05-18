@@ -1,10 +1,9 @@
 {
-  "ai": "codex",
-  "ai_skills": true,
+  "ai": "generic",
   "branch_numbering": "sequential",
+  "context_file": "AGENTS.md",
   "here": true,
-  "integration": "codex",
-  "preset": null,
-  "script": "ps",
-  "speckit_version": "0.5.0"
+  "integration": "generic",
+  "script": "sh",
+  "speckit_version": "0.8.12.dev0"
 }
