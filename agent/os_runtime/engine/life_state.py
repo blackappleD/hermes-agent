@@ -158,13 +158,20 @@ class LifeStateSystem:
             evidence.append("life_state:generated_intent_count")
 
         for field in NUMERIC_FIELDS:
-            setattr(current, field, _clamp(getattr(current, field)))
+            setattr(current, field, _round_numeric(getattr(current, field)))
         current.life_cycle = _life_cycle(current, self.max_generated_intents)
         current.recovery_cycle = _recovery_cycle(current)
         current.metadata = {
             **current.metadata,
             "rule_version": self.rule_version,
-            "action_inhibition": _clamp((current.fatigue + current.restraint + current.boredom) / 3.0),
+            "action_inhibition": _clamp(
+                (
+                    _bounded_metric(current, "fatigue")
+                    + _bounded_metric(current, "restraint")
+                    + _bounded_metric(current, "boredom")
+                )
+                / 3.0
+            ),
         }
 
         changes = _changes(previous, current)
@@ -298,6 +305,14 @@ def _add(state: LifeState, field: str, delta: float) -> None:
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return max(low, min(high, round(float(value), 6)))
+
+
+def _round_numeric(value: float) -> float:
+    return round(float(value), 6)
+
+
+def _bounded_metric(state: LifeState, field: str) -> float:
+    return _clamp(getattr(state, field))
 
 
 def _life_cycle(state: LifeState, max_generated_intents: int) -> str:
