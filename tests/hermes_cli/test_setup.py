@@ -280,6 +280,21 @@ def test_setup_gateway_starts_other_profiles_after_service_start(monkeypatch):
     assert started == {"service": 1, "profiles": 1}
 
 
+def test_plugin_platform_status_uses_is_connected_without_check_fn_fallback():
+    import hermes_cli.gateway as gateway_mod
+    from gateway.platform_registry import PlatformEntry
+
+    entry = PlatformEntry(
+        name="example",
+        label="Example",
+        adapter_factory=lambda cfg: None,
+        check_fn=lambda: True,
+        is_connected=lambda cfg: False,
+    )
+
+    assert gateway_mod._platform_status({"key": "example", "_registry_entry": entry}) == "not configured"
+
+
 def test_setup_syncs_custom_provider_removal_from_disk(tmp_path, monkeypatch):
     """Removing the last custom provider in model setup should persist."""
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))

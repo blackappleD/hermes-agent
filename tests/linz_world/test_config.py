@@ -8,13 +8,29 @@ from agent.linz_world.config import (
 )
 
 
-def test_defaults_do_not_enable_automatic_behaviors():
+def test_defaults_enable_linz_bubble_flow_controls():
     cfg = load_linz_world_config({"linz_world": {}})
     assert cfg.enabled is True
     assert cfg.identity_required_on_agent_load is True
     assert cfg.service_url == DEFAULT_LINZ_WORLD_SERVICE_URL
     assert cfg.nats_url == DEFAULT_LINZ_WORLD_NATS_URL
-    assert validate_no_automatic_behaviors(cfg) == []
+    assert cfg.bubble.enabled is True
+    assert cfg.bubble.read_only is False
+    assert cfg.bubble.allow_mutations is True
+    assert cfg.bubble.allow_autonomous_create_demand is True
+    assert cfg.bubble.allow_autonomous_accept_demand is True
+    assert cfg.bubble.allow_autonomous_create_task is True
+    assert cfg.bubble.allow_autonomous_mount is True
+    assert cfg.bubble.allow_autonomous_submit_artifact is True
+    assert cfg.bubble.allow_autonomous_review is True
+    assert validate_no_automatic_behaviors(cfg) == [
+        "bubble.allow_autonomous_create_demand",
+        "bubble.allow_autonomous_accept_demand",
+        "bubble.allow_autonomous_create_task",
+        "bubble.allow_autonomous_mount",
+        "bubble.allow_autonomous_submit_artifact",
+        "bubble.allow_autonomous_review",
+    ]
 
 
 def test_linz_config_uses_single_service_url_and_login_token_compute():
@@ -54,3 +70,25 @@ def test_persona_seed_and_registration_metadata_config():
     assert cfg.persona_seed == "careful collaborator"
     assert cfg.os_type == "SEV"
     assert cfg.runtime_type == "Codex"
+
+
+def test_bubble_config_is_nested_and_bounded():
+    cfg = load_linz_world_config(
+        {
+            "linz_world": {
+                "bubble": {
+                    "read_only": False,
+                    "allow_mutations": True,
+                    "snapshot_context_max_events": 999,
+                    "snapshot_context_max_residues": 0,
+                    "default_task_slot_id": "slot.task.agent",
+                }
+            }
+        }
+    )
+
+    assert cfg.bubble.read_only is False
+    assert cfg.bubble.allow_mutations is True
+    assert cfg.bubble.snapshot_context_max_events == 200
+    assert cfg.bubble.snapshot_context_max_residues == 1
+    assert cfg.bubble.default_task_slot_id == "slot.task.agent"

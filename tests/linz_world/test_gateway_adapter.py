@@ -184,6 +184,30 @@ async def test_linz_world_adapter_connect_without_subscribe_subjects_fails(monke
     assert "no authorized NATS subscribe subjects" in login.listener_last_error
 
 
+@pytest.mark.asyncio
+async def test_linz_world_adapter_reports_authorization_refresh_failure(monkeypatch, linz_home):
+    monkeypatch.setattr(
+        "agent.linz_world.gateway_adapter.auth.refresh_authorization_map",
+        lambda repo: AuthorizationMap(
+            state=AuthState.FAILED,
+            last_error="Linz World service unavailable: timed out",
+        ),
+    )
+    monkeypatch.setattr(
+        "agent.linz_world.gateway_adapter.load_linz_world_config",
+        lambda: LinzWorldConfig(nats_url="nats://127.0.0.1:4222"),
+    )
+
+    adapter = LinzWorldPlatformAdapter(PlatformConfig(enabled=True))
+    assert await adapter.connect() is False
+
+    login = adapter._repository.get_login()
+    assert login.online is False
+    assert "timed out" in login.listener_last_error
+    assert adapter.has_fatal_error is True
+    assert adapter.fatal_error_code == "linz_world_authorization_refresh_failed"
+
+
 def test_world_event_projection_uses_redacted_summary(linz_home):
     repo = LinzStateRepository(root=linz_home / "linz_world", profile_id="test-profile")
     record, _ = repo.persist_world_event(

@@ -358,6 +358,23 @@ class TestGatewayRuntimeStatus:
         assert payload["platforms"]["discord"]["error_code"] is None
         assert payload["platforms"]["discord"]["error_message"] is None
 
+    def test_write_runtime_status_can_clear_stale_platforms_on_startup(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+
+        status.write_runtime_status(
+            gateway_state="startup_failed",
+            platform="linz_world",
+            platform_state="retrying",
+            error_code="linz_world_listener_not_authorized",
+            error_message="stale",
+        )
+
+        status.write_runtime_status(gateway_state="starting", clear_platforms=True)
+
+        payload = status.read_runtime_status()
+        assert payload["gateway_state"] == "starting"
+        assert payload["platforms"] == {}
+
 
 class TestTerminatePid:
     def test_force_uses_taskkill_on_windows(self, monkeypatch):

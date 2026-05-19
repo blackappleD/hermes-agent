@@ -352,6 +352,17 @@ class TestGeneratedSystemdUnits:
         assert "/mnt/c/WINDOWS/system32" in unit
         assert "/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/" in unit
 
+    def test_user_unit_captures_proxy_environment(self, monkeypatch):
+        for name in gateway_cli._PROXY_ENV_VARS:
+            monkeypatch.delenv(name, raising=False)
+        monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:10807")
+        monkeypatch.setenv("NO_PROXY", "localhost,127.0.0.1")
+
+        unit = gateway_cli.generate_systemd_unit(system=False)
+
+        assert 'Environment="HTTP_PROXY=http://127.0.0.1:10807"' in unit
+        assert 'Environment="NO_PROXY=localhost,127.0.0.1"' in unit
+
     def test_user_unit_omits_windows_interop_paths_outside_wsl(self, monkeypatch):
         monkeypatch.setattr(gateway_cli, "is_wsl", lambda: False)
         monkeypatch.setenv("PATH", "/usr/local/bin:/mnt/c/WINDOWS/system32")
