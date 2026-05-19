@@ -230,7 +230,10 @@ class TensionFieldEngine:
                 relation = _relation(source, target)
                 if not relation:
                     continue
-                weight = _clamp(((source.activation + target.activation) / 2.0) * (1.0 - life.restraint * 0.25))
+                weight = _clamp(
+                    ((source.activation + target.activation) / 2.0)
+                    * (1.0 - _life_metric(life, "restraint") * 0.25)
+                )
                 delta.propagation_edges.append(
                     _edge(
                         source.tension_id,
@@ -261,8 +264,16 @@ def _remove(tension_set: TensionSet, tension_id: str) -> None:
 
 
 def _activation(intensity: float, life: LifeState) -> float:
-    readiness = (life.energy + life.wakefulness + life.health) / 3.0
-    inhibition = (life.fatigue * 0.25) + (life.restraint * 0.35) + (life.boredom * 0.10)
+    readiness = (
+        _life_metric(life, "energy")
+        + _life_metric(life, "wakefulness")
+        + _life_metric(life, "health")
+    ) / 3.0
+    inhibition = (
+        _life_metric(life, "fatigue") * 0.25
+        + _life_metric(life, "restraint") * 0.35
+        + _life_metric(life, "boredom") * 0.10
+    )
     return _clamp(intensity * (0.65 + readiness * 0.35) * (1.0 - inhibition))
 
 
@@ -271,7 +282,12 @@ def _confidence(operation: TensionOperation, base: float) -> float:
 
 
 def _influence_weight(operation: TensionOperation, life: LifeState) -> float:
-    return _clamp(abs(operation.intensity_delta) + 0.20 + life.wakefulness * 0.10 - life.restraint * 0.05)
+    return _clamp(
+        abs(operation.intensity_delta)
+        + 0.20
+        + _life_metric(life, "wakefulness") * 0.10
+        - _life_metric(life, "restraint") * 0.05
+    )
 
 
 def _relation(source: Tension, target: Tension) -> str:
@@ -315,6 +331,10 @@ def _dedupe_edges(edges: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return max(low, min(high, round(float(value), 6)))
+
+
+def _life_metric(life: LifeState, field: str) -> float:
+    return _clamp(getattr(life, field, 0.0))
 
 
 def _dedupe(values: list[str]) -> list[str]:

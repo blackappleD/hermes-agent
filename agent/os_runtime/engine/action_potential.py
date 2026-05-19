@@ -169,8 +169,9 @@ class ActionPotentialEvaluator:
             if tension.tension_type == TensionType.SOCIAL_SIGNAL:
                 score += tension.intensity * 0.30 + tension.activation * 0.08
                 evidence.extend(_tension_evidence(tension))
-        if life.social_hunger:
-            score += min(0.12, life.social_hunger * 0.12)
+        social_hunger = _life_metric(life, "social_hunger")
+        if social_hunger:
+            score += min(0.12, social_hunger * 0.12)
             evidence.append("life_state:social_hunger")
         if signals.task_context and signals.task_context.user_goal and _has_relationship_signal(items):
             score += 0.10
@@ -195,11 +196,13 @@ class ActionPotentialEvaluator:
             if tension.tension_type in {TensionType.UNCERTAINTY, TensionType.MEMORY_RESONANCE, TensionType.CREATIVE_PRESSURE}:
                 score += tension.intensity * 0.28 + tension.activation * 0.08
                 evidence.extend(_tension_evidence(tension))
-        if life.curiosity:
-            score += min(0.16, life.curiosity * 0.18)
+        curiosity = _life_metric(life, "curiosity")
+        if curiosity:
+            score += min(0.16, curiosity * 0.18)
             evidence.append("life_state:curiosity")
-        if life.creative_pressure:
-            score += min(0.12, life.creative_pressure * 0.14)
+        creative_pressure = _life_metric(life, "creative_pressure")
+        if creative_pressure:
+            score += min(0.12, creative_pressure * 0.14)
             evidence.append("life_state:creative_pressure")
         if candidate.get("uncertainty") or candidate.get("new_task_type"):
             score += 0.16
@@ -230,11 +233,13 @@ class ActionPotentialEvaluator:
                 weight = 0.25 if current_allowed_chat and tension.tension_type == TensionType.CONSTRAINT else 1.0
                 score += (tension.intensity * 0.32 + tension.activation * 0.08) * weight
                 evidence.extend(_tension_evidence(tension))
-        score += max(0.0, life.restraint - 0.25) * 0.22
-        score += life.fatigue * 0.18
-        if life.restraint >= 0.25:
+        restraint = _life_metric(life, "restraint")
+        fatigue = _life_metric(life, "fatigue")
+        score += max(0.0, restraint - 0.25) * 0.22
+        score += fatigue * 0.18
+        if restraint >= 0.25:
             evidence.append("life_state:restraint")
-        if life.fatigue:
+        if fatigue:
             evidence.append("life_state:fatigue")
         risk_level = str(candidate.get("risk_level") or "").lower()
         if risk_level:
@@ -274,7 +279,11 @@ class ActionPotentialEvaluator:
         has_goal = bool(signals.task_context and (signals.task_context.active_goal or signals.task_context.user_goal))
         action_family = str(candidate.get("action_family") or candidate.get("family") or "").lower()
         is_tool = action_family == OpenActionFamily.USE_TOOL.value or bool(candidate.get("tools_needed") or candidate.get("tool_names"))
-        inhibited = life.fatigue >= 0.75 or life.restraint >= 0.82 or life.life_cycle == "cooldown"
+        inhibited = (
+            _life_metric(life, "fatigue") >= 0.75
+            or _life_metric(life, "restraint") >= 0.82
+            or life.life_cycle == "cooldown"
+        )
         simple_chat = _is_simple_chat(signal_items, has_goal=has_goal)
         direct_world_chat = _is_direct_world_chat(signal_items)
 
@@ -402,7 +411,20 @@ def _risk_weight(item: dict[str, Any]) -> float:
 
 
 def _readiness(life: LifeState) -> float:
-    return _clamp((life.energy + life.health + life.wakefulness) / 3.0 - life.fatigue * 0.25 - life.restraint * 0.15)
+    return _clamp(
+        (
+            _life_metric(life, "energy")
+            + _life_metric(life, "health")
+            + _life_metric(life, "wakefulness")
+        )
+        / 3.0
+        - _life_metric(life, "fatigue") * 0.25
+        - _life_metric(life, "restraint") * 0.15
+    )
+
+
+def _life_metric(life: LifeState, field: str) -> float:
+    return _clamp(getattr(life, field, 0.0))
 
 
 def _is_simple_chat(items: list[dict[str, Any]], *, has_goal: bool) -> bool:
@@ -449,12 +471,17 @@ def _simple_chat_action_ready(
         return False
     if not _logged_in_for_world_chat(signal_items):
         return False
-    if _readiness(life) < 0.55 or life.energy < 0.30 or life.health < 0.55 or life.wakefulness < 0.45:
+    if (
+        _readiness(life) < 0.55
+        or _life_metric(life, "energy") < 0.30
+        or _life_metric(life, "health") < 0.55
+        or _life_metric(life, "wakefulness") < 0.45
+    ):
         return False
     if _constraint_activation(active_tensions, signal_items) >= 0.55:
         return False
     social_activation = _social_activation(active_tensions)
-    social_pressure = max(mutual, social_activation, life.social_hunger)
+    social_pressure = max(mutual, social_activation, _life_metric(life, "social_hunger"))
     return social_pressure >= 0.18 and (overall >= thresholds["none_below"] or social_pressure >= 0.35)
 
 

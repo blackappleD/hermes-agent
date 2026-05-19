@@ -196,7 +196,7 @@ class CognitiveEconomyController:
         depth = _depth_value(action_potential)
         if score < float(self.config["auxiliary_small_score_at"]) or depth in {RecommendedDepth.NONE.value, RecommendedDepth.REPORT.value}:
             return CognitiveEconomyPath.RULE_PATH, "Low score or report-only depth does not justify model budget.", "minimal"
-        if risk >= 0.62 or life.restraint >= 0.80:
+        if risk >= 0.62 or _life_metric(life, "restraint") >= 0.80:
             return CognitiveEconomyPath.RULE_PATH, "Risk or restraint keeps the recommendation on a deterministic path.", "minimal"
         if score < float(self.config["main_model_score_at"]):
             return CognitiveEconomyPath.AUXILIARY_SMALL, "Low-risk lightweight work fits a small auxiliary path.", "small"
@@ -260,7 +260,7 @@ def _base_evidence(
         evidence.append("task_context:active_goal")
     for tension in _active_tensions(tensions):
         evidence.append(f"tension:{tension.tension_type.value}:{tension.tension_id}")
-    if life.fatigue:
+    if _life_metric(life, "fatigue"):
         evidence.append("life_state:fatigue")
     return _dedupe(evidence)
 
@@ -365,6 +365,10 @@ def _enum_value(value: Any) -> Any:
     if isinstance(value, Enum):
         return value.value
     return str(value)
+
+
+def _life_metric(life: LifeState, field: str) -> float:
+    return max(0.0, min(1.0, round(float(getattr(life, field, 0.0)), 6)))
 
 
 def _dedupe(values: list[str]) -> list[str]:

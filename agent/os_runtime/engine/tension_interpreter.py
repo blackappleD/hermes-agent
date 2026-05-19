@@ -54,7 +54,7 @@ class TensionInterpreter:
                 TensionOperationType.UPDATE if _has_tension(previous, tension_id) else TensionOperationType.GENERATE,
                 tension_id,
                 TensionType.UNSATISFIED_GOAL,
-                0.18 + life.creative_pressure * 0.10,
+                0.18 + _life_metric(life, "creative_pressure") * 0.10,
                 "Unfinished goal or world requirement remains unresolved.",
                 [event_id, *goal_evidence],
                 conflict="goal-vs-current-state",
@@ -80,13 +80,14 @@ class TensionInterpreter:
             evidence.extend(operation.evidence)
 
         risk_evidence = _risk_evidence_for(items)
-        if risk_evidence or life.restraint >= 0.65:
+        restraint = _life_metric(life, "restraint")
+        if risk_evidence or restraint >= 0.65:
             tension_id = _existing_id(previous, TensionType.CONSTRAINT) or "constraint:risk"
             operation = _operation(
                 TensionOperationType.UPDATE if _has_tension(previous, tension_id) else TensionOperationType.GENERATE,
                 tension_id,
                 TensionType.CONSTRAINT,
-                0.22 + min(0.12, life.restraint * 0.10),
+                0.22 + min(0.12, restraint * 0.10),
                 "Risk, authorization, approval, settlement, or rent constraint limits action.",
                 [event_id, *risk_evidence],
                 conflict="value-benefit-vs-risk-constraint",
@@ -101,7 +102,7 @@ class TensionInterpreter:
                 TensionOperationType.GENERATE,
                 "social:relationship",
                 TensionType.SOCIAL_SIGNAL,
-                0.11 + life.social_hunger * 0.05,
+                0.11 + _life_metric(life, "social_hunger") * 0.05,
                 "Chat or relationship signal creates social response tension.",
                 [event_id, *social_evidence],
                 conflict="social-connection-vs-focus",
@@ -306,6 +307,10 @@ def _matches(item: dict[str, Any], needles: tuple[str, ...]) -> bool:
     if isinstance(metadata, dict):
         haystack = f"{haystack} {' '.join(str(value) for value in metadata.values()).lower()}"
     return any(needle in haystack for needle in needles)
+
+
+def _life_metric(life: LifeState, field: str) -> float:
+    return max(0.0, min(1.0, round(float(getattr(life, field, 0.0)), 6)))
 
 
 def _is_allowed_authorization_signal(item: dict[str, Any]) -> bool:
