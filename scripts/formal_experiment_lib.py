@@ -721,7 +721,7 @@ def _filesystem_checks(home: Path) -> list[CheckResult]:
     return [
         _path_check("gateway_message_events_db", home / "gateway" / "message_events.db"),
         _path_check("state_db", home / "state.db"),
-        _path_check("linz_world_state", home / "linz_world" / "state.json"),
+        _path_check("linz_world_profile_state", home / "linz_world" / "state.json"),
         _path_check("os_runtime_logs", home / "logs" / "os_runtime_*.log", kind="glob"),
     ]
 
@@ -857,9 +857,9 @@ def _publish_event_direct_nats(event: dict[str, Any], repo: Any, *, event_id: st
             receipt={"formal_transport": "direct_nats"},
         )
     # Direct NATS injection is intentionally out-of-band from governed Linz
-    # publishing. Do not write this receipt into linz_world/state.json here:
+    # publishing. Do not write this receipt into the Linz runtime store here:
     # the gateway listener may be persisting the consumed world event at the
-    # same time, and that state file is not a transactional multi-writer store.
+    # same time, and direct injection is not a governed side effect.
     return receipt
 
 
@@ -903,7 +903,7 @@ def run_export(args: argparse.Namespace) -> int:
         "source_paths": {
             "gateway": str(ctx.hermes_home / "gateway" / "message_events.db"),
             "state_db": str(ctx.hermes_home / "state.db"),
-            "linz_state": str(ctx.hermes_home / "linz_world" / "state.json"),
+            "linz_profile_state": str(ctx.hermes_home / "linz_world" / "state.json"),
             "os_runtime_logs": str(ctx.hermes_home / "logs" / "os_runtime_*.log"),
         },
         "counts": status_counts,
@@ -942,7 +942,10 @@ def _read_gateway_events(home: Path, run_id: str, since: str | None, until: str 
         store = EventProjectionStore(root=home)
         try:
             records = store.list_records(limit=500, q=run_id, from_time=since, to_time=until)["records"]
-            return [store.get_record(row["record_id"]) or {"record": row, "projection": None, "transitions": []} for row in records]
+            return [
+                redact(store.get_record(row["record_id"]) or {"record": row, "projection": None, "transitions": []})
+                for row in records
+            ]
         finally:
             store.close()
     except Exception as exc:
@@ -1009,17 +1012,16 @@ def _read_os_runtime_logs(home: Path, run_id: str, since: str | None, until: str
 
 
 def _read_linz_receipts(home: Path, run_id: str, since: str | None, until: str | None, anomalies: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    path = home / "linz_world" / "state.json"
-    if not path.exists():
-        anomalies.append(_anomaly("linz_state_missing", run_id, f"Linz state not found: {path}"))
-        return []
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        anomalies.append(_anomaly("linz_state_read_failed", run_id, str(exc)))
+        from agent.linz_world.event_state import LinzStateRepository
+
+        repo = LinzStateRepository(root=home / "linz_world", profile_id=home.name or "default")
+        raw_receipts = repo.runtime_items("receipts")
+    except Exception as exc:
+        anomalies.append(_anomaly("linz_runtime_state_read_failed", run_id, str(exc)))
         return []
     receipts = []
-    for receipt in data.get("receipts") or []:
+    for receipt in raw_receipts:
         text = json.dumps(receipt, ensure_ascii=False, default=str)
         if run_id not in text:
             continue
@@ -1349,8 +1351,11 @@ def _write_event_transition_markdown(path: Path, events_rows: list[dict[str, Any
 
 def _compact_json(value: Any) -> str:
     if isinstance(value, str):
-        return value
-    return json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True, default=str)
+        parsed = _json_loads(value, None)
+        if parsed is None or isinstance(parsed, str):
+            return str(redact(value))
+        value = parsed
+    return json.dumps(redact(value), ensure_ascii=False, indent=2, sort_keys=True, default=str)
 
 
 def _markdown_code_block(value: str, language: str = "") -> str:
