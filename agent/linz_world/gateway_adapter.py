@@ -19,7 +19,7 @@ from . import auth
 from .config import load_linz_world_config
 from .event_bus import project_to_message_event
 from .event_state import LinzStateRepository
-from .models import EventDispatchRecord, ReceiptStatus, to_plain, utc_now_iso
+from .models import AuthState, EventDispatchRecord, ReceiptStatus, to_plain, utc_now_iso
 from .nats_transport import NatsEventListener
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,16 @@ class LinzWorldPlatformAdapter(BasePlatformAdapter):
             subjects = list(auth_map.allowed_subscribe_subjects)
             cfg = load_linz_world_config()
             self._loop = asyncio.get_running_loop()
+            if auth_map.state != AuthState.CURRENT:
+                message = auth_map.last_error or "Linz World authorization map is not current."
+                logger.warning(message)
+                self._mark_listener_offline(message, only_current_pid=False)
+                self._set_fatal_error(
+                    "linz_world_authorization_refresh_failed",
+                    message,
+                    retryable=True,
+                )
+                return False
             if not subjects:
                 message = (
                     "Linz World listener has no authorized NATS subscribe subjects; "
@@ -780,6 +790,13 @@ def _resolve_session_id(message: MessageEvent, *, session_store: Any = None) -> 
     return f"{platform}:{chat_id}:{user_id}".strip(":")
 
 
+def _setup_linz_world_from_gateway_menu() -> None:
+    from hermes_cli.config import load_config
+    from hermes_cli.setup import setup_linz_world
+
+    setup_linz_world(load_config())
+
+
 def register_platform() -> None:
     if platform_registry.is_registered("linz_world"):
         return
@@ -790,6 +807,7 @@ def register_platform() -> None:
             adapter_factory=lambda cfg: LinzWorldPlatformAdapter(cfg),
             check_fn=lambda: True,
             validate_config=lambda cfg: True,
+            setup_fn=_setup_linz_world_from_gateway_menu,
             source="builtin",
             emoji="🌐",
             platform_hint="Linz World events are external world signals. Respond using redacted summaries only.",

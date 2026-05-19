@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from . import auth
+from .config import load_linz_world_config
 from .event_state import LinzStateRepository
 from .models import LoginState, to_plain
 
@@ -16,6 +17,7 @@ def status_summary(repository: LinzStateRepository | None = None, service=None, 
         else repo.get_login()
     )
     auth_map = repo.get_auth_map()
+    cfg = load_linz_world_config()
     login_verified = login.state == LoginState.LOGGED_IN and bool(login.server_checked_at) and not login.last_error
     listener_last_error = login.listener_last_error
     if (
@@ -55,6 +57,13 @@ def status_summary(repository: LinzStateRepository | None = None, service=None, 
         "gateway_linz_platform_enabled": gateway_linz.get("enabled"),
         "gateway_linz_platform_state": gateway_linz.get("state", ""),
         "gateway_linz_platform_error": gateway_linz.get("error_message", ""),
+        "bubble_protocol": {
+            "enabled": cfg.bubble.enabled,
+            "read_only": cfg.bubble.read_only,
+            "allow_mutations": cfg.bubble.allow_mutations,
+            "require_approval_for_mutations": cfg.bubble.require_approval_for_mutations,
+            "default_task_slot_id": cfg.bubble.default_task_slot_id,
+        },
         "next_action": identity.next_action if identity else "Run hermes linz status to initialize identity.",
         "last_error": (login.last_error or identity.last_error) if identity else login.last_error,
     }
