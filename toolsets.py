@@ -71,6 +71,10 @@ _HERMES_CORE_TOOLS = [
     # Native Linz World identity and world access tools.
     "linz_status", "linz_map", "linz_events_recent", "linz_chat_send", "linz_publish",
     "linz_compute", "linz_memory_sink", "linz_relationship",
+    "linz_bubble_snapshot", "linz_bubble_create_demand", "linz_bubble_accept_demand",
+    "linz_bubble_create_task", "linz_bubble_request_mount", "linz_bubble_review_mount",
+    "linz_bubble_submit_artifact", "linz_bubble_review_task_acceptance",
+    "linz_bubble_submit_demand_delivery", "linz_bubble_review_demand_acceptance",
     # Computer use (macOS, gated on cua-driver being installed via check_fn)
     "computer_use",
 ]
@@ -251,10 +255,25 @@ TOOLSETS = {
     },
 
     "linz_world": {
-        "description": "Native Linz World identity, authorization, events, publish, compute, Soul Memory, and relationship tools",
+        "description": "Native Linz World identity, authorization, events, publish, compute, Soul Memory, relationship, and Bubble Protocol tools",
         "tools": [
             "linz_status", "linz_map", "linz_events_recent", "linz_chat_send", "linz_publish",
             "linz_compute", "linz_memory_sink", "linz_relationship",
+            "linz_bubble_snapshot", "linz_bubble_create_demand", "linz_bubble_accept_demand",
+            "linz_bubble_create_task", "linz_bubble_request_mount", "linz_bubble_review_mount",
+            "linz_bubble_submit_artifact", "linz_bubble_review_task_acceptance",
+            "linz_bubble_submit_demand_delivery", "linz_bubble_review_demand_acceptance",
+        ],
+        "includes": [],
+    },
+
+    "linz_bubble": {
+        "description": "Linz World Bubble Protocol tools. Snapshot is read-only; lifecycle mutations are disabled by default and require explicit confirmation.",
+        "tools": [
+            "linz_bubble_snapshot", "linz_bubble_create_demand", "linz_bubble_accept_demand",
+            "linz_bubble_create_task", "linz_bubble_request_mount", "linz_bubble_review_mount",
+            "linz_bubble_submit_artifact", "linz_bubble_review_task_acceptance",
+            "linz_bubble_submit_demand_delivery", "linz_bubble_review_demand_acceptance",
         ],
         "includes": [],
     },
