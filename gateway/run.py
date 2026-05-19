@@ -3324,7 +3324,11 @@ class GatewayRunner:
             pass
         try:
             from gateway.status import write_runtime_status
-            write_runtime_status(gateway_state="starting", exit_reason=None)
+            write_runtime_status(
+                gateway_state="starting",
+                exit_reason=None,
+                clear_platforms=True,
+            )
         except Exception:
             pass
         

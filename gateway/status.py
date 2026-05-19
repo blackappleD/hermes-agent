@@ -478,6 +478,7 @@ def write_runtime_status(
     exit_reason: Any = _UNSET,
     restart_requested: Any = _UNSET,
     active_agents: Any = _UNSET,
+    clear_platforms: Any = _UNSET,
     platform: Any = _UNSET,
     platform_state: Any = _UNSET,
     error_code: Any = _UNSET,
@@ -494,6 +495,8 @@ def write_runtime_status(
     payload["start_time"] = current_record["start_time"]
     payload["updated_at"] = _utc_now_iso()
 
+    if clear_platforms is not _UNSET and bool(clear_platforms):
+        payload["platforms"] = {}
     if gateway_state is not _UNSET:
         payload["gateway_state"] = gateway_state
     if exit_reason is not _UNSET:
