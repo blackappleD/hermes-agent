@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from types import SimpleNamespace
 
+from agent.linz_world.event_state import LinzStateRepository
 from agent.os_runtime.adapters.session_store import OSRuntimeEventRepository
 from gateway.event_projection_store import EventProjectionStore
 from scripts import formal_experiment_lib as formal
@@ -36,7 +37,9 @@ def _make_home(home):
     repo = OSRuntimeEventRepository(root=home)
     repo.close()
     (home / "linz_world").mkdir(parents=True, exist_ok=True)
-    (home / "linz_world" / "state.json").write_text('{"receipts":[]}', encoding="utf-8")
+    LinzStateRepository(root=home / "linz_world", profile_id="default").save(
+        {"identity": {"profile_id": "default"}}
+    )
     (home / "logs").mkdir(parents=True, exist_ok=True)
     (home / "logs" / "os_runtime_20260518.log").write_text("", encoding="utf-8")
 

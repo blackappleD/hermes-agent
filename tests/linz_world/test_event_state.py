@@ -49,7 +49,7 @@ def test_retry_stops_after_third_failure(linz_home):
     assert "secret" not in failed.payload_summary
 
 
-def test_parallel_state_updates_do_not_corrupt_json(linz_home):
+def test_parallel_runtime_updates_do_not_pollute_profile_json(linz_home):
     root = linz_home / "linz_world"
     repo = LinzStateRepository(root=root, profile_id="test-profile")
 
@@ -59,8 +59,43 @@ def test_parallel_state_updates_do_not_corrupt_json(linz_home):
     with ThreadPoolExecutor(max_workers=8) as executor:
         list(executor.map(append_compute, range(40)))
 
-    with (root / "state.json").open("r", encoding="utf-8") as f:
-        data = json.load(f)
+    assert len(repo.runtime_items("compute")) == 40
 
-    assert len(data["compute"]) == 40
+    if (root / "state.json").exists():
+        with (root / "state.json").open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        assert "compute" not in data
     assert not list(root.glob("state.json.*.tmp"))
+
+
+def test_legacy_dynamic_state_json_is_migrated_to_sqlite(linz_home):
+    root = linz_home / "linz_world"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "state.json").write_text(
+        json.dumps(
+            {
+                "identity": {"profile_id": "test-profile"},
+                "login": {"state": "logged_in", "token_ref": "token-ref"},
+                "authorization": {"state": "current", "allowed_subscribe_subjects": ["wsp.*"]},
+                "events": {
+                    "evt_1": {
+                        "event_id": "evt_1",
+                        "subject": "wsp.chat.message.sent",
+                        "event_type": "message.sent",
+                        "payload_summary": "hello",
+                    }
+                },
+                "receipts": [{"request_id": "req_1"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    repo = LinzStateRepository(root=root, profile_id="test-profile")
+    state = json.loads((root / "state.json").read_text(encoding="utf-8"))
+
+    assert state == {"identity": {"profile_id": "test-profile"}}
+    assert repo.get_login().token_ref == "token-ref"
+    assert repo.get_auth_map().allowed_subscribe_subjects == ["wsp.*"]
+    assert repo.recent_events()[0].event_id == "evt_1"
+    assert repo.runtime_items("receipts") == [{"request_id": "req_1"}]

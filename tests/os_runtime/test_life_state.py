@@ -135,3 +135,16 @@ def test_ambient_world_constraints_do_not_drain_simple_turn_energy():
     assert state.life_cycle == "active"
     assert "continuous failures increase fatigue and restraint" not in delta.reasons
     assert "risk, approval, authorization, or settlement constraints raise restraint" not in delta.reasons
+
+
+def test_life_state_keeps_actual_numeric_values_in_state():
+    previous = LifeState(energy=1.0, fatigue=0.0, wakefulness=1.0, restraint=0.2)
+    signal_set = _signal_set(_signal("simple_chat_message", group="relationships", level="low"))
+
+    state, delta = LifeStateSystem().update(signal_set, previous)
+
+    assert state.energy == 1.005
+    assert state.fatigue == -0.01
+    assert delta.changes["energy"] == {"before": 1.0, "after": 1.005, "delta": 0.005}
+    assert delta.changes["fatigue"] == {"before": 0.0, "after": -0.01, "delta": -0.01}
+    assert state.metadata["action_inhibition"] == 0.066667

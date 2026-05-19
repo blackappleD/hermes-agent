@@ -4,6 +4,7 @@ import argparse
 import json
 from types import SimpleNamespace
 
+from agent.linz_world.event_state import LinzStateRepository
 from agent.os_runtime.adapters.session_store import OSRuntimeEventRepository
 from agent.os_runtime.domain import EventSource
 from gateway.event_projection_store import EventProjectionStore
@@ -85,23 +86,17 @@ def _runtime_event(home, run_id="formal-export"):
 
 
 def _linz_state(home, run_id="formal-export"):
-    path = home / "linz_world" / "state.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(
-            {
-                "receipts": [
-                    {
-                        "request_id": "req-1",
-                        "status": "published",
-                        "world_event_id": "world-1",
-                        "payload_summary": json.dumps({"run_id": run_id}),
-                        "recorded_at": "2026-05-18T00:00:00Z",
-                    }
-                ]
-            }
-        ),
-        encoding="utf-8",
+    repo = LinzStateRepository(root=home / "linz_world", profile_id="default")
+    repo.save({"identity": {"profile_id": "default"}})
+    repo.append_list(
+        "receipts",
+        {
+            "request_id": "req-1",
+            "status": "published",
+            "world_event_id": "world-1",
+            "payload_summary": json.dumps({"run_id": run_id}),
+            "recorded_at": "2026-05-18T00:00:00Z",
+        },
     )
 
 
