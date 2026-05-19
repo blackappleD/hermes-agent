@@ -6,7 +6,7 @@ import json
 import os
 import threading
 import uuid
-from dataclasses import asdict
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +27,7 @@ from .models import (
     utc_now_iso,
 )
 from .redaction import audit_ref_for_payload, payload_summary
+from .runtime_store import LinzRuntimeStore
 
 
 class LinzStateError(RuntimeError):
@@ -34,6 +35,18 @@ class LinzStateError(RuntimeError):
 
 
 _STATE_IO_LOCK = threading.RLock()
+_PROFILE_STATE_KEYS = ("identity", "secrets")
+_LEGACY_DYNAMIC_KEYS = (
+    "login",
+    "authorization",
+    "events",
+    "sequence_index",
+    "receipts",
+    "compute",
+    "memory",
+    "relationships",
+)
+_RUNTIME_ITEM_KEYS = ("receipts", "compute", "memory", "relationships")
 
 
 class LinzStateRepository:
@@ -41,53 +54,26 @@ class LinzStateRepository:
         self.root = root or (get_hermes_home() / "linz_world")
         self.profile_id = profile_id or self.root.parent.name or "default"
         self.path = self.root / "state.json"
+        self._runtime_store = LinzRuntimeStore(self.root.parent)
+        self._migrate_legacy_dynamic_state()
 
     def _empty(self) -> dict[str, Any]:
         return {
             "identity": {},
-            "login": {},
-            "authorization": {},
             "secrets": {},
-            "events": {},
-            "sequence_index": {},
-            "receipts": [],
-            "compute": [],
-            "memory": [],
-            "relationships": [],
         }
 
     def load(self) -> dict[str, Any]:
         with _STATE_IO_LOCK:
-            if not self.path.exists():
-                return self._empty()
-            try:
-                with self.path.open("r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except (OSError, json.JSONDecodeError) as exc:
-                raise LinzStateError(f"Could not read Linz World state: {exc}") from exc
+            data = self._load_profile_file_unlocked()
             base = self._empty()
             if isinstance(data, dict):
-                base.update(data)
+                base.update({key: data.get(key) or base[key] for key in _PROFILE_STATE_KEYS})
             return base
 
     def save(self, data: dict[str, Any]) -> None:
         with _STATE_IO_LOCK:
-            self.root.mkdir(parents=True, exist_ok=True)
-            tmp = self.path.with_name(
-                f"{self.path.name}.{os.getpid()}.{threading.get_ident()}.{uuid.uuid4().hex}.tmp"
-            )
-            try:
-                with tmp.open("w", encoding="utf-8") as f:
-                    json.dump(to_plain(data), f, ensure_ascii=False, indent=2, sort_keys=True)
-                    f.write("\n")
-                    f.flush()
-                    os.fsync(f.fileno())
-                os.replace(tmp, self.path)
-            finally:
-                try:
-                    tmp.unlink()
-                except FileNotFoundError:
-                    pass
+            self._write_profile_file_unlocked(self._profile_state_only(data))
 
     def get_identity(self) -> WorldIdentity | None:
         raw = self.load().get("identity") or {}
@@ -111,7 +97,7 @@ class LinzStateRepository:
         return self.save_identity(identity)
 
     def get_login(self) -> LoginSession:
-        raw = self.load().get("login") or {}
+        raw = self._runtime_store.get_state("login")
         return LoginSession(
             state=LoginState(raw.get("state", LoginState.LOGGED_OUT.value)),
             token_ref=str(raw.get("token_ref") or ""),
@@ -128,15 +114,12 @@ class LinzStateRepository:
         )
 
     def save_login(self, session: LoginSession) -> LoginSession:
-        with _STATE_IO_LOCK:
-            session.updated_at = utc_now_iso()
-            data = self.load()
-            data["login"] = to_plain(session)
-            self.save(data)
+        session.updated_at = utc_now_iso()
+        self._runtime_store.set_state("login", session)
         return session
 
     def get_auth_map(self) -> AuthorizationMap:
-        raw = self.load().get("authorization") or {}
+        raw = self._runtime_store.get_state("authorization")
         return AuthorizationMap(
             state=AuthState(raw.get("state", AuthState.UNKNOWN.value)),
             map_version=str(raw.get("map_version") or ""),
@@ -150,103 +133,129 @@ class LinzStateRepository:
         )
 
     def save_auth_map(self, auth_map: AuthorizationMap) -> AuthorizationMap:
-        with _STATE_IO_LOCK:
-            data = self.load()
-            data["authorization"] = to_plain(auth_map)
-            self.save(data)
+        self._runtime_store.set_state("authorization", auth_map)
         return auth_map
 
     def persist_world_event(self, raw_event: dict[str, Any]) -> tuple[EventDispatchRecord, bool]:
         event = normalize_world_event(raw_event)
-        with _STATE_IO_LOCK:
-            data = self.load()
-            events = data.setdefault("events", {})
-            sequence_index = data.setdefault("sequence_index", {})
-            if event.event_id in events:
-                return _record_from_dict(events[event.event_id]), False
-            if event.sequence_key and event.sequence_key in sequence_index:
-                existing = sequence_index[event.sequence_key]
-                return _record_from_dict(events[existing]), False
-            record = EventDispatchRecord(
-                event_id=event.event_id,
-                subject=event.subject,
-                event_type=event.event_type,
-                payload_summary=event.payload_summary,
-                audit_ref=event.audit_ref,
-                os_id=event.os_id,
-                soul_id=event.soul_id,
-                nats_sequence=event.nats_sequence,
-                sequence_key=event.sequence_key,
-                source=event.source,
-                occurred_at=event.occurred_at,
-                last_delivery_at=utc_now_iso(),
-            )
-            events[event.event_id] = to_plain(record)
-            if event.sequence_key:
-                sequence_index[event.sequence_key] = event.event_id
-            self.save(data)
-            return record, True
+        record = EventDispatchRecord(
+            event_id=event.event_id,
+            subject=event.subject,
+            event_type=event.event_type,
+            payload_summary=event.payload_summary,
+            audit_ref=event.audit_ref,
+            os_id=event.os_id,
+            soul_id=event.soul_id,
+            nats_sequence=event.nats_sequence,
+            sequence_key=event.sequence_key,
+            source=event.source,
+            occurred_at=event.occurred_at,
+            last_delivery_at=utc_now_iso(),
+        )
+        return self._runtime_store.persist_event(record)
 
     def mark_processing(self, event_id: str) -> EventDispatchRecord:
-        with _STATE_IO_LOCK:
-            data = self.load()
-            events = data.setdefault("events", {})
-            if event_id not in events:
-                raise LinzStateError(f"Unknown Linz World event: {event_id}")
-            record = _record_from_dict(events[event_id])
-            record.dispatch_status = DispatchStatus.PROCESSING
-            record.last_delivery_at = utc_now_iso()
-            events[event_id] = to_plain(record)
-            self.save(data)
-            return record
+        record = self._runtime_store.mark_processing(event_id)
+        if record is None:
+            raise LinzStateError(f"Unknown Linz World event: {event_id}")
+        return record
 
     def mark_processing_failure(self, event_id: str, error: str, retry_limit: int = 3) -> EventDispatchRecord:
-        with _STATE_IO_LOCK:
-            data = self.load()
-            events = data.setdefault("events", {})
-            if event_id not in events:
-                raise LinzStateError(f"Unknown Linz World event: {event_id}")
-            record = _record_from_dict(events[event_id])
-            record.attempt_count += 1
-            record.last_error = error
-            record.last_delivery_at = utc_now_iso()
-            if record.attempt_count >= retry_limit:
-                record.dispatch_status = DispatchStatus.FAILED
-                record.requires_manual_handling = True
-            else:
-                record.dispatch_status = DispatchStatus.QUEUED
-            events[event_id] = to_plain(record)
-            self.save(data)
-            return record
+        record = self._runtime_store.mark_processing_failure(
+            event_id,
+            error,
+            retry_limit=retry_limit,
+        )
+        if record is None:
+            raise LinzStateError(f"Unknown Linz World event: {event_id}")
+        return record
 
     def mark_handled(self, event_id: str) -> EventDispatchRecord:
-        with _STATE_IO_LOCK:
-            data = self.load()
-            events = data.setdefault("events", {})
-            record = _record_from_dict(events[event_id])
-            record.dispatch_status = DispatchStatus.HANDLED
-            record.last_error = ""
-            record.last_delivery_at = utc_now_iso()
-            events[event_id] = to_plain(record)
-            self.save(data)
-            return record
+        record = self._runtime_store.mark_handled(event_id)
+        if record is None:
+            raise LinzStateError(f"Unknown Linz World event: {event_id}")
+        return record
 
     def recent_events(self, limit: int = 20, status: str | None = None) -> list[EventDispatchRecord]:
-        events = self.load().get("events") or {}
-        records = [_record_from_dict(raw) for raw in events.values()]
-        if status:
-            records = [r for r in records if r.dispatch_status.value == status]
-        records.sort(key=lambda r: r.last_delivery_at or r.occurred_at, reverse=True)
-        return records[: max(1, min(int(limit), 100))]
+        return self._runtime_store.recent_events(limit=limit, status=status)
 
     def append_list(self, key: str, value: Any) -> None:
-        with _STATE_IO_LOCK:
-            data = self.load()
-            data.setdefault(key, []).append(to_plain(value))
-            self.save(data)
+        self._runtime_store.append_item(key, value)
+
+    def runtime_items(self, key: str, limit: int | None = None) -> list[dict[str, Any]]:
+        return self._runtime_store.list_items(key, limit=limit)
 
     def relationships(self) -> list[dict[str, Any]]:
-        return list(self.load().get("relationships") or [])
+        return self.runtime_items("relationships")
+
+    def _load_profile_file_unlocked(self) -> dict[str, Any]:
+        if not self.path.exists():
+            return {}
+        try:
+            with self.path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError) as exc:
+            raise LinzStateError(f"Could not read Linz World state: {exc}") from exc
+        return data if isinstance(data, dict) else {}
+
+    def _write_profile_file_unlocked(self, data: dict[str, Any]) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_name(
+            f"{self.path.name}.{os.getpid()}.{threading.get_ident()}.{uuid.uuid4().hex}.tmp"
+        )
+        try:
+            with tmp.open("w", encoding="utf-8") as f:
+                json.dump(to_plain(data), f, ensure_ascii=False, indent=2, sort_keys=True)
+                f.write("\n")
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, self.path)
+        finally:
+            try:
+                tmp.unlink()
+            except FileNotFoundError:
+                pass
+
+    def _profile_state_only(self, data: dict[str, Any]) -> dict[str, Any]:
+        profile: dict[str, Any] = {}
+        if not isinstance(data, dict):
+            return profile
+        for key in _PROFILE_STATE_KEYS:
+            value = data.get(key)
+            if value not in (None, {}, []):
+                profile[key] = to_plain(value)
+        return profile
+
+    def _migrate_legacy_dynamic_state(self) -> None:
+        with _STATE_IO_LOCK:
+            data = self._load_profile_file_unlocked()
+            if not data or not any(key in data for key in _LEGACY_DYNAMIC_KEYS):
+                return
+            login = data.get("login")
+            if isinstance(login, dict) and login:
+                self._runtime_store.set_state("login", login)
+            authorization = data.get("authorization")
+            if isinstance(authorization, dict) and authorization:
+                self._runtime_store.set_state("authorization", authorization)
+
+            events = data.get("events")
+            if isinstance(events, dict):
+                for raw in events.values():
+                    if isinstance(raw, dict):
+                        self._runtime_store.upsert_legacy_event(_record_from_dict(raw))
+
+            for bucket in _RUNTIME_ITEM_KEYS:
+                values = data.get(bucket)
+                if not isinstance(values, list):
+                    continue
+                for index, value in enumerate(values):
+                    self._runtime_store.append_item(
+                        bucket,
+                        value,
+                        migration_key=_migration_key(bucket, index, value),
+                    )
+
+            self._write_profile_file_unlocked(self._profile_state_only(data))
 
 
 def normalize_world_event(raw_event: dict[str, Any]) -> WorldEvent:
@@ -337,3 +346,14 @@ def _record_from_dict(raw: dict[str, Any]) -> EventDispatchRecord:
         source=dict(raw.get("source") or {}),
         occurred_at=str(raw.get("occurred_at") or utc_now_iso()),
     )
+
+
+def _migration_key(bucket: str, index: int, value: Any) -> str:
+    material = json.dumps(
+        {"bucket": bucket, "index": index, "value": to_plain(value)},
+        ensure_ascii=False,
+        sort_keys=True,
+        default=str,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
