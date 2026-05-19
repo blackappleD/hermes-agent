@@ -2051,6 +2051,31 @@ def _build_wsl_interop_paths(path_entries: list[str]) -> list[str]:
     return result
 
 
+_PROXY_ENV_VARS = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+)
+
+
+def _escape_systemd_environment_value(value: str) -> str:
+    return str(value).replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%")
+
+
+def _captured_proxy_environment_lines() -> str:
+    lines = []
+    for name in _PROXY_ENV_VARS:
+        value = os.environ.get(name)
+        if value:
+            lines.append(f'Environment="{name}={_escape_systemd_environment_value(value)}"')
+    return "\n".join(lines)
+
+
 def _remap_path_for_user(path: str, target_home_dir: str) -> str:
     """Remap *path* from the current user's home to *target_home_dir*.
 
@@ -2127,6 +2152,8 @@ def generate_systemd_unit(system: bool = False, run_as_user: str | None = None) 
     # (#8202). 30s of headroom covers the worst case we've observed.
     _drain_timeout = int(_get_restart_drain_timeout() or 0)
     restart_timeout = max(60, _drain_timeout) + 30
+    proxy_environment = _captured_proxy_environment_lines()
+    proxy_environment_block = f"\n{proxy_environment}" if proxy_environment else ""
 
     if system:
         username, group_name, home_dir = _system_service_identity(run_as_user)
@@ -2163,6 +2190,7 @@ Environment="LOGNAME={username}"
 Environment="PATH={sane_path}"
 Environment="VIRTUAL_ENV={venv_dir}"
 Environment="HERMES_HOME={hermes_home}"
+{proxy_environment_block}
 Restart=always
 RestartSec=60
 RestartMaxDelaySec=300
@@ -2198,6 +2226,7 @@ WorkingDirectory={working_dir}
 Environment="PATH={sane_path}"
 Environment="VIRTUAL_ENV={venv_dir}"
 Environment="HERMES_HOME={hermes_home}"
+{proxy_environment_block}
 Restart=always
 RestartSec=60
 RestartMaxDelaySec=300
@@ -3732,21 +3761,19 @@ def _platform_status(platform: dict) -> str:
     """
     entry = platform.get("_registry_entry")
     if entry is not None:
-        configured = False
         # Prefer is_connected (checks both env and config.yaml) over
         # check_fn (typically just dependency / env presence).
         if entry.is_connected is not None:
             try:
                 from gateway.config import PlatformConfig
                 synthetic = PlatformConfig(enabled=True)
-                configured = bool(entry.is_connected(synthetic))
+                return "configured" if entry.is_connected(synthetic) else "not configured"
             except Exception:
-                configured = False
-        if not configured:
-            try:
-                configured = bool(entry.check_fn())
-            except Exception:
-                configured = False
+                return "not configured"
+        try:
+            configured = bool(entry.check_fn())
+        except Exception:
+            configured = False
         return "configured" if configured else "not configured"
 
     token_var = platform.get("token_var", "")
