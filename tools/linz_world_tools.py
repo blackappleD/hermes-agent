@@ -8,6 +8,9 @@ from agent.linz_world import auth, identity
 from agent.linz_world.chat import send_chat_message
 from agent.linz_world.compute import invoke_compute
 from agent.linz_world.event_state import LinzStateRepository
+from agent.linz_world.guide import get_section as get_linz_world_section
+from agent.linz_world.guide import guide as search_linz_world_guide
+from agent.linz_world.guide import resolve_flow as resolve_linz_world_flow
 from agent.linz_world.memory import write_memory
 from agent.linz_world.models import to_plain
 from agent.linz_world.publisher import publish_event
@@ -93,12 +96,131 @@ def linz_relationship(args=None, **kwargs) -> str:
     return _result({"success": False, "error": {"code": "invalid_action", "message": "Use action=read, action=add, or action=add_active."}})
 
 
+def linz_world_guide(args=None, **kwargs) -> str:
+    args = args or {}
+    return _result(
+        search_linz_world_guide(
+            query=str(args.get("query") or ""),
+            subject=str(args.get("subject") or ""),
+            event_type=str(args.get("event_type") or ""),
+            bubble_type=str(args.get("bubble_type") or ""),
+            lifecycle_state=str(args.get("lifecycle_state") or ""),
+            user_intent=str(args.get("user_intent") or ""),
+            limit=int(args.get("limit", 5)),
+            include_content=bool(args.get("include_content", False)),
+        )
+    )
+
+
+def linz_world_section(args=None, **kwargs) -> str:
+    args = args or {}
+    return _result(
+        get_linz_world_section(
+            str(args.get("section_id") or ""),
+            max_chars=int(args.get("max_chars", 6000)),
+        )
+    )
+
+
+def linz_world_flow_resolve(args=None, **kwargs) -> str:
+    args = args or {}
+    known_fields = args.get("known_fields") if isinstance(args.get("known_fields"), dict) else {}
+    return _result(
+        resolve_linz_world_flow(
+            query=str(args.get("query") or ""),
+            subject=str(args.get("subject") or ""),
+            event_type=str(args.get("event_type") or ""),
+            bubble_type=str(args.get("bubble_type") or ""),
+            lifecycle_state=str(args.get("lifecycle_state") or ""),
+            user_intent=str(args.get("user_intent") or ""),
+            bubble_id=str(args.get("bubble_id") or ""),
+            known_fields=known_fields,
+            limit=int(args.get("limit", 5)),
+        )
+    )
+
+
 registry.register(
     name="linz_status",
     toolset="linz_world",
     schema={"description": "Return current profile Linz World identity and status.", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
     handler=linz_status,
     description="Show native Linz World identity and status",
+)
+registry.register(
+    name="linz_world_guide",
+    toolset="linz_world",
+    schema={
+        "description": (
+            "Search the Linz World runtime manual for relevant world concepts, rules, workflows, and tool guidance. "
+            "Use this before answering Linz World questions or choosing Linz workflow steps from long-world knowledge."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Natural-language question or context to retrieve guide sections for."},
+                "subject": {"type": "string", "description": "Optional Linz World event subject."},
+                "event_type": {"type": "string", "description": "Optional Linz World event_type."},
+                "bubble_type": {"type": "string", "description": "Optional Bubble Protocol type, for example demand or task."},
+                "lifecycle_state": {"type": "string", "description": "Optional Bubble lifecycle state."},
+                "user_intent": {"type": "string", "description": "Optional normalized intent such as accept_demand, submit_artifact, or reply_chat."},
+                "limit": {"type": "integer", "default": 5, "minimum": 1, "maximum": 20},
+                "include_content": {"type": "boolean", "default": False, "description": "Return longer matched section snippets. Use linz_world_section for full sections."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    handler=linz_world_guide,
+    description="Search Linz World runtime manual",
+)
+registry.register(
+    name="linz_world_section",
+    toolset="linz_world",
+    schema={
+        "description": "Read one Linz World runtime manual section by section_id for progressive disclosure.",
+        "parameters": {
+            "type": "object",
+            "required": ["section_id"],
+            "properties": {
+                "section_id": {"type": "string", "description": "Section id returned by linz_world_guide, for example LW-MRK-REQUIREMENT."},
+                "max_chars": {"type": "integer", "default": 6000, "minimum": 500, "maximum": 20000},
+            },
+            "additionalProperties": False,
+        },
+    },
+    handler=linz_world_section,
+    description="Read Linz World guide section",
+)
+registry.register(
+    name="linz_world_flow_resolve",
+    toolset="linz_world",
+    schema={
+        "description": (
+            "Resolve the current Linz World workflow phase from event/bubble/user intent context. "
+            "Returns matched guide sections, next steps, recommended linz tools, required fields, approval requirements, and forbidden actions."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Natural-language context or user request."},
+                "subject": {"type": "string", "description": "Optional Linz World event subject."},
+                "event_type": {"type": "string", "description": "Optional Linz World event_type."},
+                "bubble_type": {"type": "string", "description": "Optional Bubble Protocol type, for example demand or task."},
+                "lifecycle_state": {"type": "string", "description": "Optional Bubble lifecycle state."},
+                "user_intent": {"type": "string", "description": "Optional normalized intent such as accept_demand, submit_artifact, or reply_chat."},
+                "bubble_id": {"type": "string", "description": "Known bubble id, if present."},
+                "known_fields": {
+                    "type": "object",
+                    "description": "Fields already known for the prospective tool call, used to report missing required fields.",
+                    "additionalProperties": True,
+                },
+                "limit": {"type": "integer", "default": 5, "minimum": 1, "maximum": 20},
+            },
+            "additionalProperties": False,
+        },
+    },
+    handler=linz_world_flow_resolve,
+    description="Resolve Linz World workflow phase",
 )
 registry.register(
     name="linz_map",
@@ -117,7 +239,24 @@ registry.register(
 registry.register(
     name="linz_publish",
     toolset="linz_world",
-    schema={"description": "Advanced/raw Linz World publish escape hatch. Use semantic Linz tools such as linz_chat_send for normal user intents; use this only when the user provides a specific subject, event_type, and payload or no semantic tool covers the event.", "parameters": {"type": "object", "required": ["subject", "event_type", "payload"], "properties": {"subject": {"type": "string"}, "event_type": {"type": "string"}, "payload": {"type": "object"}}, "additionalProperties": False}},
+    schema={
+        "description": (
+            "Advanced/raw Linz World publish escape hatch. Use semantic Linz tools such as linz_chat_send for normal user intents; "
+            "use this only when the user provides a specific subject, event_type, and payload or no semantic tool covers the event. "
+            "For MRK collaboration, publish only authoritative MRK subjects, not derived WSP/direct inbox notifications. "
+            "Typical MRK receiver sequence: publish subject=mrk.order event_type=mrk.order.accepted with requirement_id, order_id, "
+            "requester_os_id/name, worker_os_id/name; after producing the deliverable, publish subject=mrk.order.handover "
+            "event_type=mrk.order.handover.delivered with order_id, requirement_id, deliverer_os_id/name, handover_version, "
+            "file_ref, checksum, size, mime_type, version. Publisher-side approval uses subject=mrk.order.handover "
+            "event_type=mrk.order.handover.approved. Do not manually publish wsp.mrk.* notifications; Linz World dispatches them."
+        ),
+        "parameters": {
+            "type": "object",
+            "required": ["subject", "event_type", "payload"],
+            "properties": {"subject": {"type": "string"}, "event_type": {"type": "string"}, "payload": {"type": "object"}},
+            "additionalProperties": False,
+        },
+    },
     handler=linz_publish,
     description="Advanced raw Linz World publish",
 )
