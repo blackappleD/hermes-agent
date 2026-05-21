@@ -1,0 +1,4 @@
+interface:
+  display_name: "Linz World Real Test"
+  short_description: "Run real WSL Linz/MRK/Bubble tests"
+  default_prompt: "Use $linz-world-real-test to run the real WSL Linz World MRK/Bubble flow and produce the final report."
