@@ -2,7 +2,7 @@
 
 日期：2026-05-19  
 状态：草案  
-目标脚本：`scripts/linz_bubble_mrk_flow_test.py`
+目标脚本：`scripts/linz-world/linz_bubble_mrk_flow_test.py`
 
 ## 1. 目标
 
@@ -15,7 +15,14 @@ MRK 流程必须使用两个不同的元神：
 
 测试脚本的第一步必须检查 Hermes profiles。若只有一个可用 profile，脚本必须创建并注册第二个 Linz World 元神；创建时必须复制默认配置，等价于 Dashboard `/profiles` 页面点击“创建元神”并勾选“Clone config from default profile”。若已有多个 profiles，脚本选择一个作为发布方、一个作为接收方，并在报告中记录选择结果。
 
-本计划把 MRK 作为主路径，把直接 Bubble API 作为观测和辅助校验路径：
+本计划区分两类测试，二者都保留：
+
+- **Smoke 测试**：脚本直接编排 Linz publish / `linz_bubble_*` 工具，验证 Bubble 协议和 MRK 后端状态机可用。该模式用于快速发现后端、配置、权限和工具适配问题，但不能证明元神真实自主协作。
+- **真实流程测试**：脚本只提供外部输入需求，并启动/检查必要 gateway；需求发布、接单、任务处理、交付和验收必须由 Hermes 元神通过真实 LLM turn、gateway 消费和工具调用完成。脚本只能读取 gateway ledger、session JSONL 和 Bubble snapshot 做观察，不能直接调用 mutating Bubble 工具推进业务状态。
+
+测试需求内容必须是具体可交付任务，例如“开发 JSONL 事件统计脚本”，并包含交付物、输入输出、验收字段和运行方式要求；不得把“请接收方完成 MRK/Bubble 协作流程”这类测试说明当作业务需求发布给接收方。
+
+Smoke 测试把 MRK 作为主路径，把直接 Bubble API 作为观测和辅助校验路径：
 
 - MRK 主路径：需求发布、接单、交付、验收、结算通知。
 - 泡泡辅助校验：读取 DemandBubble / TaskBubble snapshot，验证生命周期、挂载、行为事件、残留摘要。
@@ -27,7 +34,7 @@ MRK 流程必须使用两个不同的元神：
 
 - Linz World 身份、登录、授权、配置预检。
 - 双 profile / 双元神发现、选择和必要时补齐。
-- 发布方发出 `mrk.requirement.published` 到 DemandBubble 创建。
+- 发布方发出原始 `mrk.requirement.published`；Linz World MRK 模块落库后派生 `mrk.requirement.published.broadcast` 或 `wsp.mrk.requirement.published` 通知。
 - 接收方发出 `mrk.order.accepted` 到 DemandBubble 激活和默认 TaskBubble 创建。
 - TaskBubble 挂载接收方 Hermes AgentBubble。
 - 接收方通过 `linz_bubble_submit_artifact` 提交代码或文档成果。
@@ -41,7 +48,8 @@ MRK 流程必须使用两个不同的元神：
 - linz-world 后端状态机单元测试。
 - 未进入正式事件目录的 `bubble.*` NATS 事件。
 - 真实 EC 转账发起；结算只观测 MRK/settlement 事件和泡泡残留引用。
-- LLM 自主决策正确性评测；脚本调用确定性工具和事件发布接口。
+- Smoke 模式不覆盖 LLM 自主决策正确性评测；脚本调用确定性工具和事件发布接口。
+- 真实模式覆盖“是否发生真实 LLM/tool/gateway 行为”，但不保证模型每次都做出正确商业决策；失败时必须保留完整证据。
 
 ## 3. 前置条件
 
@@ -82,13 +90,25 @@ linz_world:
 建议命令：
 
 ```bash
-python scripts/linz_bubble_mrk_flow_test.py run \
+python scripts/linz-world/linz_bubble_mrk_flow_test.py run \
   --publisher-profile default \
   --receiver-profile bubble-mrk-worker \
   --run-id bubble-mrk-001 \
   --output-root experiment/results \
   --confirm-mutations \
   --auto-create-receiver
+```
+
+真实流程命令：
+
+```bash
+python scripts/linz-world/linz_bubble_mrk_flow_test.py real \
+  --publisher-profile default \
+  --receiver-profile bubble-mrk-worker \
+  --run-id real-bubble-mrk-001 \
+  --output-root experiment/results \
+  --confirm-mutations \
+  --start-missing-gateways
 ```
 
 建议参数：
@@ -111,6 +131,18 @@ python scripts/linz_bubble_mrk_flow_test.py run \
 | `--timeout-seconds` | 120 | 每个远端状态等待上限 |
 | `--poll-interval` | 3 | snapshot / event 轮询间隔 |
 
+真实流程额外参数：
+
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `real` | 必填子命令 | 执行真实 agent/gateway 流程测试 |
+| `--start-missing-gateways` | true | profile gateway 未在线时由脚本启动前台 gateway 子进程 |
+| `--keep-started-gateways` | false | 保留脚本启动的 gateway；默认测试结束后只停止脚本自己启动的 gateway |
+| `--gateway-start-timeout` | 90 | 等待 gateway online 的秒数 |
+| `--gateway-event-timeout` | 180 | 等待接收方 gateway 消费需求广播的秒数 |
+| `--agent-timeout-seconds` | 600 | 发布方元神处理外部需求输入的最长时间 |
+| `--timeout-seconds` | 900 | 等待真实协作最终完成的最长时间 |
+
 ## 5. 输出文件
 
 每次运行写入：
@@ -122,6 +154,10 @@ experiment/results/<run_id>/
 ├── receipts.jsonl
 ├── snapshots.jsonl
 ├── events.jsonl
+├── agent_runs.jsonl
+├── gateway_records.jsonl
+├── session_evidence.jsonl
+├── observations.jsonl
 ├── summary.json
 ├── REPORT.md
 └── anomalies.json
@@ -134,6 +170,10 @@ experiment/results/<run_id>/
 - `receipts.jsonl`：Hermes 工具 receipt、Linz publish receipt、BubbleReceipt，并包含 `actor_profile` / `actor_os_id`。
 - `snapshots.jsonl`：每次 snapshot 摘要，必须脱敏且不包含完整 raw spec。
 - `events.jsonl`：与 `run_id` 相关的 MRK/WSP 本地事件投影。
+- `agent_runs.jsonl`：真实模式下脚本给元神的外部输入、agent 进程退出码和 stdout/stderr 路径。
+- `gateway_records.jsonl`：真实模式下 gateway projection ledger 中与 `run_id` 相关的记录和 transitions。
+- `session_evidence.jsonl`：真实模式下 session JSONL 中的 LLM 消息、tool_call、tool result 摘要。
+- `observations.jsonl`：真实模式轮询过程中观察到的 gateway/tool/snapshot 状态。
 - `summary.json`：总状态、通过/失败/阻塞数量、关键业务 ID。
 - `REPORT.md`：人类可读报告，包含步骤表和失败诊断。
 - `anomalies.json`：所有断言失败、超时、权限缺失和协议不一致。
@@ -145,11 +185,13 @@ experiment/results/<run_id>/
 
 ## 6. MRK 全流程步骤
 
+### 6.1 Smoke 模式步骤
+
 | 序号 | 步骤 | 动作 | 期望结果 | 关键记录 |
 | --- | --- | --- | --- | --- |
 | 0 | profile discovery | 列出 profiles；若只有一个，则创建并注册接收方元神，复制 default 配置 | 得到两个不同 profile 和两个不同 Linz World 身份 | publisher_profile、receiver_profile、双方 `os_id` |
 | 1 | preflight | 分别加载发布方和接收方配置、检查身份、登录、授权、Bubble 配置 | 双方通过或 `BLOCKED` | 双方授权摘要、配置摘要 |
-| 2 | 发布需求 | 使用发布方 profile 发布 `mrk.requirement.published` 或调用后端 MRK 需求接口 | 生成 `requirement_id`，MRK receipt 为 published | `requirement_id`、event_id、publisher_os_id |
+| 2 | 发布需求 | 使用发布方 profile 发布原始 `mrk.requirement.published` 或调用后端 MRK 需求接口 | 生成 `requirement_id`，MRK receipt 为 published | `requirement_id`、event_id、publisher_os_id |
 | 3 | 定位 DemandBubble | 用 requirement 关联 ID 或已知返回值读取 snapshot | DemandBubble 存在，生命周期为 produced/open 等可接受初始态 | `demand_bubble_id` |
 | 4 | 接单 | 使用接收方 profile 发布/触发 `mrk.order.accepted`，或调用 `linz_bubble_accept_demand` 辅助路径 | DemandBubble 激活，生成或关联 order | `order_id`、receiver_os_id、DemandBubble 状态 |
 | 5 | 定位 TaskBubble | snapshot DemandBubble children 或后端返回关联 | 至少一个 TaskBubble 存在 | `task_bubble_id` |
@@ -163,6 +205,26 @@ experiment/results/<run_id>/
 | 13 | 导出报告 | 汇总所有步骤 | 生成完整报告，失败时返回非 0 | report path |
 
 如果 linz-world 当前 MRK API 不能直接由 Hermes 发起某些业务动作，脚本必须把该步骤标记为 `BLOCKED` 或走受控 Bubble API 辅助路径，并在 `anomalies.json` 中记录原因，不能伪造成功。
+
+### 6.2 真实流程模式步骤
+
+| 序号 | 步骤 | 动作 | 期望结果 | 禁止事项 |
+| --- | --- | --- | --- | --- |
+| 0 | profile discovery | 选择或创建两个不同 profile | 得到发布方和接收方两个不同元神 | 不得复用同一个 `os_id` |
+| 1 | real preflight | 检查身份、登录、授权、Bubble 配置和真实模式策略 | 双方可用，脚本 mutation policy 为 forbidden | 不得把 smoke mutation 当真实证据 |
+| 2 | publisher gateway ready | 检查或启动发布方 gateway | Linz World platform online/connected | 不得杀掉非脚本启动的 gateway |
+| 3 | receiver gateway ready | 检查或启动接收方 gateway | 接收方能监听 NATS 授权 subject | 不得跳过接收方在线要求 |
+| 4 | external requirement input | 给发布方元神一次自然语言外部需求输入 | 发布方真实 agent turn 结束，并留下 session/工具证据 | 脚本不得直接调用 `publish_event` 或 mutating `linz_bubble_*` |
+| 5 | receiver gateway consumes requirement | 轮询接收方 gateway ledger | 出现 handled 的 `mrk.requirement.published`/broadcast 记录 | 不得直接调用接收方工具推进 |
+| 6 | wait for real autonomous completion | 轮询 session、gateway、只读 Bubble snapshot | DemandBubble 最终 archived，且接收方存在真实 LLM/tool 活动 | 不得用脚本验收、提交交付或创建任务 |
+
+真实模式全局通过条件：
+
+- 接收方 gateway 必须消费需求事件。
+- 接收方 session evidence 必须包含 `linz_*` 或 `linz_bubble_*` tool call / tool result。
+- 最终 DemandBubble 必须通过只读 snapshot 观察到 `archived`。
+- 报告必须包含 agent run、gateway records、session evidence 和 observations。
+- 若模型只回复“收到/stand by”或没有调用工具，必须失败。
 
 ## 7. 断言标准
 

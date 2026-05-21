@@ -764,17 +764,17 @@ hermes-agent
 可以实现为一个带子命令的脚本，也可以拆成多个脚本。建议形态如下：
 
 ```bash
-scripts/formal_experiment_prepare.sh
-scripts/formal_experiment_run.sh
-scripts/formal_experiment_export.py
+scripts/linz-world/formal_experiment_prepare.sh
+scripts/linz-world/formal_experiment_run.sh
+scripts/linz-world/formal_experiment_export.py
 ```
 
 或：
 
 ```bash
-scripts/formal_experiment.sh prepare
-scripts/formal_experiment.sh run
-scripts/formal_experiment.sh export
+scripts/linz-world/formal_experiment.sh prepare
+scripts/linz-world/formal_experiment.sh run
+scripts/linz-world/formal_experiment.sh export
 ```
 
 ### 使用顺序要求
@@ -797,14 +797,14 @@ hermes linz status
 hermes gateway
 
 # 4. 另开 shell，执行实验前检查
-bash scripts/formal_experiment_prepare.sh --profile default --phase all
+bash scripts/linz-world/formal_experiment_prepare.sh --profile default --phase all
 
 # 5. 执行实验阶段
-bash scripts/formal_experiment_run.sh --profile default --phase P1 --repeat 3 --run-id formal-p1-001
-bash scripts/formal_experiment_run.sh --profile default --phase all --run-id formal-all-001
+bash scripts/linz-world/formal_experiment_run.sh --profile default --phase P1 --repeat 3 --run-id formal-p1-001
+bash scripts/linz-world/formal_experiment_run.sh --profile default --phase all --run-id formal-all-001
 
 # 6. 导出实验数据
-python scripts/formal_experiment_export.py --profile default --run-id formal-all-001 --output-root experiment/results
+python scripts/linz-world/formal_experiment_export.py --profile default --run-id formal-all-001 --output-root experiment/results
 ```
 
 如果 gateway/os_runtime 未运行、Linz World 未登录、授权 map 不可用、正式事件不在 catalog 内、或没有任何真实 runtime transition，脚本必须 fail closed，并输出可诊断原因。

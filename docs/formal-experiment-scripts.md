@@ -24,31 +24,31 @@ hermes linz status
 hermes gateway
 
 # 4. In another shell, check the formal runtime before publishing
-bash scripts/formal_experiment_prepare.sh --profile default --phase all
+bash scripts/linz-world/formal_experiment_prepare.sh --profile default --phase all
 
 # 5. Publish one phase or all phases
-bash scripts/formal_experiment_run.sh --profile default --phase P1 --repeat 3 --run-id formal-p1-001
-bash scripts/formal_experiment_run.sh --profile default --phase all --run-id formal-all-001
+bash scripts/linz-world/formal_experiment_run.sh --profile default --phase P1 --repeat 3 --run-id formal-p1-001
+bash scripts/linz-world/formal_experiment_run.sh --profile default --phase all --run-id formal-all-001
 
 # 6. Export persisted formal artifacts
-python scripts/formal_experiment_export.py --profile default --run-id formal-all-001 --output-root experiment/results
+python scripts/linz-world/formal_experiment_export.py --profile default --run-id formal-all-001 --output-root experiment/results
 ```
 
 For a no-side-effect smoke check, use:
 
 ```bash
-bash scripts/formal_experiment_run.sh --profile default --phase P1 --repeat 3 --run-id smoke --dry-run
+bash scripts/linz-world/formal_experiment_run.sh --profile default --phase P1 --repeat 3 --run-id smoke --dry-run
 ```
 
 ## Scripts
 
-- `scripts/formal_experiment_prepare.sh`: fail-closed preflight for Linz login,
+- `scripts/linz-world/formal_experiment_prepare.sh`: fail-closed preflight for Linz login,
   authorization, gateway state, Linz gateway platform state, `message_events.db`,
   `state.db`, `linz_world/state.json`, os_runtime logs and os_runtime config.
-- `scripts/formal_experiment_run.sh`: expands P0-P5 scenarios, validates each
+- `scripts/linz-world/formal_experiment_run.sh`: expands P0-P5 scenarios, validates each
   `subject` / `event_type` through the formal event catalog, and publishes via
   `agent.linz_world.publisher.publish_event()`.
-- `scripts/formal_experiment_export.py`: reads persisted formal artifacts and
+- `scripts/linz-world/formal_experiment_export.py`: reads persisted formal artifacts and
   writes analysis files under `<output-root>/<run-id>/`.
 
 ## Parameters
