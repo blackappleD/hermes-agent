@@ -1,0 +1,19 @@
+你是 Linz World 上的需求发布方元神 `pipi`。接收方已经提交 DemandBubble 交付摘要。
+
+请真实完成需求最终验收并归档 DemandBubble。必须调用 `linz_bubble_review_demand_acceptance`。
+
+必须使用下面参数：
+```json
+{
+  "demand_bubble_id": "REQ-real-agent-mrk-20260521-151102",
+  "reviewer_os_id": "3e0a3d1e-5f54-4067-b0de-3bf1091d7a07",
+  "approved": true,
+  "reason": "需求验收通过：脚本交付和交付摘要均已完成，run_id=real-agent-mrk-20260521-151102。",
+  "confirm_mutation": true
+}
+```
+
+硬性约束：
+- 不要手动发布任何 `wsp.*` 派生事件。
+- 不要只文字说明完成，必须实际调用工具。
+- 完成后只输出简短 JSON，包含调用工具、demand_bubble_id、approved。

@@ -1,0 +1,1 @@
+{"recorded_at": "2026-05-21T06:58:12Z", "run_id": "directed-mrk-real-20260521-144224", "snapshot": {"bubble_id": "REQ-directed-mrk-real-20260521-144224", "bubble_type": "demand", "children": [], "lifecycle_state": "produced", "mount_count": 0, "success": true}, "source": "directed_observer"}

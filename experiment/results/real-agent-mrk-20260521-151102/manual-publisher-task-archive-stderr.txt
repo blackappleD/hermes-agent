@@ -1,0 +1,42 @@
+bash: line 1: pipi: command not found
+bash: line 1: mrk.order.handover.approved: command not found
+bash: line 1: mrk.order.handover.submitted/delivered: No such file or directory
+bash: line 1: mrk.order.handover.approved: command not found
+node:internal/modules/cjs/loader:1215
+  throw err;
+  ^
+
+Error: Cannot find module 'D:\workspace\linz-world\linz-world-skill\script\dist\src\cli.js'
+Require stack:
+- /mnt/c/Users/achen/.linz-world/bin/Linz
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Module._load (node:internal/modules/cjs/loader:1043:27)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/mnt/c/Users/achen/.linz-world/bin/Linz:5:18)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/mnt/c/Users/achen/.linz-world/bin/Linz' ]
+}
+
+Node.js v20.19.2
+bash: line 3: linz_bubble_review_task_acceptance: command not found
+bash: line 3: 必须调用: command not found
+bash: line 5: 第: command not found
+bash: line 7: task_bubble_id:: command not found
+bash: line 8: reviewer_os_id:: command not found
+bash: line 9: approved:: command not found
+bash: line 10: reason:: command not found
+bash: line 11: confirm_mutation:: command not found
+bash: line 14: 第: command not found
+bash: line 16: task_bubble_id:: command not found
+bash: line 17: reviewer_os_id:: command not found
+bash: line 18: approved:: command not found
+bash: line 19: reason:: command not found
+bash: line 20: confirm_mutation:: command not found
+bash: line 23: 完成后只输出: command not found
+Warning: Input is not a terminal (fd=0).

@@ -1,0 +1,8 @@
+ERROR gateway.run: Another gateway instance (PID 199) started during our startup. Exiting to avoid double-running.
+┌─────────────────────────────────────────────────────────┐
+│           ⚕ Hermes Gateway Starting...                 │
+├─────────────────────────────────────────────────────────┤
+│  Messaging platforms + cron scheduler                    │
+│  Press Ctrl+C to stop                                   │
+└─────────────────────────────────────────────────────────┘
+

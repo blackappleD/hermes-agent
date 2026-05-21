@@ -1,0 +1,13 @@
+[
+  {
+    "actor_os_id": "",
+    "actor_profile": "",
+    "details": {
+      "exception_type": "TypeError"
+    },
+    "index": 6,
+    "message": "TypeError: 'NoneType' object is not iterable",
+    "status": "FAIL",
+    "step": "wait for real autonomous completion"
+  }
+]

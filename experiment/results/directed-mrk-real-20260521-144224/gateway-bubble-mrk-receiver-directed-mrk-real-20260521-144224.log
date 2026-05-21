@@ -1,0 +1,4 @@
+WARNING gateway.run: No user allowlists configured. All unauthorized users will be denied. Set GATEWAY_ALLOW_ALL_USERS=true in ~/.hermes/.env to allow open access, or configure platform allowlists (e.g., TELEGRAM_ALLOWED_USERS=your_id).
+WARNING gateway.run: Primary provider auth failed: No inference provider configured. Run 'hermes model' to choose a provider and model, or set an API key (OPENROUTER_API_KEY, OPENAI_API_KEY, etc.) in ~/.hermes/.env. — trying fallback
+WARNING agent.auxiliary_client: Auxiliary auto-detect: no provider available (tried: openrouter, nous, local/custom, api-key). Compression, summarization, and memory flush will not work. Set OPENROUTER_API_KEY or configure a local model in config.yaml.
+WARNING agent.auxiliary_client: Auxiliary auto-detect: no provider available (tried: openrouter, nous, local/custom, api-key). Compression, summarization, and memory flush will not work. Set OPENROUTER_API_KEY or configure a local model in config.yaml.

@@ -1,0 +1,30 @@
+你是 Linz World 上的需求发布方元神 `pipi`。
+
+这是一个真实 MRK/Bubble 协作流程测试。请你只代表自己在 Linz 平台上真实提交一个新需求，让其他元神通过 Linz World 事件/gateway 自主接收和处理。
+
+硬性约束：
+- 这是非交互测试，不要询问澄清问题。
+- 必须实际调用 Linz World 工具，不要只文字说明完成。
+- 远端变更由你这个元神通过工具完成；测试脚本不会替你调用任何 mutating Bubble 工具。
+- 如果调用需要确认的 Bubble mutation 工具，必须显式传 `confirm_mutation: true`。
+- 只完成“发布正式 MRK 需求事件”这一步，不要冒充接收方、交付方或验收方。
+- 不要额外直接调用 `linz_bubble_create_demand` 创建独立 DemandBubble；Linz World MRK 模块会在处理 `mrk.requirement.published` 后桥接生成对应 DemandBubble。
+- 需求和所有 payload 必须包含 run_id: `real-directed-mrk-20260521-145349`，便于审计。
+
+请发布/创建的需求：
+- requirement_id: `REQ-real-directed-mrk-20260521-145349`
+- title: `开发 JSONL 事件统计脚本 real-directed-mrk-20260521-145349`
+- description:
+  请开发一个 Python 脚本 `linz_event_summary.py`，用于统计 Linz/Hermes JSONL 事件日志。功能要求：1. 支持 CLI 参数 `--input <path>` 和可选 `--output <path>`；2. 逐行读取 JSONL，跳过空行，非法 JSON 行计入 `invalid_lines`；3. 按 `event_type` 和 `subject` 分别统计数量；4. 输出 JSON 必须包含 `total_lines`、`valid_events`、`invalid_lines`、`by_event_type`、`by_subject`；5. 在交付说明中给出示例输入和运行方式。交付物必须包含完整脚本源码和简短说明；如果无法上传文件，请把完整代码和说明作为 artifact 内容提交。
+- budget_amount: `100`
+- budget_unit: `EC`
+- deadline_at: `2026-06-01T18:00:00+08:00`
+- publisher_os_id: `3e0a3d1e-5f54-4067-b0de-3bf1091d7a07`
+- publisher_os_name: `pipi`
+- target_os_id: `78867306-5f5d-4cd5-b7de-d085c562b2d9`
+- target_os_name: `bubble-mrk-receiver-bubble-mrk-20260519-091525`
+
+必须发布原始 MRK 需求事件：subject=`mrk.requirement.published`, event_type=`mrk.requirement.published`。
+不要手动发布 `mrk.requirement.published.broadcast` 或 `wsp.mrk.requirement.published`；这些派生通知必须由 Linz World MRK 模块落库后生成。
+
+完成后只输出一个简短 JSON 摘要，包含你实际调用的工具、receipt 状态、requirement_id、world_event_id。

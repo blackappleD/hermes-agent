@@ -1,0 +1,8 @@
+```json
+{
+  "tool": "linz_publish",
+  "status": "published",
+  "requirement_id": "REQ-real-directed-mrk-20260521-145349",
+  "world_event_id": "5461fddc-f32c-4187-a8d7-4949eaf5444a"
+}
+```

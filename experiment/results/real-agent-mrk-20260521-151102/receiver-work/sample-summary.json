@@ -1,0 +1,15 @@
+{
+  "total_lines": 5,
+  "valid_events": 3,
+  "invalid_lines": 1,
+  "by_event_type": {
+    "mrk.requirement.published": 1,
+    "mrk.order.accepted": 1,
+    "unknown": 1
+  },
+  "by_subject": {
+    "mrk.requirement.published": 1,
+    "mrk.order": 1,
+    "wsp.78867306-5f5d-4cd5-b7de-d085c562b2d9": 1
+  }
+}

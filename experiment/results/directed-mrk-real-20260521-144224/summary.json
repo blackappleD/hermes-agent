@@ -1,0 +1,32 @@
+{
+  "counts": {
+    "BLOCKED": 0,
+    "FAIL": 1,
+    "PASS": 6,
+    "SKIPPED": 0
+  },
+  "dry_run": false,
+  "finished_at": "2026-05-21T06:58:13Z",
+  "ids": {
+    "artifact_ref": "hermes-session://directed-mrk-flow/directed-mrk-real-20260521-144224/artifact",
+    "demand_bubble_id": "REQ-directed-mrk-real-20260521-144224",
+    "handover_id": "HANDOVER-directed-mrk-real-20260521-144224",
+    "mount_id": "",
+    "order_id": "ORD-directed-mrk-real-20260521-144224",
+    "requirement_id": "REQ-directed-mrk-real-20260521-144224",
+    "settlement_id": "SET-directed-mrk-real-20260521-144224",
+    "summary_ref": "hermes-session://directed-mrk-flow/directed-mrk-real-20260521-144224/summary",
+    "task_bubble_id": ""
+  },
+  "mode": "directed",
+  "publisher_os_id": "82ed1cc2-fc77-4b09-9969-92f8990ea982",
+  "publisher_profile": "bubble-mrk-receiver-directed-mrk-20260521-144117",
+  "publisher_soul_id": "soul-378c53ptb6qrap9n",
+  "receiver_os_id": "3fc1570b-2185-4504-a49c-0509813ba5c4",
+  "receiver_profile": "bubble-mrk-receiver-directed-mrk-real-20260521-144224",
+  "receiver_soul_id": "soul-310yc01p6o6tga2l",
+  "report_path": "experiment\\results\\directed-mrk-real-20260521-144224\\REPORT.md",
+  "result": "FAIL",
+  "run_id": "directed-mrk-real-20260521-144224",
+  "started_at": "2026-05-21T06:42:25Z"
+}

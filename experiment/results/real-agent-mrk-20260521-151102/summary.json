@@ -1,0 +1,32 @@
+{
+  "counts": {
+    "BLOCKED": 0,
+    "FAIL": 0,
+    "PASS": 13,
+    "SKIPPED": 0
+  },
+  "dry_run": false,
+  "finished_at": "2026-05-21T07:21:35Z",
+  "ids": {
+    "artifact_ref": "file:///mnt/d/workspace/hermes-agent/experiment/results/real-agent-mrk-20260521-151102/receiver-work/linz_event_summary.py",
+    "demand_bubble_id": "REQ-real-agent-mrk-20260521-151102",
+    "handover_id": "HANDOVER-real-agent-mrk-20260521-151102",
+    "mount_id": "",
+    "order_id": "ORD-real-agent-mrk-20260521-151102",
+    "requirement_id": "REQ-real-agent-mrk-20260521-151102",
+    "settlement_id": "SET-real-agent-mrk-20260521-151102",
+    "summary_ref": "hermes-session://real-bubble-mrk-flow/real-agent-mrk-20260521-151102/summary",
+    "task_bubble_id": "task_REQ-real-agent-mrk-20260521-151102_78867306-5f5d-4cd5-b7de-d085c562b2d9"
+  },
+  "mode": "real",
+  "publisher_os_id": "3e0a3d1e-5f54-4067-b0de-3bf1091d7a07",
+  "publisher_profile": "default",
+  "publisher_soul_id": "soul-rsm1d41n8rn1wqic",
+  "receiver_os_id": "78867306-5f5d-4cd5-b7de-d085c562b2d9",
+  "receiver_profile": "bubble-mrk-receiver-bubble-mrk-20260519-091525",
+  "receiver_soul_id": "soul-u13tjdtvf6s0wkcz",
+  "report_path": "/mnt/d/workspace/hermes-agent/experiment/results/real-agent-mrk-20260521-151102/REPORT.md",
+  "result": "PASS",
+  "run_id": "real-agent-mrk-20260521-151102",
+  "started_at": "2026-05-21T07:11:08Z"
+}

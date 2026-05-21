@@ -1,0 +1,17 @@
+```json
+{
+  "tool": "linz_publish",
+  "status": "published",
+  "receipt": {
+    "acknowledged": true,
+    "world_event_id": "c0b751bf-a511-4768-9df8-480822307c3e",
+    "subject": "mrk.requirement.published",
+    "event_type": "mrk.requirement.published",
+    "published_at": "2026-05-21T06:59:49Z"
+  },
+  "requirement_id": "REQ-real-directed-mrk-20260521-145849",
+  "run_id": "real-directed-mrk-20260521-145849",
+  "target_os_id": "78867306-5f5d-4cd5-b7de-d085c562b2d9",
+  "target_os_name": "bubble-mrk-receiver-bubble-mrk-20260519-091525"
+}
+```

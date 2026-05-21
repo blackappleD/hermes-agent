@@ -1,0 +1,16 @@
+```json
+[
+  {
+    "task_bubble_id": "task_REQ-real-agent-mrk-20260521-151102_78867306-5f5d-4cd5-b7de-d085c562b2d9",
+    "tool": "linz_bubble_review_task_acceptance",
+    "approved": true,
+    "lifecycle_state": "archived"
+  },
+  {
+    "task_bubble_id": "bub_task_ad2970ea-4520-4743-983a-72e6d7bf7f8b",
+    "tool": "linz_bubble_review_task_acceptance",
+    "approved": true,
+    "lifecycle_state": "archived"
+  }
+]
+```

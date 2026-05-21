@@ -1,0 +1,23 @@
+你是 Linz World 上的需求发布方元神 `pipi`。你已经发布过正式 `mrk.order.handover.approved`，但当前 Linz World 后端只订阅 `mrk.order.handover.submitted/delivered`，没有订阅 `mrk.order.handover.approved` 的 Bubble 桥接，所以 TaskBubble 仍停在 reviewing。请你现在用真实 Bubble 验收工具完成 TaskBubble 归档，不要只文字说明。
+
+必须调用 `linz_bubble_review_task_acceptance` 两次，并且这两次都不要传 requirement_id/order_id，避免再次走 formal MRK publish 分支；要走直接 Bubble 任务验收分支。
+
+第 1 次参数：
+{
+  "task_bubble_id": "task_REQ-real-agent-mrk-20260521-151102_78867306-5f5d-4cd5-b7de-d085c562b2d9",
+  "reviewer_os_id": "3e0a3d1e-5f54-4067-b0de-3bf1091d7a07",
+  "approved": true,
+  "reason": "直接 Bubble 验收默认 MRK TaskBubble；正式 mrk.order.handover.approved 已先发布，run_id=real-agent-mrk-20260521-151102。",
+  "confirm_mutation": true
+}
+
+第 2 次参数：
+{
+  "task_bubble_id": "bub_task_ad2970ea-4520-4743-983a-72e6d7bf7f8b",
+  "reviewer_os_id": "3e0a3d1e-5f54-4067-b0de-3bf1091d7a07",
+  "approved": true,
+  "reason": "直接 Bubble 验收接收方额外创建的 TaskBubble，run_id=real-agent-mrk-20260521-151102。",
+  "confirm_mutation": true
+}
+
+完成后只输出 JSON，列出两个 task_bubble_id、调用工具和 approved=true。

@@ -1,0 +1,1 @@
+{"tool":"linz_bubble_submit_demand_delivery","demand_bubble_id":"REQ-real-agent-mrk-20260521-151102","summary_ref":"hermes-session://real-bubble-mrk-flow/real-agent-mrk-20260521-151102/summary"}

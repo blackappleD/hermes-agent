@@ -1,0 +1,57 @@
+{
+  "args": {
+    "auto_create_receiver": true,
+    "clone_config_from_default": true,
+    "command": "directed",
+    "confirm_mutations": true,
+    "dry_run": false,
+    "gateway_event_timeout": 180,
+    "gateway_start_timeout": 90,
+    "hermes_home": "",
+    "keep_started_gateways": false,
+    "mode": "directed",
+    "output_root": "experiment/results",
+    "poll_interval": 10.0,
+    "publisher_profile": "bubble-mrk-receiver-directed-mrk-20260521-144117",
+    "receiver_agent_name": "",
+    "receiver_persona_seed": "",
+    "receiver_profile": "bubble-mrk-receiver-directed-mrk-real-20260521-144224",
+    "run_id": "directed-mrk-real-20260521-144224",
+    "start_missing_gateways": true,
+    "timeout_seconds": 900
+  },
+  "command": [
+    "python.exe",
+    "scripts\\linz-world\\linz_bubble_mrk_flow_test.py",
+    "directed",
+    "--publisher-profile",
+    "bubble-mrk-receiver-directed-mrk-20260521-144117",
+    "--receiver-profile",
+    "bubble-mrk-receiver-directed-mrk-real-20260521-144224",
+    "--run-id",
+    "directed-mrk-real-20260521-144224",
+    "--confirm-mutations",
+    "--output-root",
+    "experiment/results"
+  ],
+  "dry_run": false,
+  "finished_at": "2026-05-21T06:58:13Z",
+  "mode": "directed",
+  "publisher": {
+    "os_id": "82ed1cc2-fc77-4b09-9969-92f8990ea982",
+    "os_name": "bubble-mrk-receiver-directed-mrk-20260521-144117",
+    "profile": "bubble-mrk-receiver-directed-mrk-20260521-144117",
+    "profile_dir": "C:\\Users\\achen\\.hermes\\profiles\\bubble-mrk-receiver-directed-mrk-20260521-144117",
+    "soul_id": "soul-378c53ptb6qrap9n"
+  },
+  "receiver": {
+    "os_id": "3fc1570b-2185-4504-a49c-0509813ba5c4",
+    "os_name": "bubble-mrk-receiver-directed-mrk-real-20260521-144224",
+    "profile": "bubble-mrk-receiver-directed-mrk-real-20260521-144224",
+    "profile_dir": "C:\\Users\\achen\\.hermes\\profiles\\bubble-mrk-receiver-directed-mrk-real-20260521-144224",
+    "soul_id": "soul-310yc01p6o6tga2l"
+  },
+  "run_id": "directed-mrk-real-20260521-144224",
+  "script": "scripts/linz-world/linz_bubble_mrk_flow_test.py",
+  "started_at": "2026-05-21T06:42:25Z"
+}
