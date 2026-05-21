@@ -13,6 +13,25 @@ source .venv/bin/activate   # or: source venv/bin/activate
 `$HOME/.hermes/hermes-agent/venv` (for worktrees that share a venv with the
 main checkout).
 
+## External Business Source of Truth
+
+When Linz World business behavior is uncertain, do not infer protocol rules
+from symptoms or local Hermes code alone. Pull and inspect the Linz World
+implementation first:
+
+```bash
+# Prefer the sibling checkout when present; otherwise clone it there.
+git -C /mnt/d/workspace/linz-world fetch --all --prune
+# or: git clone https://github.com/OPEWorld-Tech/linz-world.git /mnt/d/workspace/linz-world
+```
+
+Use `rg` in `linz-world` to find the authoritative module and tests for the
+business feature before changing Hermes behavior, prompts, or tests. For MRK
+and Bubble flows, verify the backend implementation under
+`backend/internal/modules/mrk`, `backend/internal/modules/bubble`, and related
+event catalog/tests. Document the Linz World file or behavior that justifies
+the Hermes-side decision when the change depends on cross-repo business logic.
+
 ## Project Structure
 
 File counts shift constantly — don't treat the tree below as exhaustive.
