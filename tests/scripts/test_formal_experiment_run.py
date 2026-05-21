@@ -5,7 +5,10 @@ import json
 
 import pytest
 
-from scripts import formal_experiment_lib as formal
+from tests._linz_world_script_loader import load_linz_world_script
+
+
+formal = load_linz_world_script("formal_experiment_lib")
 
 
 def test_p1_repeat_generates_three_formal_catalog_events():

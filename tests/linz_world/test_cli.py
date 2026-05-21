@@ -18,6 +18,8 @@ def test_linz_toolset_is_discoverable():
     toolset = get_toolset("linz_world")
     assert toolset is not None
     assert "linz_status" in toolset["tools"]
+    assert "linz_world_guide" in toolset["tools"]
+    assert "linz_world_flow_resolve" in toolset["tools"]
     assert "linz_chat_send" in toolset["tools"]
     assert "linz_publish" in resolve_toolset("linz_world")
 

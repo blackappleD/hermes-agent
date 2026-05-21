@@ -104,6 +104,34 @@ def test_open_space_uses_new_action_family_schema_only():
     assert values.isdisjoint({"reply", "draft", "use_tool"})
 
 
+def test_compiler_includes_authoritative_linz_rule_context_in_constraints():
+    prompt = SelfPromptCompiler().compile(
+        task_context=TaskContextView(
+            task_id="task-linz",
+            metadata={
+                "linz_rule_context": {
+                    "authoritative": True,
+                    "phase": "chat_response",
+                    "confidence": "high",
+                    "summary": "Chat can be drafted freely, but sending is an external side effect.",
+                    "matched_sections": [{"section_id": "LW-CHAT"}],
+                    "required_fields": ["to_os_id", "content"],
+                    "missing_fields": ["to_os_id"],
+                    "forbidden": ["send_empty_message"],
+                    "next_steps": ["Draft a reply first"],
+                    "approval_required": True,
+                }
+            },
+        ),
+        action_potential=ActionPotential(),
+    )
+
+    assert any("phase=chat_response" in item for item in prompt.constraint_scope)
+    assert "linz_rule_missing_fields: to_os_id" in prompt.constraint_scope
+    assert "linz_rule_forbidden: send_empty_message" in prompt.constraint_scope
+    assert "linz_rule_approval_required: true" in prompt.constraint_scope
+
+
 def test_pre_llm_call_injects_ephemeral_context_without_mutating_system_prompt():
     prompt = SelfPromptCompiler().compile(task_context=TaskContextView(task_id="task-4"))
     request = {

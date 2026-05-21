@@ -6,7 +6,10 @@ from types import SimpleNamespace
 from agent.linz_world.event_state import LinzStateRepository
 from agent.os_runtime.adapters.session_store import OSRuntimeEventRepository
 from gateway.event_projection_store import EventProjectionStore
-from scripts import formal_experiment_lib as formal
+from tests._linz_world_script_loader import load_linz_world_script
+
+
+formal = load_linz_world_script("formal_experiment_lib")
 
 
 def _args(home, **overrides):
