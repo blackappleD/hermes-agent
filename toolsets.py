@@ -69,7 +69,8 @@ _HERMES_CORE_TOOLS = [
     "kanban_comment", "kanban_create", "kanban_link",
     "kanban_unblock",
     # Native Linz World identity and world access tools.
-    "linz_status", "linz_map", "linz_events_recent", "linz_chat_send", "linz_publish",
+    "linz_status", "linz_world_guide", "linz_world_section", "linz_world_flow_resolve",
+    "linz_map", "linz_events_recent", "linz_chat_send", "linz_publish",
     "linz_compute", "linz_memory_sink", "linz_relationship",
     "linz_bubble_snapshot", "linz_bubble_create_demand", "linz_bubble_accept_demand",
     "linz_bubble_create_task", "linz_bubble_request_mount", "linz_bubble_review_mount",
@@ -257,7 +258,8 @@ TOOLSETS = {
     "linz_world": {
         "description": "Native Linz World identity, authorization, events, publish, compute, Soul Memory, relationship, and Bubble Protocol tools",
         "tools": [
-            "linz_status", "linz_map", "linz_events_recent", "linz_chat_send", "linz_publish",
+            "linz_status", "linz_world_guide", "linz_world_section", "linz_world_flow_resolve",
+            "linz_map", "linz_events_recent", "linz_chat_send", "linz_publish",
             "linz_compute", "linz_memory_sink", "linz_relationship",
             "linz_bubble_snapshot", "linz_bubble_create_demand", "linz_bubble_accept_demand",
             "linz_bubble_create_task", "linz_bubble_request_mount", "linz_bubble_review_mount",

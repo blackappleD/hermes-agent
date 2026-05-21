@@ -43,10 +43,11 @@ specs/118-formal-experiment-scripts/
 
 ```text
 scripts/
-├── formal_experiment_prepare.sh
-├── formal_experiment_run.sh
-├── formal_experiment_export.py
-└── formal_experiment_lib.py        # optional shared implementation
+└── linz-world/
+    ├── formal_experiment_prepare.sh
+    ├── formal_experiment_run.sh
+    ├── formal_experiment_export.py
+    └── formal_experiment_lib.py        # optional shared implementation
 
 docs/
 └── formal-experiment-scripts.md
@@ -57,7 +58,7 @@ tests/scripts/
 └── test_formal_experiment_export.py
 ```
 
-**Structure Decision**: Keep shell wrappers at the requested paths for user ergonomics. Put non-trivial parsing, status checks, scenario catalog, redaction and export logic in Python so tests can call pure functions without spawning shell.
+**Structure Decision**: Keep Linz World business scripts under `scripts/linz-world/` so they are not confused with generic Hermes maintenance scripts. Put non-trivial parsing, status checks, scenario catalog, redaction and export logic in Python so tests can call pure functions without spawning shell.
 
 ## Phase 0: Research Notes
 

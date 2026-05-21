@@ -83,7 +83,7 @@
 
 ### 功能需求
 
-- **FR-001**: 系统必须新增正式脚本入口，建议为 `scripts/formal_experiment_prepare.sh`、`scripts/formal_experiment_run.sh`、`scripts/formal_experiment_export.py`；如 Builder 合并入口，也必须保留同等子命令能力。
+- **FR-001**: 系统必须新增正式脚本入口，建议为 `scripts/linz-world/formal_experiment_prepare.sh`、`scripts/linz-world/formal_experiment_run.sh`、`scripts/linz-world/formal_experiment_export.py`；如 Builder 合并入口，也必须保留同等子命令能力。
 - **FR-002**: 所有脚本必须支持 `--profile` 和 `--hermes-home`，默认解析当前 profile 的 `get_hermes_home()`，不得隐式读取错误 profile。
 - **FR-003**: prepare 必须检查 Linz identity/login/auth map、gateway runtime state、Linz World gateway platform state、`gateway/message_events.db`、`state.db`、`logs/os_runtime_*.log` 路径和 os_runtime 配置。
 - **FR-004**: run 必须支持 `--phase P0|P1|P2|P3|P4|P5|all`、`--run-id`、`--repeat`、`--dry-run`、`--target-os-id`、`--seed-id`、`--persona`。
@@ -108,7 +108,7 @@
 
 ## 建议方案
 
-- 建议新增共享 Python 模块 `scripts/formal_experiment_lib.py` 承载参数解析、Hermes home 解析、scenario catalog、redaction、DB/log 读取和 summary 聚合；shell 脚本只做环境激活友好的薄入口。
+- 建议新增共享 Python 模块 `scripts/linz-world/formal_experiment_lib.py` 承载参数解析、Hermes home 解析、scenario catalog、redaction、DB/log 读取和 summary 聚合；shell 脚本只做环境激活友好的薄入口。
 - prepare 直接复用 `agent.linz_world.status.status_summary()`、`gateway.status.read_runtime_status()`、`gateway.event_projection_store.EventProjectionStore` 和 `agent.os_runtime.adapters.session_store.OSRuntimeEventRepository` 做只读检查。
 - run 将 `docs/共博自制框架实验准备.md` 的语义事件映射到正式 catalog；每个 payload 写入 `run_id`、`phase`、`scenario_id`、`seed_id/persona`、`sequence` 和 `published_at`，便于 export 关联。
 - export 优先通过 repository/store API 读取；缺 API 的部分可只读 SQLite/JSONL，但必须保持 profile-scoped 路径和脱敏。
@@ -116,10 +116,10 @@
 
 ## 修改范围
 
-- 新增 `scripts/formal_experiment_prepare.sh`
-- 新增 `scripts/formal_experiment_run.sh`
-- 新增 `scripts/formal_experiment_export.py`
-- 可新增 `scripts/formal_experiment_lib.py` 或等价共享模块
+- 新增 `scripts/linz-world/formal_experiment_prepare.sh`
+- 新增 `scripts/linz-world/formal_experiment_run.sh`
+- 新增 `scripts/linz-world/formal_experiment_export.py`
+- 可新增 `scripts/linz-world/formal_experiment_lib.py` 或等价共享模块
 - 新增文档，建议 `docs/formal-experiment-scripts.md`
 - 新增测试，建议 `tests/scripts/test_formal_experiment_prepare.py`、`tests/scripts/test_formal_experiment_run.py`、`tests/scripts/test_formal_experiment_export.py`
 - 不修改核心业务链路，除非 Builder 发现脚本无法通过现有只读 API 访问必要数据；如需补薄 API，必须保持兼容并补测试。

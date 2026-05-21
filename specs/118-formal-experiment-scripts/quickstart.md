@@ -18,14 +18,14 @@ hermes linz status
 hermes gateway
 
 # 4. In another shell, run preflight
-bash scripts/formal_experiment_prepare.sh --profile default --phase all
+bash scripts/linz-world/formal_experiment_prepare.sh --profile default --phase all
 
 # 5. Run one phase or all phases
-bash scripts/formal_experiment_run.sh --profile default --phase P1 --repeat 3 --run-id formal-p1-001
-bash scripts/formal_experiment_run.sh --profile default --phase all --run-id formal-all-001
+bash scripts/linz-world/formal_experiment_run.sh --profile default --phase P1 --repeat 3 --run-id formal-p1-001
+bash scripts/linz-world/formal_experiment_run.sh --profile default --phase all --run-id formal-all-001
 
 # 6. Export persisted formal data
-python scripts/formal_experiment_export.py --profile default --run-id formal-all-001 --output-root experiment/results
+python scripts/linz-world/formal_experiment_export.py --profile default --run-id formal-all-001 --output-root experiment/results
 ```
 
 ## Required Parameters
@@ -54,5 +54,5 @@ python -m pytest tests/scripts/test_formal_experiment_export.py
 
 1. Run prepare with gateway stopped; it must fail with a gateway diagnostic.
 2. Run prepare after `hermes linz logout`; it must fail with a login diagnostic.
-3. Run `formal_experiment_run.sh --dry-run --phase P1`; output events must all pass the formal catalog.
+3. Run `scripts/linz-world/formal_experiment_run.sh --dry-run --phase P1`; output events must all pass the formal catalog.
 4. Export a run with no os_runtime transitions; `anomalies.json` must include `missing_transition`.

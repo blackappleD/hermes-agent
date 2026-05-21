@@ -7,9 +7,9 @@
 
 **Purpose**: Shared script infrastructure and fixtures.
 
-- [ ] T001 Create `scripts/formal_experiment_lib.py` with argument dataclasses, Hermes home/profile resolution, JSONL helpers and redaction helpers.
+- [ ] T001 Create `scripts/linz-world/formal_experiment_lib.py` with argument dataclasses, Hermes home/profile resolution, JSONL helpers and redaction helpers.
 - [ ] T002 [P] Add test fixture builders for temporary Hermes home, `gateway/message_events.db`, `state.db`, Linz state and os_runtime JSONL logs in `tests/scripts/`.
-- [ ] T003 [P] Define the formal P0-P5 scenario catalog in `scripts/formal_experiment_lib.py`, mapping doc scenarios to `agent.linz_world.event_catalog` allowed subject/event_type pairs.
+- [ ] T003 [P] Define the formal P0-P5 scenario catalog in `scripts/linz-world/formal_experiment_lib.py`, mapping doc scenarios to `agent.linz_world.event_catalog` allowed subject/event_type pairs.
 - [ ] T004 Add secret-scanning test helper that asserts generated result files do not contain token/api_key/password/private_key/authorization sample values.
 
 ## Phase 2: Prepare (US1, P1)
@@ -20,7 +20,7 @@
 
 - [ ] T005 [P] Write prepare tests for successful environment, Linz logged out, stale/missing auth map, gateway offline, Linz platform disabled and missing DB/log paths in `tests/scripts/test_formal_experiment_prepare.py`.
 - [ ] T006 Implement prepare logic using `agent.linz_world.status.status_summary()`, `gateway.status.read_runtime_status()`, `EventProjectionStore` path checks and `OSRuntimeEventRepository` read checks.
-- [ ] T007 Add `scripts/formal_experiment_prepare.sh` shell wrapper that calls the Python prepare entry and preserves exit codes.
+- [ ] T007 Add `scripts/linz-world/formal_experiment_prepare.sh` shell wrapper that calls the Python prepare entry and preserves exit codes.
 - [ ] T008 Validate prepare output includes checked profile, Hermes home, blocked reason and next action.
 
 ## Phase 3: Formal Run MVP (US2, P1)
@@ -33,7 +33,7 @@
 - [ ] T010 Implement run argument parsing for `--profile`, `--hermes-home`, `--phase`, `--run-id`, `--repeat`, `--target-os-id`, `--seed-id`, `--persona`, `--dry-run`.
 - [ ] T011 Implement P1 scenario expansion with run metadata in payload and stable `scenario_id` / sequence fields.
 - [ ] T012 Implement catalog/governance fail-closed checks before calling `agent.linz_world.publisher.publish_event()`.
-- [ ] T013 Add `scripts/formal_experiment_run.sh` shell wrapper that calls the Python run entry and preserves exit codes.
+- [ ] T013 Add `scripts/linz-world/formal_experiment_run.sh` shell wrapper that calls the Python run entry and preserves exit codes.
 
 ## Phase 4: Export (US3, P1)
 
@@ -71,7 +71,7 @@
 - [ ] T028 Run `python -m pytest tests/scripts/test_formal_experiment_prepare.py`.
 - [ ] T029 Run `python -m pytest tests/scripts/test_formal_experiment_run.py`.
 - [ ] T030 Run `python -m pytest tests/scripts/test_formal_experiment_export.py`.
-- [ ] T031 Run dry-run smoke: `bash scripts/formal_experiment_run.sh --profile default --phase P1 --repeat 3 --run-id smoke --dry-run`.
+- [ ] T031 Run dry-run smoke: `bash scripts/linz-world/formal_experiment_run.sh --profile default --phase P1 --repeat 3 --run-id smoke --dry-run`.
 - [ ] T032 Confirm no business-code behavior changed outside script/doc/test surfaces unless a documented thin read-only API was required.
 
 ## Dependencies
