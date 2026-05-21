@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"git add .omc/ .obsidian/\"}",
+  "error": "Exit code 1\nwarning: in the working copy of '.obsidian/app.json', LF will be replaced by CRLF the next time Git touches it\nwarning: in the working copy of '.obsidian/workspace.json', LF will be replaced by CRLF the next time Git touches it\nwarning: in the working copy of '.omc/project-memory.json', LF will be replaced by CRLF the next time Git touches it\nwarning: in the working copy of '.omc/state/hud-state.json', LF will be replaced by CRLF the next time Git touches it\nwarning: in the working c...",
+  "timestamp": "2026-05-21T09:51:42.871Z",
+  "retry_count": 1
+}
