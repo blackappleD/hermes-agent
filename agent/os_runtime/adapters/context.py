@@ -35,6 +35,7 @@ class ContextAdapter:
         memory_manager: Any = None,
         context_engine: Any = None,
         tool_registry: Any = None,
+        linz_rule_resolver: Any = None,
         config: OSRuntimeConfig | dict[str, Any] | None = None,
         recent_limit: int = 20,
     ):
@@ -45,6 +46,7 @@ class ContextAdapter:
         self.memory_manager = memory_manager
         self.context_engine = context_engine
         self.tool_registry = tool_registry
+        self.linz_rule_resolver = linz_rule_resolver
         if isinstance(config, OSRuntimeConfig):
             self.config = config
         elif isinstance(config, dict):
@@ -151,6 +153,27 @@ class ContextAdapter:
             },
         )
 
+        linz_rule_context = self._linz_rule_context(
+            task_context=task_context,
+            agent_context=agent_context,
+            recent_events=event_items,
+            diagnostics=diagnostics,
+        )
+        if linz_rule_context:
+            task_context.metadata = {
+                **task_context.metadata,
+                "linz_rule_context": linz_rule_context,
+            }
+            try:
+                from agent.os_runtime.adapters.linz_rules import constraints_from_rule_context
+
+                task_context.constraints = sorted(
+                    set([*task_context.constraints, *constraints_from_rule_context(linz_rule_context)])
+                )
+                constraints = list(task_context.constraints)
+            except Exception as exc:
+                diagnostics["errors"].append(f"linz_rule_constraints: {type(exc).__name__}: {exc}")
+
         diagnostics["constraint_count"] = len(task_context.constraints)
         return ContextSnapshot(
             task_context=task_context,
@@ -161,6 +184,42 @@ class ContextAdapter:
             authorization_map=auth_map,
             relationships=relationship_dicts,
         )
+
+    def _linz_rule_context(
+        self,
+        *,
+        task_context: TaskContextView,
+        agent_context: AgentContextView,
+        recent_events: list[Any],
+        diagnostics: dict[str, Any],
+    ) -> dict[str, Any]:
+        if not self.config.enabled:
+            return {}
+        resolver = self.linz_rule_resolver
+        if resolver is None:
+            try:
+                from agent.os_runtime.adapters.linz_rules import LinzRuleContextResolver
+
+                resolver = LinzRuleContextResolver()
+            except Exception as exc:
+                diagnostics["errors"].append(f"linz_rule_resolver: {type(exc).__name__}: {exc}")
+                return {}
+        try:
+            snapshot = ContextSnapshot(
+                task_context=task_context,
+                agent_context=agent_context,
+                recent_events=recent_events,
+                constraints=task_context.constraints,
+                diagnostics=diagnostics,
+            )
+            resolution = resolver.resolve(snapshot, events=recent_events)
+            data = resolution.to_dict() if hasattr(resolution, "to_dict") else dict(resolution or {})
+            if data.get("status") == "skipped" and not data.get("context", {}).get("event_ids"):
+                return {}
+            return data
+        except Exception as exc:
+            diagnostics["errors"].append(f"linz_rule_resolver: {type(exc).__name__}: {exc}")
+            return {}
 
     def _recent_events(
         self,

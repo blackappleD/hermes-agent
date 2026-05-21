@@ -58,7 +58,7 @@ class SelfPromptCompiler:
         explanation = _coerce_explanation(tension_explanation)
         potential = action_potential or ActionPotential()
         tools = _dedupe([*(available_tools or []), *task.tool_names, *agent.active_tools])
-        merged_constraints = _dedupe([*(constraints or []), *task.constraints])
+        merged_constraints = _dedupe([*(constraints or []), *task.constraints, *_linz_rule_constraints(task)])
         if not action_potential:
             merged_constraints.append("action potential unavailable: using neutral defaults")
         fail_closed = _fail_closed_constraints(merged_constraints, environment_state)
@@ -296,6 +296,66 @@ def _fail_closed_constraints(
     if "high risk" in text or "risk=high" in text:
         constraints_out.append("fail-closed: high risk requires approval")
     return constraints_out
+
+
+def _linz_rule_constraints(task: TaskContextView) -> list[str]:
+    metadata = task.metadata if isinstance(task.metadata, dict) else {}
+    rule = metadata.get("linz_rule_context")
+    if not isinstance(rule, dict) or not rule:
+        return []
+    lines: list[str] = []
+    if rule.get("authoritative"):
+        sections = [
+            str(item.get("section_id") or "")
+            for item in rule.get("matched_sections") or []
+            if isinstance(item, dict) and item.get("section_id")
+        ]
+        phase = str(rule.get("phase") or "unknown")
+        confidence = str(rule.get("confidence") or "unknown")
+        summary = str(rule.get("summary") or "").strip()
+        head = f"linz_rule_context: phase={phase}; confidence={confidence}"
+        if sections:
+            head += f"; sections={','.join(sections[:5])}"
+        lines.append(head)
+        if summary:
+            lines.append(f"linz_rule_summary: {_clamp_rule_text(summary)}")
+        required = _string_list(rule.get("required_fields"))
+        if required:
+            lines.append(f"linz_rule_required_fields: {', '.join(required[:12])}")
+        missing = _string_list(rule.get("missing_fields"))
+        if missing:
+            lines.append(f"linz_rule_missing_fields: {', '.join(missing[:12])}")
+        forbidden = _string_list(rule.get("forbidden"))
+        if forbidden:
+            lines.append(f"linz_rule_forbidden: {'; '.join(forbidden[:8])}")
+        next_steps = _string_list(rule.get("next_steps"))
+        if next_steps:
+            lines.append(f"linz_rule_next_steps: {'; '.join(next_steps[:5])}")
+        if rule.get("approval_required"):
+            lines.append("linz_rule_approval_required: true")
+        return lines
+    if rule.get("status") == "unmatched":
+        return ["linz_rule_context: no authoritative structured match; ask for missing world identifiers before side effects"]
+    return []
+
+
+def _string_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        values = [value]
+    elif isinstance(value, (list, tuple, set)):
+        values = list(value)
+    else:
+        values = [value]
+    return _dedupe([str(item) for item in values if str(item or "").strip()])
+
+
+def _clamp_rule_text(text: str, max_chars: int = 500) -> str:
+    text = str(text or "").strip()
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 16].rstrip() + "... [truncated]"
 
 
 def _strongest_tension(tensions: TensionSet) -> Tension | None:

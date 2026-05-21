@@ -383,6 +383,16 @@ class SignalInterpreter:
         auth_meta = _auth_metadata(task_context, agent_context)
         if auth_meta.get("state", AuthState.UNKNOWN.value) != AuthState.CURRENT.value:
             constraints.append(f"world_authorization_{auth_meta.get('state', AuthState.UNKNOWN.value)}")
+        rule_context = task_context.metadata.get("linz_rule_context", {}) if isinstance(task_context.metadata, dict) else {}
+        if isinstance(rule_context, dict) and rule_context:
+            if rule_context.get("status") == "unmatched":
+                constraints.append("linz_rule_no_authoritative_match")
+            if rule_context.get("approval_required"):
+                constraints.append("linz_rule_approval_required")
+            for field_name in rule_context.get("missing_fields") or []:
+                constraints.append(f"linz_rule_missing_field:{field_name}")
+            for forbidden in (rule_context.get("forbidden") or [])[:12]:
+                constraints.append(f"linz_rule_forbidden:{forbidden}")
         return [
             _signal(
                 f"constraint_{constraint}",
